@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ArrowLeft, Check, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Store } from 'lucide-react'
 import { supabase } from './lib/supabase'
+import { getCurrentProfile } from './lib/database'
 
 function Brand({ inverted = false }) {
   return <a href="/" className="inline-flex items-center gap-3" aria-label="SmartPOS">
@@ -39,8 +40,15 @@ export default function LoginPage() {
       setAuthError(error.message === 'Invalid login credentials' ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : error.message)
       return
     }
-    setMessage('เข้าสู่ระบบสำเร็จ กำลังพาคุณไปยังหน้าจัดการร้าน…')
-    window.setTimeout(() => { window.location.href = '/admin' }, 600)
+    setMessage('เข้าสู่ระบบสำเร็จ กำลังพาคุณไปยังหน้าหลัก…')
+    let destination = '/'
+    try {
+      const { profile } = await getCurrentProfile()
+      if (profile?.role === 'super_admin') destination = '/admin'
+    } catch {
+      destination = '/'
+    }
+    window.setTimeout(() => { window.location.href = destination }, 600)
   }
 
   const loginWithGoogle = async () => {

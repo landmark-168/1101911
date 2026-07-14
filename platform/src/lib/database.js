@@ -56,3 +56,16 @@ export async function requireSession() {
   const { data:{ session } } = await supabase.auth.getSession()
   return session
 }
+
+export async function getCurrentProfile() {
+  const session = await requireSession()
+  if (!session) return { session:null, profile:null }
+  const { data:profile, error } = await supabase.from('profiles').select('id,email,full_name,role').eq('id', session.user.id).maybeSingle()
+  if (error) throw error
+  return { session, profile }
+}
+
+export async function requireSuperAdmin() {
+  const { session, profile } = await getCurrentProfile()
+  return { session, profile, allowed:profile?.role === 'super_admin' }
+}

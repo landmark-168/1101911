@@ -8,7 +8,7 @@ import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { fetchAdminDashboard, requireSession } from './lib/database'
+import { fetchAdminDashboard, requireSuperAdmin } from './lib/database'
 
 const navItems = [
   ['Dashboard', LayoutDashboard], ['ร้านค้า', Store], ['แพ็กเกจ', Package],
@@ -85,7 +85,10 @@ export default function AdminDashboard() {
   const [newStoresData, setNewStoresData] = useState([])
   const [recentStores, setRecentStores] = useState([])
   const [dbError, setDbError] = useState('')
-  useEffect(()=>{let live=true;(async()=>{try{const session=await requireSession();if(!session){window.location.href='/login';return}const data=await fetchAdminDashboard();if(!live)return;setRevenueData(data.revenue);setNewStoresData(data.newStores);setRecentStores(data.recent.map((s,i)=>({...s,plan:s.package,date:s.created,color:['bg-amber-100 text-amber-700','bg-emerald-100 text-emerald-700','bg-sky-100 text-sky-700','bg-pink-100 text-pink-700','bg-orange-100 text-orange-700'][i]})));setCards([{...defaultCards[0],value:Number(data.stats.stores||0).toLocaleString()},{...defaultCards[1],value:`฿${Number(data.stats.revenue||0).toLocaleString()}`},{...defaultCards[2],value:Number(data.stats.users||0).toLocaleString()},{...defaultCards[3],value:Number(data.stats.subscriptions||0).toLocaleString()}])}catch(error){if(live)setDbError(error.message)}})();return()=>{live=false}},[])
+  const [authorizing, setAuthorizing] = useState(true)
+  useEffect(()=>{let live=true;(async()=>{try{const auth=await requireSuperAdmin();if(!auth.session){window.location.replace('/login');return}if(!auth.allowed){window.location.replace('/');return}const data=await fetchAdminDashboard();if(!live)return;setRevenueData(data.revenue);setNewStoresData(data.newStores);setRecentStores(data.recent.map((s,i)=>({...s,plan:s.package,date:s.created,color:['bg-amber-100 text-amber-700','bg-emerald-100 text-emerald-700','bg-sky-100 text-sky-700','bg-pink-100 text-pink-700','bg-orange-100 text-orange-700'][i]})));setCards([{...defaultCards[0],value:Number(data.stats.stores||0).toLocaleString()},{...defaultCards[1],value:`฿${Number(data.stats.revenue||0).toLocaleString()}`},{...defaultCards[2],value:Number(data.stats.users||0).toLocaleString()},{...defaultCards[3],value:Number(data.stats.subscriptions||0).toLocaleString()}])}catch(error){if(live)setDbError(error.message)}finally{if(live)setAuthorizing(false)}})();return()=>{live=false}},[])
+
+  if (authorizing) return <div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังตรวจสอบสิทธิ์…</div>
 
   return <div className="min-h-screen bg-[#f7f7f8] text-zinc-950">
     <Sidebar open={sidebarOpen} onClose={()=>setSidebarOpen(false)} active={active} setActive={setActive}/>
