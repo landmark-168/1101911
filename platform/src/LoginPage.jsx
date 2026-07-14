@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: '', password: '', remember: false })
   const [touched, setTouched] = useState({})
   const [showPassword, setShowPassword] = useState(false)
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(() => new URLSearchParams(window.location.search).get('registered') === '1' ? 'สมัครร้านสำเร็จแล้ว กรุณาเข้าสู่ระบบ' : '')
   const [authError, setAuthError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -41,7 +41,8 @@ export default function LoginPage() {
       return
     }
     setMessage('เข้าสู่ระบบสำเร็จ กำลังพาคุณไปยังหน้าหลัก…')
-    let destination = '/'
+    const requestedNext = new URLSearchParams(window.location.search).get('next')
+    let destination = requestedNext?.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/'
     try {
       const { profile } = await getCurrentProfile()
       if (profile?.role === 'super_admin') destination = '/admin'

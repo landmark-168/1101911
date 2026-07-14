@@ -17,7 +17,7 @@ const provinces = [
   'หนองบัวลำภู', 'อ่างทอง', 'อำนาจเจริญ', 'อุดรธานี', 'อุตรดิตถ์', 'อุทัยธานี', 'อุบลราชธานี',
 ]
 
-const initialForm = { shopName: '', shopType: '', phone: '', email: '', password: '', confirmPassword: '', province: '', address: '', accepted: false }
+const initialForm = { fullName: '', shopName: '', shopType: '', phone: '', email: '', password: '', confirmPassword: '', province: '', address: '', latitude: '13.7563', longitude: '100.5018', accepted: false }
 
 function Brand({ inverted = false }) {
   return <a href="/" className="inline-flex items-center gap-3" aria-label="SmartPOS">
@@ -47,9 +47,11 @@ export default function RegisterPage() {
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [locating, setLocating] = useState(false)
   const fileRef = useRef(null)
 
   const validate = (data = form) => ({
+    fullName: !data.fullName.trim() ? 'กรุณากรอกชื่อ–นามสกุล' : data.fullName.trim().length < 4 ? 'กรุณากรอกชื่อ–นามสกุลให้ครบถ้วน' : '',
     shopName: !data.shopName.trim() ? 'กรุณากรอกชื่อร้าน' : data.shopName.trim().length < 2 ? 'ชื่อร้านต้องมีอย่างน้อย 2 ตัวอักษร' : '',
     shopType: !data.shopType ? 'กรุณาเลือกประเภทร้าน' : '',
     phone: !data.phone ? 'กรุณากรอกเบอร์โทรศัพท์' : !/^0\d{8,9}$/.test(data.phone.replace(/[-\s]/g, '')) ? 'กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง' : '',
@@ -63,6 +65,16 @@ export default function RegisterPage() {
   const errors = validate()
   const inputClass = (name, extra = '') => `h-12 w-full rounded-xl border bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:ring-4 ${errors[name] && touched[name] ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-zinc-200 hover:border-zinc-300 focus:border-orange-400 focus:ring-orange-100'} ${extra}`
   const update = (name, value) => setForm(prev => ({ ...prev, [name]: value }))
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) { setSubmitError('เบราว์เซอร์นี้ไม่รองรับการระบุตำแหน่ง'); return }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      position => { setForm(prev => ({ ...prev, latitude:position.coords.latitude.toFixed(6), longitude:position.coords.longitude.toFixed(6) })); setLocating(false); setSubmitError('') },
+      () => { setLocating(false); setSubmitError('ไม่สามารถอ่านตำแหน่งได้ กรุณาอนุญาต Location หรือกรอกพิกัดเอง') },
+      { enableHighAccuracy:true, timeout:10000 },
+    )
+  }
 
   const handleLogo = e => {
     const file = e.target.files?.[0]
@@ -90,8 +102,7 @@ export default function RegisterPage() {
       email: form.email,
       password: form.password,
       options: {
-        emailRedirectTo: `${window.location.origin}/login`,
-        data: { shop_name: form.shopName, shop_type: form.shopType, phone: form.phone, province: form.province, address: form.address, role: 'shop_owner' },
+        data: { full_name: form.fullName, shop_name: form.shopName, shop_type: form.shopType, phone: form.phone, province: form.province, address: form.address, latitude: Number(form.latitude), longitude: Number(form.longitude), role: 'shop_owner' },
       },
     })
     setSubmitting(false)
@@ -103,16 +114,15 @@ export default function RegisterPage() {
       setSubmitError('ไม่สามารถสร้างบัญชีได้ กรุณาลองใหม่อีกครั้ง')
       return
     }
-    setSubmitted(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    window.location.href = '/login?registered=1'
   }
 
   if (submitted) return <main className="grid min-h-screen place-items-center bg-[#fffaf5] px-5">
     <div className="w-full max-w-md rounded-[28px] border border-orange-100 bg-white p-8 text-center shadow-[0_24px_80px_rgba(249,115,22,.12)]">
       <span className="mx-auto grid size-16 place-items-center rounded-full bg-emerald-100 text-emerald-600"><Check size={32} strokeWidth={3}/></span>
       <h1 className="mt-6 text-2xl font-black">สมัครร้านสำเร็จ!</h1>
-      <p className="mt-3 leading-7 text-zinc-500">เราได้รับข้อมูลของ <b className="text-zinc-800">{form.shopName}</b> แล้ว กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี</p>
-      <button onClick={() => { setSubmitted(false); setTouched({}) }} className="mt-7 h-12 w-full rounded-xl bg-zinc-950 font-bold text-white transition hover:bg-zinc-800">กลับไปแก้ไขข้อมูล</button>
+      <p className="mt-3 leading-7 text-zinc-500">บัญชีของ <b className="text-zinc-800">{form.shopName}</b> พร้อมใช้งานแล้ว</p>
+      <button onClick={() => { window.location.href = '/login' }} className="mt-7 h-12 w-full rounded-xl bg-zinc-950 font-bold text-white transition hover:bg-zinc-800">ไปหน้าเข้าสู่ระบบ</button>
     </div>
   </main>
 
@@ -150,6 +160,7 @@ export default function RegisterPage() {
             <section className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm sm:p-7">
               <div className="flex items-center gap-3 border-b border-zinc-100 pb-5"><span className="grid size-9 place-items-center rounded-xl bg-orange-100 text-orange-600"><Store size={18}/></span><div><h3 className="font-extrabold">ข้อมูลร้านค้า</h3><p className="mt-0.5 text-xs text-zinc-400">ข้อมูลพื้นฐานสำหรับแสดงในระบบ</p></div></div>
               <div className="mt-6 space-y-5">
+                <Field label="ชื่อ–นามสกุลเจ้าของร้าน" required error={touched.fullName && errors.fullName}><input value={form.fullName} onChange={e=>update('fullName',e.target.value)} onBlur={()=>setTouched(p=>({...p,fullName:true}))} className={inputClass('fullName')} placeholder="เช่น สมชาย ใจดี" autoComplete="name" aria-invalid={!!(touched.fullName && errors.fullName)}/></Field>
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-zinc-800">โลโก้ร้าน <span className="font-normal text-zinc-400">(ไม่บังคับ)</span></label>
                   <div className="flex items-center gap-4">
@@ -186,6 +197,12 @@ export default function RegisterPage() {
               <div className="mt-6 space-y-5">
                 <Field label="จังหวัด" required error={touched.province && errors.province}><select value={form.province} onChange={e=>update('province',e.target.value)} onBlur={()=>setTouched(p=>({...p,province:true}))} className={inputClass('province','appearance-none pr-10')} aria-invalid={!!(touched.province && errors.province)}><option value="">เลือกจังหวัด</option>{provinces.map(x=><option key={x}>{x}</option>)}</select><ChevronDown size={17} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400"/></Field>
                 <Field label="ที่อยู่" required error={touched.address && errors.address}><textarea value={form.address} onChange={e=>update('address',e.target.value)} onBlur={()=>setTouched(p=>({...p,address:true}))} className={`${inputClass('address')} min-h-24 resize-y py-3`} placeholder="บ้านเลขที่ อาคาร ถนน แขวง/ตำบล เขต/อำเภอ และรหัสไปรษณีย์" aria-invalid={!!(touched.address && errors.address)}/></Field>
+                <div>
+                  <div className="flex items-center justify-between gap-3"><label className="text-sm font-semibold text-zinc-800">ตำแหน่งร้านบนแผนที่</label><button type="button" onClick={useCurrentLocation} disabled={locating} className="inline-flex h-9 items-center gap-2 rounded-lg bg-orange-100 px-3 text-xs font-bold text-orange-700 transition hover:bg-orange-200 disabled:opacity-60"><MapPin size={14}/>{locating?'กำลังค้นหา…':'ใช้ตำแหน่งปัจจุบัน'}</button></div>
+                  <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100"><iframe title="ตำแหน่งร้านบนแผนที่" src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(form.longitude)-0.01}%2C${Number(form.latitude)-0.007}%2C${Number(form.longitude)+0.01}%2C${Number(form.latitude)+0.007}&layer=mapnik&marker=${form.latitude}%2C${form.longitude}`} className="h-56 w-full border-0" loading="lazy"/></div>
+                  <div className="mt-3 grid grid-cols-2 gap-3"><div><label className="mb-1.5 block text-xs font-semibold text-zinc-500">Latitude</label><input type="number" step="any" value={form.latitude} onChange={e=>update('latitude',e.target.value)} className={inputClass('latitude')} aria-label="Latitude"/></div><div><label className="mb-1.5 block text-xs font-semibold text-zinc-500">Longitude</label><input type="number" step="any" value={form.longitude} onChange={e=>update('longitude',e.target.value)} className={inputClass('longitude')} aria-label="Longitude"/></div></div>
+                  <p className="mt-2 text-xs leading-5 text-zinc-400">กดใช้ตำแหน่งปัจจุบัน หรือกรอกพิกัดเพื่อกำหนดจุดร้านให้แม่นยำ</p>
+                </div>
               </div>
             </section>
 
