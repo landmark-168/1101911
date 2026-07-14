@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   BarChart3, Bell, ChevronDown, ChevronRight, CircleDollarSign, CreditCard,
   LayoutDashboard, Menu, Package, Search, Settings, ShieldCheck, Store,
@@ -8,6 +8,7 @@ import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from 'recharts'
+import { fetchAdminDashboard, requireSession } from './lib/database'
 
 const navItems = [
   ['Dashboard', LayoutDashboard], ['ร้านค้า', Store], ['แพ็กเกจ', Package],
@@ -36,7 +37,7 @@ const recentStores = [
   { name: 'อิ่มอร่อย ชาบู', owner: 'ธนกร ศรีทอง', plan: 'Starter', date: '13 ธ.ค. 2026', status: 'Inactive', color: 'bg-orange-100 text-orange-700' },
 ]
 
-const cards = [
+const defaultCards = [
   { label: 'จำนวนร้านทั้งหมด', value: '2,847', change: '+12.5%', detail: 'เทียบเดือนที่ผ่านมา', icon: Store, tone: 'orange' },
   { label: 'รายได้รวม', value: '฿12.48M', change: '+18.2%', detail: 'รายได้เดือนนี้', icon: WalletCards, tone: 'emerald' },
   { label: 'ผู้ใช้งานทั้งหมด', value: '18,392', change: '+8.4%', detail: 'ผู้ใช้งาน Active', icon: Users, tone: 'violet' },
@@ -79,6 +80,12 @@ export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [active, setActive] = useState('Dashboard')
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [cards, setCards] = useState(defaultCards)
+  const [revenueData, setRevenueData] = useState([])
+  const [newStoresData, setNewStoresData] = useState([])
+  const [recentStores, setRecentStores] = useState([])
+  const [dbError, setDbError] = useState('')
+  useEffect(()=>{let live=true;(async()=>{try{const session=await requireSession();if(!session){window.location.href='/login';return}const data=await fetchAdminDashboard();if(!live)return;setRevenueData(data.revenue);setNewStoresData(data.newStores);setRecentStores(data.recent.map((s,i)=>({...s,plan:s.package,date:s.created,color:['bg-amber-100 text-amber-700','bg-emerald-100 text-emerald-700','bg-sky-100 text-sky-700','bg-pink-100 text-pink-700','bg-orange-100 text-orange-700'][i]})));setCards([{...defaultCards[0],value:Number(data.stats.stores||0).toLocaleString()},{...defaultCards[1],value:`฿${Number(data.stats.revenue||0).toLocaleString()}`},{...defaultCards[2],value:Number(data.stats.users||0).toLocaleString()},{...defaultCards[3],value:Number(data.stats.subscriptions||0).toLocaleString()}])}catch(error){if(live)setDbError(error.message)}})();return()=>{live=false}},[])
 
   return <div className="min-h-screen bg-[#f7f7f8] text-zinc-950">
     <Sidebar open={sidebarOpen} onClose={()=>setSidebarOpen(false)} active={active} setActive={setActive}/>
