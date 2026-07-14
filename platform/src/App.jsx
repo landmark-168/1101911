@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import {
   ArrowRight, BarChart3, Bell, Check, ChefHat, ChevronRight,
   CircleDollarSign, Menu, PackageCheck, QrCode, ShoppingBag,
@@ -9,6 +9,8 @@ import { Card } from './components/ui/card'
 import RegisterPage from './RegisterPage'
 import LoginPage from './LoginPage'
 import PricingPage from './PricingPage'
+const AdminDashboard = lazy(() => import('./AdminDashboard'))
+const StoreManagement = lazy(() => import('./StoreManagement'))
 
 const features = [
   { icon: CircleDollarSign, label: 'POS', title: 'ขายง่าย หน้าร้านลื่นไหล', description: 'รับออเดอร์ ชำระเงิน และจัดการโต๊ะในหน้าจอเดียว ใช้งานง่ายแม้ช่วงร้านแน่น', stat: 'เร็วขึ้น 2×', tone: 'orange' },
@@ -108,5 +110,7 @@ export default function App() {
   if (window.location.pathname === '/register') return <RegisterPage />
   if (window.location.pathname === '/login') return <LoginPage />
   if (window.location.pathname === '/pricing') return <PricingPage />
+  if (window.location.pathname === '/admin') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลด Dashboard…</div>}><AdminDashboard /></Suspense>
+  if (window.location.pathname === '/admin/stores') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลดร้านค้า…</div>}><StoreManagement /></Suspense>
   return <LandingPage />
 }

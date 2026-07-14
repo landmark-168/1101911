@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ArrowLeft, Check, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Store } from 'lucide-react'
+import { supabase } from './lib/supabase'
 
 function Brand({ inverted = false }) {
   return <a href="/" className="inline-flex items-center gap-3" aria-label="SmartPOS">
@@ -13,6 +14,8 @@ export default function LoginPage() {
   const [touched, setTouched] = useState({})
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const errors = {
     email: !form.email ? 'กรุณากรอกอีเมล' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) ? 'รูปแบบอีเมลไม่ถูกต้อง' : '',
@@ -21,14 +24,39 @@ export default function LoginPage() {
   const update = (name, value) => setForm(prev => ({ ...prev, [name]: value }))
   const inputClass = name => `h-13 w-full rounded-xl border bg-white pl-11 pr-11 text-sm outline-none transition placeholder:text-zinc-400 focus:ring-4 ${errors[name] && touched[name] ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-zinc-200 hover:border-zinc-300 focus:border-orange-400 focus:ring-orange-100'}`
 
-  const submit = e => {
+  const submit = async e => {
     e.preventDefault()
     setTouched({ email: true, password: true })
     if (errors.email || errors.password) {
       document.querySelector('[aria-invalid="true"]')?.focus()
       return
     }
+    setLoading(true)
+    setAuthError('')
+    const { error } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password })
+    setLoading(false)
+    if (error) {
+      setAuthError(error.message === 'Invalid login credentials' ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : error.message)
+      return
+    }
     setMessage('เข้าสู่ระบบสำเร็จ กำลังพาคุณไปยังหน้าจัดการร้าน…')
+    window.setTimeout(() => { window.location.href = '/admin' }, 600)
+  }
+
+  const loginWithGoogle = async () => {
+    setAuthError('')
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/admin` } })
+    if (error) setAuthError(error.message)
+  }
+
+  const forgotPassword = async e => {
+    e.preventDefault()
+    if (!form.email || errors.email) { setTouched(p => ({ ...p, email: true })); setAuthError('กรุณากรอกอีเมลที่ถูกต้องก่อนขอรีเซ็ตรหัสผ่าน'); return }
+    setLoading(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(form.email, { redirectTo: `${window.location.origin}/login` })
+    setLoading(false)
+    if (error) setAuthError(error.message)
+    else { setAuthError(''); setMessage('ส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลแล้ว') }
   }
 
   return <div className="min-h-screen bg-[#fffaf5] text-zinc-950">
@@ -66,18 +94,19 @@ export default function LoginPage() {
               {touched.email && errors.email && <p className="mt-1.5 text-xs font-medium text-red-500">{errors.email}</p>}
             </div>
             <div>
-              <div className="mb-2 flex items-center justify-between"><label htmlFor="password" className="text-sm font-semibold">รหัสผ่าน</label><a href="#forgot-password" className="text-xs font-bold text-orange-600 transition hover:text-orange-700">ลืมรหัสผ่าน?</a></div>
+              <div className="mb-2 flex items-center justify-between"><label htmlFor="password" className="text-sm font-semibold">รหัสผ่าน</label><button type="button" onClick={forgotPassword} className="text-xs font-bold text-orange-600 transition hover:text-orange-700">ลืมรหัสผ่าน?</button></div>
               <div className="relative"><LockKeyhole size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400"/><input id="password" type={showPassword?'text':'password'} autoComplete="current-password" value={form.password} onChange={e=>update('password',e.target.value)} onBlur={()=>setTouched(p=>({...p,password:true}))} className={inputClass('password')} placeholder="กรอกรหัสผ่าน" aria-invalid={!!(touched.password && errors.password)}/><button type="button" onClick={()=>setShowPassword(!showPassword)} className="absolute right-3 top-1/2 grid size-8 -translate-y-1/2 place-items-center text-zinc-400 transition hover:text-zinc-700" aria-label={showPassword?'ซ่อนรหัสผ่าน':'แสดงรหัสผ่าน'}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></div>
               {touched.password && errors.password && <p className="mt-1.5 text-xs font-medium text-red-500">{errors.password}</p>}
             </div>
 
             <label className="inline-flex cursor-pointer items-center gap-2.5 text-sm text-zinc-600"><input type="checkbox" checked={form.remember} onChange={e=>update('remember',e.target.checked)} className="sr-only"/><span className={`grid size-5 place-items-center rounded border transition ${form.remember?'border-orange-500 bg-orange-500 text-white':'border-zinc-300 bg-white'}`}>{form.remember&&<Check size={14} strokeWidth={3}/>}</span>จดจำการเข้าสู่ระบบ</label>
             {message && <p role="status" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">{message}</p>}
-            <button type="submit" className="h-13 w-full rounded-xl bg-orange-500 text-base font-extrabold text-white shadow-lg shadow-orange-500/20 transition hover:-translate-y-0.5 hover:bg-orange-600 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-orange-200 active:translate-y-0">เข้าสู่ระบบ</button>
+            {authError && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{authError}</p>}
+            <button type="submit" disabled={loading} className="h-13 w-full rounded-xl bg-orange-500 text-base font-extrabold text-white shadow-lg shadow-orange-500/20 transition hover:-translate-y-0.5 hover:bg-orange-600 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-orange-200 active:translate-y-0 disabled:cursor-wait disabled:opacity-60">{loading?'กำลังดำเนินการ…':'เข้าสู่ระบบ'}</button>
           </form>
 
           <div className="my-7 flex items-center gap-4"><span className="h-px flex-1 bg-zinc-200"/><span className="text-xs text-zinc-400">หรือเข้าสู่ระบบด้วย</span><span className="h-px flex-1 bg-zinc-200"/></div>
-          <button type="button" className="flex h-13 w-full items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white text-sm font-bold transition hover:border-zinc-300 hover:bg-zinc-50">
+          <button type="button" onClick={loginWithGoogle} className="flex h-13 w-full items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-white text-sm font-bold transition hover:border-zinc-300 hover:bg-zinc-50">
             <svg className="size-5" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z"/><path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z"/><path fill="#FBBC05" d="M6.39 13.93A6 6 0 0 1 6.08 12c0-.67.12-1.32.31-1.93V7.45H3.04A10 10 0 0 0 2 12c0 1.61.39 3.14 1.04 4.55l3.35-2.62Z"/><path fill="#EA4335" d="M12 5.94c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.96 5.45l3.35 2.62C7.18 7.7 9.39 5.94 12 5.94Z"/></svg>
             เข้าสู่ระบบด้วย Google
           </button>

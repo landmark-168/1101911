@@ -3,6 +3,7 @@ import {
   ArrowLeft, Check, ChevronDown, Eye, EyeOff, ImagePlus,
   LockKeyhole, Mail, MapPin, Phone, ShieldCheck, Store, Upload, X,
 } from 'lucide-react'
+import { supabase } from './lib/supabase'
 
 const shopTypes = ['ร้านอาหาร', 'คาเฟ่ / ร้านกาแฟ', 'เบเกอรี', 'ฟู้ดทรัก', 'ร้านเครื่องดื่ม', 'ร้านค้าปลีก', 'อื่น ๆ']
 const provinces = [
@@ -44,6 +45,8 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const fileRef = useRef(null)
 
   const validate = (data = form) => ({
@@ -74,11 +77,30 @@ export default function RegisterPage() {
     reader.readAsDataURL(file)
   }
 
-  const handleSubmit = e => {
+  const handleSubmit = async e => {
     e.preventDefault()
     setTouched(Object.fromEntries(Object.keys(initialForm).map(key => [key, true])))
     if (Object.values(validate()).some(Boolean)) {
       document.querySelector('[aria-invalid="true"]')?.focus()
+      return
+    }
+    setSubmitting(true)
+    setSubmitError('')
+    const { data, error } = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/login`,
+        data: { shop_name: form.shopName, shop_type: form.shopType, phone: form.phone, province: form.province, address: form.address, role: 'shop_owner' },
+      },
+    })
+    setSubmitting(false)
+    if (error) {
+      setSubmitError(error.message)
+      return
+    }
+    if (!data.user) {
+      setSubmitError('ไม่สามารถสร้างบัญชีได้ กรุณาลองใหม่อีกครั้ง')
       return
     }
     setSubmitted(true)
@@ -176,7 +198,8 @@ export default function RegisterPage() {
               {touched.accepted && errors.accepted && <p className="ml-9 mt-1 text-xs font-medium text-red-500">{errors.accepted}</p>}
             </div>
 
-            <button type="submit" className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-orange-500 text-base font-extrabold text-white shadow-lg shadow-orange-500/20 transition hover:-translate-y-0.5 hover:bg-orange-600 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-orange-200 active:translate-y-0">สมัครร้าน <Store size={18}/></button>
+            {submitError && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{submitError}</p>}
+            <button type="submit" disabled={submitting} className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-orange-500 text-base font-extrabold text-white shadow-lg shadow-orange-500/20 transition hover:-translate-y-0.5 hover:bg-orange-600 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-orange-200 active:translate-y-0 disabled:cursor-wait disabled:opacity-60">{submitting?'กำลังสร้างบัญชี…':<>สมัครร้าน <Store size={18}/></>}</button>
             <p className="text-center text-xs text-zinc-400 sm:hidden">มีบัญชีอยู่แล้ว? <a href="/login" className="font-bold text-orange-600">เข้าสู่ระบบ</a></p>
           </form>
         </div>
