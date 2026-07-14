@@ -1,0 +1,46 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700;800;900&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Noto Sans Thai", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Playfair Display", serif;
+  --color-ink: #241c15;
+  --color-paper: #f6eedc;
+  --color-soft: #fffaf0;
+  --color-coal: #171310;
+  --color-ember: #ff5b24;
+  --color-deep: #c8380f;
+  --color-copper: #c98a46;
+  --color-smoke: #796f60;
+  --color-line: #ded1b9;
+}
+
+html { scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; font-family: var(--font-sans); background: var(--color-paper); color: var(--color-ink); }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
+::selection { background: #ded1b9; color: #241c15; }
+
+/* Custom styles for Toast and scrollbar */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: var(--color-coal);
+  color: var(--color-paper);
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.toast.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
