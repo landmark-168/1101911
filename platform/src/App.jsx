@@ -6,6 +6,9 @@ import {
 } from 'lucide-react'
 import { Button } from './components/ui/button'
 import { Card } from './components/ui/card'
+import RegisterPage from './RegisterPage'
+import LoginPage from './LoginPage'
+import PricingPage from './PricingPage'
 
 const features = [
   { icon: CircleDollarSign, label: 'POS', title: 'ขายง่าย หน้าร้านลื่นไหล', description: 'รับออเดอร์ ชำระเงิน และจัดการโต๊ะในหน้าจอเดียว ใช้งานง่ายแม้ช่วงร้านแน่น', stat: 'เร็วขึ้น 2×', tone: 'orange' },
@@ -58,18 +61,18 @@ function DashboardMockup() {
   )
 }
 
-export default function App() {
+function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
   const scrollTo = id => { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); setMenuOpen(false) }
   return <div className="min-h-screen overflow-hidden bg-[#fffdf9] text-zinc-950">
     <nav className="fixed inset-x-0 top-0 z-50 border-b border-zinc-200/60 bg-white/75 backdrop-blur-xl">
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8">
         <Logo />
-        <div className="hidden items-center gap-8 md:flex">{[['home','Home'],['features','Features'],['pricing','Pricing'],['contact','Contact']].map(([id,label])=><button key={id} onClick={()=>scrollTo(id)} className="text-sm font-medium text-zinc-600 transition hover:text-orange-600">{label}</button>)}</div>
-        <div className="hidden items-center gap-2 md:flex"><Button variant="ghost" onClick={()=>scrollTo('contact')}>เข้าสู่ระบบ</Button><Button className="h-10 rounded-lg px-4" onClick={()=>scrollTo('cta')}>สมัครร้าน <ArrowRight size={15}/></Button></div>
+        <div className="hidden items-center gap-8 md:flex">{[['home','Home'],['features','Features'],['pricing','Pricing'],['contact','Contact']].map(([id,label])=><button key={id} onClick={()=>id==='pricing' ? window.location.href='/pricing' : scrollTo(id)} className="text-sm font-medium text-zinc-600 transition hover:text-orange-600">{label}</button>)}</div>
+        <div className="hidden items-center gap-2 md:flex"><Button variant="ghost" onClick={()=>{ window.location.href='/login' }}>เข้าสู่ระบบ</Button><Button className="h-10 rounded-lg px-4" onClick={()=>{ window.location.href='/register' }}>สมัครร้าน <ArrowRight size={15}/></Button></div>
         <button className="grid size-10 place-items-center rounded-xl border border-zinc-200 md:hidden" onClick={()=>setMenuOpen(!menuOpen)} aria-label="เปิดเมนู">{menuOpen?<X/>:<Menu/>}</button>
       </div>
-      {menuOpen && <div className="border-t border-zinc-100 bg-white p-5 md:hidden">{[['home','Home'],['features','Features'],['pricing','Pricing'],['contact','Contact']].map(([id,label])=><button key={id} onClick={()=>scrollTo(id)} className="block w-full border-b border-zinc-100 py-3 text-left font-medium">{label}</button>)}<Button className="mt-4 w-full" onClick={()=>scrollTo('cta')}>สมัครร้าน</Button></div>}
+      {menuOpen && <div className="border-t border-zinc-100 bg-white p-5 md:hidden">{[['home','Home'],['features','Features'],['pricing','Pricing'],['contact','Contact']].map(([id,label])=><button key={id} onClick={()=>id==='pricing' ? window.location.href='/pricing' : scrollTo(id)} className="block w-full border-b border-zinc-100 py-3 text-left font-medium">{label}</button>)}<div className="mt-4 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={()=>{ window.location.href='/login' }}>เข้าสู่ระบบ</Button><Button onClick={()=>{ window.location.href='/register' }}>สมัครร้าน</Button></div></div>}
     </nav>
 
     <main>
@@ -80,7 +83,7 @@ export default function App() {
             <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700"><Sparkles size={14}/> ระบบจัดการร้านอาหาร All-in-One</div>
             <h1 className="mt-7 text-4xl font-black leading-[1.15] tracking-[-.04em] sm:text-5xl lg:text-[62px]">ระบบ POS และ<br/><span className="relative text-orange-500">เว็บสั่งอาหาร<span className="absolute -bottom-1 left-0 h-2 w-full -rotate-1 rounded-full bg-orange-200/70 -z-10"/></span><br/>สำหรับร้านอาหาร<br/>ทุกประเภท</h1>
             <p className="mt-6 max-w-xl text-base leading-8 text-zinc-600 sm:text-lg">ขายหน้าร้าน สั่งผ่าน QR Code เดลิเวอรี จัดการสต็อก รายงานยอดขาย และแจ้งเตือนผ่าน LINE OA — ครบในระบบเดียว</p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row"><Button className="h-14 px-7 text-base" onClick={()=>scrollTo('cta')}>ทดลองใช้งานฟรี <ArrowRight size={18}/></Button><Button variant="secondary" className="h-14 px-7 text-base" onClick={()=>scrollTo('demo')}><Store size={18}/> ดูตัวอย่างร้านหมูกระทะ</Button></div>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row"><Button className="h-14 px-7 text-base" onClick={()=>{ window.location.href='/register' }}>ทดลองใช้งานฟรี <ArrowRight size={18}/></Button><Button variant="secondary" className="h-14 px-7 text-base" onClick={()=>scrollTo('demo')}><Store size={18}/> ดูตัวอย่างร้านหมูกระทะ</Button></div>
             <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-zinc-500">{['ฟรี 14 วัน','ไม่ต้องใช้บัตรเครดิต','พร้อมใช้ใน 5 นาที'].map(x=><span key={x} className="flex items-center gap-1.5"><Check size={14} className="text-orange-500"/>{x}</span>)}</div>
           </div>
           <div id="demo"><DashboardMockup/></div>
@@ -93,9 +96,17 @@ export default function App() {
 
       <section id="pricing" className="px-5 pb-24 lg:px-8"><div className="mx-auto max-w-7xl overflow-hidden rounded-[40px] bg-zinc-950 px-6 py-16 text-white sm:px-12 lg:px-16"><div className="grid items-center gap-10 lg:grid-cols-2"><div><p className="text-sm font-bold uppercase tracking-[.18em] text-orange-500">Built to grow</p><h2 className="mt-4 text-3xl font-black sm:text-5xl">เริ่มเล็ก แล้วเติบโต<br/>ไปพร้อมกับร้านคุณ</h2><p className="mt-5 max-w-lg leading-7 text-zinc-400">ไม่ว่าจะเป็นร้านแรกหรือหลายสิบสาขา SmartPOS ก็พร้อมช่วยให้ทุกออเดอร์เป็นเรื่องง่าย</p></div><div className="grid gap-3 sm:grid-cols-2">{[[PackageCheck,'สต็อกแม่นยำ'],[Bell,'แจ้งเตือน LINE OA'],[BarChart3,'รายงานเรียลไทม์'],[QrCode,'QR Menu พร้อมใช้']].map(([Icon,text])=><div key={text} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-4"><span className="grid size-10 place-items-center rounded-xl bg-orange-500/15 text-orange-500"><Icon size={19}/></span><span className="text-sm font-semibold">{text}</span></div>)}</div></div></div></section>
 
-      <section id="cta" className="px-5 pb-24 lg:px-8"><div className="relative mx-auto max-w-7xl overflow-hidden rounded-[40px] bg-orange-500 px-6 py-16 text-center text-white sm:px-12 lg:py-20"><div className="absolute -left-20 -top-20 size-72 rounded-full border-[40px] border-white/10"/><div className="absolute -bottom-28 -right-10 size-80 rounded-full border-[55px] border-zinc-950/10"/><div className="relative"><p className="text-sm font-bold uppercase tracking-[.18em] text-orange-100">พร้อมเปิดร้านให้ Smart ขึ้นหรือยัง?</p><h2 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl">เริ่มต้นใช้งานฟรี</h2><p className="mx-auto mt-5 max-w-xl text-orange-50">ทดลองทุกฟีเจอร์ฟรี 14 วัน ให้ทีมของเราช่วยตั้งค่าร้าน พร้อมเริ่มขายได้ทันที</p><Button className="mt-8 h-14 bg-zinc-950 px-8 text-base shadow-xl hover:bg-zinc-800">สมัครร้านของคุณ <ArrowRight size={18}/></Button></div></div></section>
+      <section id="cta" className="px-5 pb-24 lg:px-8"><div className="relative mx-auto max-w-7xl overflow-hidden rounded-[40px] bg-orange-500 px-6 py-16 text-center text-white sm:px-12 lg:py-20"><div className="absolute -left-20 -top-20 size-72 rounded-full border-[40px] border-white/10"/><div className="absolute -bottom-28 -right-10 size-80 rounded-full border-[55px] border-zinc-950/10"/><div className="relative"><p className="text-sm font-bold uppercase tracking-[.18em] text-orange-100">พร้อมเปิดร้านให้ Smart ขึ้นหรือยัง?</p><h2 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl">เริ่มต้นใช้งานฟรี</h2><p className="mx-auto mt-5 max-w-xl text-orange-50">ทดลองทุกฟีเจอร์ฟรี 14 วัน ให้ทีมของเราช่วยตั้งค่าร้าน พร้อมเริ่มขายได้ทันที</p><Button onClick={()=>{ window.location.href='/register' }} className="mt-8 h-14 bg-zinc-950 px-8 text-base shadow-xl hover:bg-zinc-800">สมัครร้านของคุณ <ArrowRight size={18}/></Button></div></div></section>
     </main>
 
     <footer id="contact" className="border-t border-zinc-200 bg-white px-5 py-10 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-7 md:flex-row"><div><Logo/><p className="mt-3 text-sm text-zinc-500">ให้ทุกเรื่องร้านอาหาร ง่ายในระบบเดียว</p></div><div className="flex flex-wrap justify-center gap-6 text-sm font-medium text-zinc-500"><a href="#features" className="hover:text-orange-500">Features</a><a href="#pricing" className="hover:text-orange-500">Pricing</a><a href="mailto:hello@smartpos.co" className="hover:text-orange-500">hello@smartpos.co</a><a href="tel:020000000" className="hover:text-orange-500">02-000-0000</a></div><p className="text-xs text-zinc-400">© 2026 SmartPOS</p></div></footer>
   </div>
+}
+
+
+export default function App() {
+  if (window.location.pathname === '/register') return <RegisterPage />
+  if (window.location.pathname === '/login') return <LoginPage />
+  if (window.location.pathname === '/pricing') return <PricingPage />
+  return <LandingPage />
 }
