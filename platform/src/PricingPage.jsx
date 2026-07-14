@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, Clock, LogOut, Minus, ShieldCheck, Sparkles, Store, UserCircle, Zap } from 'lucide-react'
-import { fetchCurrentUserSummary, signOut } from './lib/database'
+import { fetchCurrentUserSummary, fetchPackages, signOut } from './lib/database'
 
-const plans = [
+const defaultPlans = [
   {
     name: 'Starter', description: 'สำหรับร้านเล็กที่กำลังเริ่มต้น', monthly: 590, yearly: 472,
     features: ['1 สาขา', 'ผู้ใช้งาน 3 คน', 'POS และ QR Menu', 'รายงานยอดขายพื้นฐาน', 'ช่วยเหลือผ่านแชต'],
@@ -32,7 +32,8 @@ const comparisons = [
 ]
 
 function Brand() {
-  return <a href="/" className="inline-flex items-center gap-2.5" aria-label="SmartPOS Home"><span className="grid size-9 place-items-center rounded-xl bg-zinc-950 text-orange-500 shadow-lg"><Zap size={19} fill="currentColor"/></span><span className="text-xl font-extrabold tracking-tight">Smart<span className="text-orange-500">POS</span></span></a>
+  const settings=window.__smartposSettings, name=settings?.general?.system_name||'SmartPOS', logo=settings?.brand?.logo_url
+  return <a href="/" className="inline-flex items-center gap-2.5" aria-label={`${name} Home`}><span className="grid size-9 place-items-center overflow-hidden rounded-xl bg-zinc-950 text-orange-500 shadow-lg">{logo?<img src={logo} alt="" className="size-full object-cover"/>:<Zap size={19} fill="currentColor"/>}</span><span className="text-xl font-extrabold tracking-tight">{name}</span></a>
 }
 
 function Value({ value }) {
@@ -43,13 +44,15 @@ function Value({ value }) {
 
 export default function PricingPage() {
   const [yearly, setYearly] = useState(true)
+  const [plans, setPlans] = useState(defaultPlans)
   const [currentUser, setCurrentUser] = useState(null)
   const [loadingPlan, setLoadingPlan] = useState('')
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [now, setNow] = useState(Date.now())
-  useEffect(()=>{let live=true;fetchCurrentUserSummary().then(data=>{if(live)setCurrentUser(data)}).catch(()=>{});const timer=setInterval(()=>setNow(Date.now()),60000);return()=>{live=false;clearInterval(timer)}},[])
+  useEffect(()=>{let live=true;Promise.all([fetchCurrentUserSummary().catch(()=>null),fetchPackages()]).then(([user,rows])=>{if(!live)return;setCurrentUser(user);if(rows?.length)setPlans(rows.map((row,index)=>({id:row.id,name:row.name,description:row.description,monthly:Number(row.monthly_price),yearly:Number(row.yearly_price)/12,yearlyTotal:Number(row.yearly_price),duration:row.duration_days,features:row.features||[],button:row.name==='Enterprise'?'ติดต่อฝ่ายขาย':`Subscribe ${row.name}`,accent:row.name==='Business'||index===1})))}).catch(err=>setError(err.message));const timer=setInterval(()=>setNow(Date.now()),60000);return()=>{live=false;clearInterval(timer)}},[])
   const trialRemaining=(()=>{const end=currentUser?.subscription?.ends_at;if(!end)return null;const diff=Math.max(0,new Date(end).getTime()-now);return diff>0?`ทดลองเหลือ ${Math.floor(diff/86400000)} วัน ${Math.floor((diff%86400000)/3600000)} ชม.`:'หมดช่วงทดลองใช้ฟรีแล้ว'})()
+  const accountStatus=[currentUser?.subscription?.package||currentUser?.shop?.package,trialRemaining].filter(Boolean).join(' · ')||currentUser?.shop?.name||'บัญชีร้านค้า'
   const choosePlan=plan=>{if(plan.name==='Enterprise'){window.location.href='mailto:sales@smartpos.co';return}const target=`/checkout?plan=${plan.name}&billing=${yearly?'yearly':'monthly'}`;window.location.href=currentUser?target:`/login?next=${encodeURIComponent(target)}`}
 
   return <div className="min-h-screen bg-[#fffdf9] text-zinc-950">
@@ -57,7 +60,7 @@ export default function PricingPage() {
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8">
         <Brand/>
         <div className="hidden items-center gap-7 md:flex lg:gap-9"><a href="/" className="text-sm font-medium text-zinc-600 transition hover:text-orange-600">Home</a><a href="/#features" className="text-sm font-medium text-zinc-600 transition hover:text-orange-600">Features</a><a href="/pricing" className="relative text-sm font-bold text-orange-600">Pricing<span className="absolute -bottom-2 left-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-orange-500"/></a><a href="/#contact" className="text-sm font-medium text-zinc-600 transition hover:text-orange-600">Contact</a></div>
-        <div className="flex items-center gap-2">{currentUser?<><div className="hidden items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 sm:flex"><span className="grid size-8 place-items-center rounded-lg bg-orange-100 text-orange-600"><UserCircle size={18}/></span><div><p className="max-w-36 truncate text-xs font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-orange-600"><Clock size={10}/>{trialRemaining||currentUser.shop?.name}</p></div></div><button onClick={signOut} className="grid size-10 place-items-center rounded-xl border border-zinc-200 text-zinc-400 hover:bg-red-50 hover:text-red-500" aria-label="ออกจากระบบ"><LogOut size={17}/></button></>:<><a href="/login?next=/pricing" className="hidden rounded-lg px-4 py-2 text-sm font-bold text-zinc-600 transition hover:bg-zinc-100 sm:block">เข้าสู่ระบบ</a><a href="/register" className="inline-flex h-10 items-center gap-2 rounded-lg bg-orange-500 px-4 text-sm font-bold text-white shadow-md shadow-orange-500/15 transition hover:bg-orange-600">ทดลองฟรี <ArrowRight size={15}/></a></>}</div>
+        <div className="flex items-center gap-2">{currentUser?<><div className="hidden items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 sm:flex"><span className="grid size-8 place-items-center rounded-lg bg-orange-100 text-orange-600"><UserCircle size={18}/></span><div><p className="max-w-36 truncate text-xs font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-orange-600"><Clock size={10}/>{accountStatus}</p></div></div><button onClick={signOut} className="grid size-10 place-items-center rounded-xl border border-zinc-200 text-zinc-400 hover:bg-red-50 hover:text-red-500" aria-label="ออกจากระบบ"><LogOut size={17}/></button></>:<><a href="/login?next=/pricing" className="hidden rounded-lg px-4 py-2 text-sm font-bold text-zinc-600 transition hover:bg-zinc-100 sm:block">เข้าสู่ระบบ</a><a href="/register" className="inline-flex h-10 items-center gap-2 rounded-lg bg-orange-500 px-4 text-sm font-bold text-white shadow-md shadow-orange-500/15 transition hover:bg-orange-600">ทดลองฟรี <ArrowRight size={15}/></a></>}</div>
       </div>
     </nav>
 
@@ -83,7 +86,7 @@ export default function PricingPage() {
             {plan.accent && <span className="absolute right-5 top-0 -translate-y-1/2 rounded-full bg-orange-500 px-3 py-1 text-[11px] font-extrabold text-white shadow-md">แนะนำ</span>}
             <div className="flex items-start justify-between"><div><h2 className="text-2xl font-black">{plan.name}</h2><p className="mt-2 text-sm text-zinc-500">{plan.description}</p></div><span className={`grid size-11 place-items-center rounded-2xl ${plan.accent?'bg-orange-500 text-white':'bg-orange-100 text-orange-600'}`}><Store size={20}/></span></div>
             <div className="mt-8 flex items-end gap-1"><span className="pb-2 text-sm font-bold text-zinc-500">฿</span><span className="text-5xl font-black tracking-tight">{(yearly?plan.yearly:plan.monthly).toLocaleString()}</span><span className="pb-2 text-sm text-zinc-400">/ เดือน</span></div>
-            <p className="mt-2 h-5 text-xs text-zinc-400">{yearly?`ชำระ ฿${(plan.yearly*12).toLocaleString()} ต่อปี`:'ชำระแบบรายเดือน'}</p>
+            <p className="mt-2 h-5 text-xs text-zinc-400">{yearly?`ชำระ ฿${(plan.yearlyTotal??plan.yearly*12).toLocaleString()} ต่อปี`:`รอบบิล ${plan.duration||30} วัน`}</p>
             <button onClick={()=>choosePlan(plan)} disabled={!!loadingPlan} className={`mt-7 flex h-12 items-center justify-center rounded-xl text-sm font-extrabold transition disabled:cursor-wait disabled:opacity-60 ${plan.accent?'bg-orange-500 text-white shadow-lg shadow-orange-500/20 hover:bg-orange-600':'bg-zinc-950 text-white hover:bg-zinc-800'}`}>{loadingPlan===plan.name?'กำลังบันทึก…':currentUser?.subscription?.package===plan.name?`แพ็กเกจปัจจุบัน · ${plan.name}`:plan.button}</button>
             <div className="my-7 h-px bg-zinc-100"/>
             <p className="text-sm font-extrabold">สิ่งที่คุณจะได้รับ</p>

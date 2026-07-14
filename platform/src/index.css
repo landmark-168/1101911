@@ -16,3 +16,12 @@ body { margin: 0; min-width: 320px; font-family: var(--font-sans); }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 ::selection { background: #fed7aa; color: #18181b; }
+
+/* Runtime brand color from Admin > Setting > Brand */
+:root { --brand-color: #f65a1b; --brand-color-dark: #e6490d; }
+.bg-orange-500 { background-color: var(--brand-color) !important; }
+.text-orange-500, .text-orange-600 { color: var(--brand-color) !important; }
+.border-orange-500 { border-color: var(--brand-color) !important; }
+.accent-orange-500 { accent-color: var(--brand-color) !important; }
+.hover\:bg-orange-600:hover { background-color: var(--brand-color-dark) !important; }
+.hover\:text-orange-600:hover, .hover\:text-orange-500:hover { color: var(--brand-color) !important; }

@@ -109,3 +109,66 @@ export async function selectSubscriptionPlan({ packageName, billingCycle, amount
   if (shopError) throw shopError
   return result.data
 }
+
+export async function fetchPackages() {
+  const { data,error }=await supabase.from('packages').select('*').order('monthly_price')
+  if(error)throw error
+  return data
+}
+
+export async function fetchPackageByName(name) {
+  const {data,error}=await supabase.from('packages').select('*').eq('name',name).eq('status','active').maybeSingle()
+  if(error)throw error
+  return data
+}
+
+export async function savePackage(values,id=null) {
+  const payload={name:values.name.trim(),slug:values.slug.trim().toLowerCase().replace(/\s+/g,'-'),description:values.description.trim(),monthly_price:Number(values.monthly_price),yearly_price:Number(values.yearly_price),features:values.features,status:values.status,duration_days:Number(values.duration_days),updated_at:new Date().toISOString()}
+  const query=id?supabase.from('packages').update(payload).eq('id',id):supabase.from('packages').insert(payload)
+  const {data,error}=await query.select().single();if(error)throw error;return data
+}
+
+export async function removePackage(id) {
+  const {error}=await supabase.from('packages').delete().eq('id',id);if(error)throw error
+}
+
+export async function fetchAnalytics(year=new Date().getFullYear()) {
+  const [{data:payments,error:paymentError},{data:subscriptions,error:subscriptionError},{data:shops,error:shopError}]=await Promise.all([
+    supabase.from('payments').select('amount,status,paid_at,created_at').eq('status','paid'),
+    supabase.from('subscriptions').select('package,status,created_at'),
+    supabase.from('shops').select('package,status,created_at'),
+  ])
+  const error=paymentError||subscriptionError||shopError;if(error)throw error
+  const months=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
+  const monthly=months.map((month,index)=>({month,revenue:0,stores:0}))
+  payments.forEach(p=>{const date=new Date(p.paid_at||p.created_at);if(date.getFullYear()===year)monthly[date.getMonth()].revenue+=Number(p.amount)})
+  shops.forEach(s=>{const date=new Date(s.created_at);if(date.getFullYear()===year)monthly[date.getMonth()].stores+=1})
+  const subscriptionMap={};subscriptions.forEach(s=>{subscriptionMap[s.status]=(subscriptionMap[s.status]||0)+1})
+  const packageMap={};shops.forEach(s=>{packageMap[s.package]=(packageMap[s.package]||0)+1})
+  return {monthly,subscriptions:Object.entries(subscriptionMap).map(([name,value])=>({name,value})),packages:Object.entries(packageMap).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value),totals:{revenue:payments.reduce((sum,p)=>sum+Number(p.amount),0),subscriptions:subscriptions.filter(s=>['active','trialing'].includes(s.status)).length,stores:shops.length,activeStores:shops.filter(s=>s.status==='Active').length}}
+}
+
+export async function fetchSettings() {
+  const {data,error}=await supabase.from('app_settings').select('*').eq('id','global').single()
+  if(error) {
+    if (error.code === 'PGRST205' || error.message?.includes("app_settings")) throw new Error('ยังไม่มีตาราง app_settings — กรุณารันไฟล์ migration 20260715060000_app_settings.sql ใน Supabase SQL Editor แล้วรีเฟรชหน้านี้')
+    throw error
+  }
+  return data
+}
+
+export async function fetchPublicSettings() {
+  const { data, error } = await supabase.rpc('get_public_app_settings')
+  if (error) {
+    try { return JSON.parse(localStorage.getItem('smartpos_public_settings') || 'null') } catch { return null }
+  }
+  return data
+}
+
+export async function saveSettings(settings) {
+  const {data:{user}}=await supabase.auth.getUser()
+  const payload={id:'global',general:settings.general,brand:settings.brand,payment:settings.payment,smtp:settings.smtp,line_oa:settings.line_oa,promptpay:settings.promptpay,domain:settings.domain,updated_by:user?.id,updated_at:new Date().toISOString()}
+  const {data,error}=await supabase.from('app_settings').upsert(payload).select().single();if(error)throw error
+  localStorage.setItem('smartpos_public_settings',JSON.stringify({general:data.general,brand:data.brand}))
+  return data
+}

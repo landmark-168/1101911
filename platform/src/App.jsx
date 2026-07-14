@@ -9,10 +9,14 @@ import { Card } from './components/ui/card'
 import RegisterPage from './RegisterPage'
 import LoginPage from './LoginPage'
 import PricingPage from './PricingPage'
-import { fetchCurrentUserSummary, signOut } from './lib/database'
+import { fetchCurrentUserSummary, fetchPublicSettings, signOut } from './lib/database'
+import { applyBranding, readCachedBranding, watchBranding } from './lib/branding'
 const AdminDashboard = lazy(() => import('./AdminDashboard'))
 const StoreManagement = lazy(() => import('./StoreManagement'))
 const CheckoutPage = lazy(() => import('./CheckoutPage'))
+const PackageManagement = lazy(() => import('./PackageManagement'))
+const AnalyticsPage = lazy(() => import('./AnalyticsPage'))
+const SettingsPage = lazy(() => import('./SettingsPage'))
 
 const features = [
   { icon: CircleDollarSign, label: 'POS', title: 'ขายง่าย หน้าร้านลื่นไหล', description: 'รับออเดอร์ ชำระเงิน และจัดการโต๊ะในหน้าจอเดียว ใช้งานง่ายแม้ช่วงร้านแน่น', stat: 'เร็วขึ้น 2×', tone: 'orange' },
@@ -22,9 +26,12 @@ const features = [
 ]
 
 function Logo() {
+  const settings = window.__smartposSettings
+  const name = settings?.general?.system_name || 'SmartPOS'
+  const logo = settings?.brand?.logo_url
   return <a href="#home" className="flex items-center gap-2.5" aria-label="SmartPOS Home">
-    <span className="grid size-9 place-items-center rounded-xl bg-zinc-950 text-orange-500 shadow-lg"><Zap size={19} fill="currentColor" /></span>
-    <span className="text-xl font-extrabold tracking-tight">Smart<span className="text-orange-500">POS</span></span>
+    <span className="grid size-9 place-items-center overflow-hidden rounded-xl bg-zinc-950 text-orange-500 shadow-lg">{logo?<img src={logo} alt="" className="size-full object-cover"/>:<Zap size={19} fill="currentColor" />}</span>
+    <span className="text-xl font-extrabold tracking-tight">{name}</span>
   </a>
 }
 
@@ -78,13 +85,14 @@ function LandingPage() {
     const hours = Math.floor((diff % 86400000) / 3600000)
     return diff > 0 ? `ทดลองเหลือ ${days} วัน ${hours} ชม.` : 'หมดช่วงทดลองใช้ฟรีแล้ว'
   })()
+  const accountStatus = [currentUser?.subscription?.package || currentUser?.shop?.package, trialRemaining].filter(Boolean).join(' · ') || currentUser?.shop?.name || 'บัญชีร้านค้า'
   const scrollTo = id => { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); setMenuOpen(false) }
   return <div className="min-h-screen overflow-hidden bg-[#fffdf9] text-zinc-950">
     <nav className="fixed inset-x-0 top-0 z-50 border-b border-zinc-200/60 bg-white/75 backdrop-blur-xl">
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8">
         <Logo />
         <div className="hidden items-center gap-8 md:flex">{[['home','Home'],['features','Features'],['pricing','Pricing'],['contact','Contact']].map(([id,label])=><button key={id} onClick={()=>id==='pricing' ? window.location.href='/pricing' : scrollTo(id)} className="text-sm font-medium text-zinc-600 transition hover:text-orange-600">{label}</button>)}</div>
-        <div className="hidden items-center gap-2 md:flex">{currentUser?<><div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-1.5"><span className="grid size-8 place-items-center rounded-lg bg-orange-100 text-orange-600"><UserCircle size={18}/></span><div className="text-left"><p className="max-w-36 truncate text-xs font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-orange-600"><Clock size={10}/>{trialRemaining||currentUser.shop?.name||'บัญชีร้านค้า'}</p></div></div><button onClick={signOut} className="grid size-10 place-items-center rounded-xl border border-zinc-200 text-zinc-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500" aria-label="ออกจากระบบ"><LogOut size={17}/></button></>:<><Button variant="ghost" onClick={()=>{ window.location.href='/login' }}>เข้าสู่ระบบ</Button><Button className="h-10 rounded-lg px-4" onClick={()=>{ window.location.href='/register' }}>สมัครร้าน <ArrowRight size={15}/></Button></>}</div>
+        <div className="hidden items-center gap-2 md:flex">{currentUser?<><div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-1.5"><span className="grid size-8 place-items-center rounded-lg bg-orange-100 text-orange-600"><UserCircle size={18}/></span><div className="text-left"><p className="max-w-36 truncate text-xs font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-orange-600"><Clock size={10}/>{accountStatus}</p></div></div><button onClick={signOut} className="grid size-10 place-items-center rounded-xl border border-zinc-200 text-zinc-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500" aria-label="ออกจากระบบ"><LogOut size={17}/></button></>:<><Button variant="ghost" onClick={()=>{ window.location.href='/login' }}>เข้าสู่ระบบ</Button><Button className="h-10 rounded-lg px-4" onClick={()=>{ window.location.href='/register' }}>สมัครร้าน <ArrowRight size={15}/></Button></>}</div>
         <button className="grid size-10 place-items-center rounded-xl border border-zinc-200 md:hidden" onClick={()=>setMenuOpen(!menuOpen)} aria-label="เปิดเมนู">{menuOpen?<X/>:<Menu/>}</button>
       </div>
       {menuOpen && <div className="border-t border-zinc-100 bg-white p-5 md:hidden">{currentUser&&<div className="mb-3 rounded-xl bg-orange-50 p-3"><p className="text-sm font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-1 text-xs font-semibold text-orange-600">{trialRemaining||currentUser.shop?.name}</p></div>}{[['home','Home'],['features','Features'],['pricing','Pricing'],['contact','Contact']].map(([id,label])=><button key={id} onClick={()=>id==='pricing' ? window.location.href='/pricing' : scrollTo(id)} className="block w-full border-b border-zinc-100 py-3 text-left font-medium">{label}</button>)}{currentUser?<Button className="mt-4 w-full" variant="secondary" onClick={signOut}><LogOut size={16}/> ออกจากระบบ</Button>:<div className="mt-4 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={()=>{ window.location.href='/login' }}>เข้าสู่ระบบ</Button><Button onClick={()=>{ window.location.href='/register' }}>สมัครร้าน</Button></div>}</div>}
@@ -120,11 +128,16 @@ function LandingPage() {
 
 
 export default function App() {
+  const [, setBrandReady] = useState(false)
+  useEffect(() => { const cached=readCachedBranding();if(cached)applyBranding(cached,false);watchBranding();fetchPublicSettings().then(settings => { if (!settings) return;applyBranding(settings);setBrandReady(true) }) }, [])
   if (window.location.pathname === '/register') return <RegisterPage />
   if (window.location.pathname === '/login') return <LoginPage />
   if (window.location.pathname === '/pricing') return <PricingPage />
   if (window.location.pathname === '/checkout') return <Suspense fallback={<div className="grid min-h-screen place-items-center">กำลังโหลด…</div>}><CheckoutPage /></Suspense>
   if (window.location.pathname === '/admin') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลด Dashboard…</div>}><AdminDashboard /></Suspense>
   if (window.location.pathname === '/admin/stores') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลดร้านค้า…</div>}><StoreManagement /></Suspense>
+  if (window.location.pathname === '/admin/packages') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลดแพ็กเกจ…</div>}><PackageManagement /></Suspense>
+  if (window.location.pathname === '/admin/analytics') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลด Analytics…</div>}><AnalyticsPage /></Suspense>
+  if (window.location.pathname === '/admin/settings') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลด Setting…</div>}><SettingsPage /></Suspense>
   return <LandingPage />
 }
