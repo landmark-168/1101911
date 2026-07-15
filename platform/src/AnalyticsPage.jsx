@@ -3,7 +3,7 @@ import { BarChart3, CircleDollarSign, CreditCard, LayoutDashboard, LogOut, Menu,
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { fetchAnalytics, requireSuperAdmin, signOut } from './lib/database'
 
-const nav=[['Dashboard',LayoutDashboard,'/admin'],['ร้านค้า',Store,'/admin/stores'],['แพ็กเกจ',Package,'/admin/packages'],['รายได้',CircleDollarSign,'#'],['สมาชิก',Users,'#'],['Analytics',BarChart3,'/admin/analytics']]
+const nav=[['Dashboard',LayoutDashboard,'/admin'],['ร้านค้า',Store,'/admin/stores'],['แพ็กเกจ',Package,'/admin/packages'],['รายได้',CircleDollarSign,'/admin/revenue'],['สมาชิก',Users,'/admin/members'],['Analytics',BarChart3,'/admin/analytics']]
 const pieColors=['#f65a1b','#22c55e','#f59e0b','#a1a1aa','#ef4444']
 const statusLabels={trialing:'ทดลองใช้',active:'ใช้งานอยู่',past_due:'ค้างชำระ',cancelled:'ยกเลิก'}
 

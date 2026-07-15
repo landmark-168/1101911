@@ -172,3 +172,11 @@ export async function saveSettings(settings) {
   localStorage.setItem('smartpos_public_settings',JSON.stringify({general:data.general,brand:data.brand}))
   return data
 }
+
+export async function fetchAdminRevenue() {
+  const {data,error}=await supabase.from('payments').select('id,amount,status,paid_at,created_at,shops(name,email),subscriptions(package,billing_cycle)').order('created_at',{ascending:false});if(error)throw error;return data||[]
+}
+
+export async function fetchAdminMembers() {
+  const {data,error}=await supabase.from('profiles').select('id,email,full_name,phone,role,created_at,shops(name,package,status)').order('created_at',{ascending:false});if(error)throw error;return data||[]
+}

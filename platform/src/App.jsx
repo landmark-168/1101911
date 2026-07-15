@@ -10,13 +10,16 @@ import RegisterPage from './RegisterPage'
 import LoginPage from './LoginPage'
 import PricingPage from './PricingPage'
 import { fetchCurrentUserSummary, fetchPublicSettings, signOut } from './lib/database'
-import { applyBranding, readCachedBranding, watchBranding } from './lib/branding'
+import { applyAdminIdentity, applyBranding, readCachedBranding, watchBranding } from './lib/branding'
 const AdminDashboard = lazy(() => import('./AdminDashboard'))
 const StoreManagement = lazy(() => import('./StoreManagement'))
 const CheckoutPage = lazy(() => import('./CheckoutPage'))
 const PackageManagement = lazy(() => import('./PackageManagement'))
 const AnalyticsPage = lazy(() => import('./AnalyticsPage'))
 const SettingsPage = lazy(() => import('./SettingsPage'))
+const RevenuePage = lazy(() => import('./RevenuePage'))
+const MembersPage = lazy(() => import('./MembersPage'))
+const StoreOwnerApp = lazy(() => import('./store-owner/StoreOwnerApp'))
 
 const features = [
   { icon: CircleDollarSign, label: 'POS', title: 'ขายง่าย หน้าร้านลื่นไหล', description: 'รับออเดอร์ ชำระเงิน และจัดการโต๊ะในหน้าจอเดียว ใช้งานง่ายแม้ช่วงร้านแน่น', stat: 'เร็วขึ้น 2×', tone: 'orange' },
@@ -129,7 +132,8 @@ function LandingPage() {
 
 export default function App() {
   const [, setBrandReady] = useState(false)
-  useEffect(() => { const cached=readCachedBranding();if(cached)applyBranding(cached,false);watchBranding();fetchPublicSettings().then(settings => { if (!settings) return;applyBranding(settings);setBrandReady(true) }) }, [])
+  useEffect(() => { const cached=readCachedBranding();if(cached)applyBranding(cached,false);watchBranding();fetchPublicSettings().then(settings => { if (!settings) return;applyBranding(settings);setBrandReady(true) });fetchCurrentUserSummary().then(applyAdminIdentity).catch(()=>{}) }, [])
+  if (window.location.pathname.startsWith('/store/')) return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-950 text-sm font-bold text-white">กำลังเปิด Store Workspace…</div>}><StoreOwnerApp /></Suspense>
   if (window.location.pathname === '/register') return <RegisterPage />
   if (window.location.pathname === '/login') return <LoginPage />
   if (window.location.pathname === '/pricing') return <PricingPage />
@@ -139,5 +143,7 @@ export default function App() {
   if (window.location.pathname === '/admin/packages') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลดแพ็กเกจ…</div>}><PackageManagement /></Suspense>
   if (window.location.pathname === '/admin/analytics') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลด Analytics…</div>}><AnalyticsPage /></Suspense>
   if (window.location.pathname === '/admin/settings') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลด Setting…</div>}><SettingsPage /></Suspense>
+  if (window.location.pathname === '/admin/revenue') return <Suspense fallback={<div className="grid min-h-screen place-items-center">กำลังโหลดรายได้…</div>}><RevenuePage /></Suspense>
+  if (window.location.pathname === '/admin/members') return <Suspense fallback={<div className="grid min-h-screen place-items-center">กำลังโหลดสมาชิก…</div>}><MembersPage /></Suspense>
   return <LandingPage />
 }

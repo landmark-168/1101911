@@ -21,7 +21,7 @@ const initialStores = [
   { id:'SP-2836', name:'ชาใจดี', owner:'อรอุมา พรชัย', email:'ornuma@chajaidee.co', phone:'088-671-4430', package:'Starter', status:'Pending', created:'9 ธ.ค. 2026', province:'นครราชสีมา' },
 ]
 
-const navItems = [['Dashboard',LayoutDashboard,'/admin'],['ร้านค้า',Store,'/admin/stores'],['แพ็กเกจ',Package,'/admin/packages'],['รายได้',CircleDollarSign,'#'],['สมาชิก',Users,'#'],['Analytics',BarChart3,'/admin/analytics']]
+const navItems = [['Dashboard',LayoutDashboard,'/admin'],['ร้านค้า',Store,'/admin/stores'],['แพ็กเกจ',Package,'/admin/packages'],['รายได้',CircleDollarSign,'/admin/revenue'],['สมาชิก',Users,'/admin/members'],['Analytics',BarChart3,'/admin/analytics']]
 const statusStyle = { Active:'bg-emerald-50 text-emerald-700 ring-emerald-200', Pending:'bg-amber-50 text-amber-700 ring-amber-200', Suspended:'bg-red-50 text-red-600 ring-red-200' }
 const planStyle = { Starter:'bg-zinc-100 text-zinc-600', Business:'bg-orange-100 text-orange-700', Enterprise:'bg-violet-100 text-violet-700' }
 

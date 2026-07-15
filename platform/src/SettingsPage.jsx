@@ -13,7 +13,7 @@ const emptySettings = {
   domain: { app_url: '', custom_domain: '', ssl_enabled: true },
 }
 
-const nav = [['Dashboard', LayoutDashboard, '/admin'], ['ร้านค้า', Store, '/admin/stores'], ['แพ็กเกจ', Package, '/admin/packages'], ['รายได้', CircleDollarSign, '#'], ['สมาชิก', Users, '#'], ['Analytics', BarChart3, '/admin/analytics']]
+const nav = [['Dashboard', LayoutDashboard, '/admin'], ['ร้านค้า', Store, '/admin/stores'], ['แพ็กเกจ', Package, '/admin/packages'], ['รายได้', CircleDollarSign, '/admin/revenue'], ['สมาชิก', Users, '/admin/members'], ['Analytics', BarChart3, '/admin/analytics']]
 const tabs = [['general', 'General', SlidersHorizontal], ['brand', 'Brand', Palette], ['payment', 'Payment', WalletCards], ['smtp', 'SMTP', Mail], ['line_oa', 'LINE OA', MessageCircle], ['promptpay', 'PromptPay', WalletCards], ['domain', 'Domain', Globe2]]
 
 function Sidebar({ open, close }) {

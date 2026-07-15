@@ -13,6 +13,9 @@
 
 html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; font-family: var(--font-sans); }
+@layer base {
+  *, ::before, ::after { border-color: #e4e4e7; }
+}
 button, a { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 ::selection { background: #fed7aa; color: #18181b; }
