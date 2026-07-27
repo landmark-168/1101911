@@ -1,11 +1,21 @@
 -- Store Owner tenant schema. Every operational row is scoped by store_id.
 alter table public.shops add column if not exists slug text;
 create unique index if not exists shops_slug_key on public.shops(slug) where slug is not null;
+update public.shops set slug=lower(regexp_replace(name,'[^a-zA-Z0-9ก-๙]+','-','g'))||'-'||left(id::text,6) where slug is null;
 create table if not exists public.store_members (id uuid primary key default gen_random_uuid(),store_id uuid not null references public.shops(id) on delete cascade,user_id uuid not null references auth.users(id) on delete cascade,role text not null check(role in ('owner','manager','cashier','kitchen','waiter','rider')),status text not null default 'active' check(status in ('invited','active','suspended')),created_at timestamptz not null default now(),unique(store_id,user_id));
 insert into public.store_members(store_id,user_id,role) select id,owner_id,'owner' from public.shops on conflict(store_id,user_id) do nothing;
+create or replace function public.add_owner_membership() returns trigger language plpgsql security definer set search_path=public as $$ begin insert into public.store_members(store_id,user_id,role) values(new.id,new.owner_id,'owner') on conflict(store_id,user_id) do nothing;return new;end $$;
+drop trigger if exists shops_add_owner_membership on public.shops;
+create trigger shops_add_owner_membership after insert on public.shops for each row execute function public.add_owner_membership();
 create or replace function public.is_store_member(target_store uuid) returns boolean language sql stable security definer set search_path=public as $$ select exists(select 1 from public.store_members where store_id=target_store and user_id=auth.uid() and status='active') or exists(select 1 from public.shops where id=target_store and owner_id=auth.uid()) $$;
 create or replace function public.is_store_manager(target_store uuid) returns boolean language sql stable security definer set search_path=public as $$ select exists(select 1 from public.store_members where store_id=target_store and user_id=auth.uid() and status='active' and role in ('owner','manager')) or exists(select 1 from public.shops where id=target_store and owner_id=auth.uid()) $$;
+drop policy if exists "shops read active member" on public.shops;
+create policy "shops read active member" on public.shops for select to authenticated using(public.is_store_member(id));
 create table if not exists public.store_categories (id uuid primary key default gen_random_uuid(),store_id uuid not null references public.shops(id) on delete cascade,name text not null,icon text,color text,status text not null default 'active',sort_order int default 0,created_at timestamptz not null default now(),unique(store_id,name));
+alter table public.store_categories add column if not exists description text;
+alter table public.store_categories add column if not exists image_url text;
+alter table public.store_categories add column if not exists is_active boolean not null default true;
+alter table public.store_categories add column if not exists updated_at timestamptz not null default now();
 create table if not exists public.store_menu_items (id uuid primary key default gen_random_uuid(),store_id uuid not null references public.shops(id) on delete cascade,category_id uuid references public.store_categories(id) on delete set null,name text not null,image_url text,price numeric(12,2) not null default 0,description text,available boolean not null default true,toppings jsonb not null default '[]',sizes jsonb not null default '[]',cooking_time int default 10,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
 create table if not exists public.store_tables (id uuid primary key default gen_random_uuid(),store_id uuid not null references public.shops(id) on delete cascade,table_number text not null,capacity int not null default 2,qr_token uuid not null default gen_random_uuid(),status text not null default 'available' check(status in ('available','occupied','reserved','cleaning')),created_at timestamptz not null default now(),unique(store_id,table_number));
 create table if not exists public.store_customers (id uuid primary key default gen_random_uuid(),store_id uuid not null references public.shops(id) on delete cascade,name text not null,phone text,member_level text not null default 'member',total_orders int not null default 0,total_spending numeric(12,2) not null default 0,loyalty_points int not null default 0,created_at timestamptz not null default now(),unique(store_id,phone));
@@ -15,11 +25,28 @@ create table if not exists public.store_inventory (id uuid primary key default g
 create table if not exists public.store_promotions (id uuid primary key default gen_random_uuid(),store_id uuid not null references public.shops(id) on delete cascade,name text not null,banner_url text,coupon_code text,discount jsonb not null,start_date timestamptz,end_date timestamptz,usage_limit int,minimum_order numeric(12,2) default 0,channels text[] not null default '{dine_in,takeaway,delivery}',status text not null default 'draft',created_at timestamptz not null default now(),unique(store_id,coupon_code));
 create table if not exists public.store_settings (store_id uuid primary key references public.shops(id) on delete cascade,logo_url text,banner_url text,description text,phone text,address text,opening_hours jsonb not null default '{}',google_maps_url text,line_oa text,promptpay_qr_url text,delivery_fee numeric(12,2) default 0,tax_percent numeric(5,2) default 0,service_charge_percent numeric(5,2) default 0,theme_color text default '#F97316',updated_at timestamptz not null default now());
 do $$ declare t text; begin foreach t in array array['store_members','store_categories','store_menu_items','store_tables','store_orders','store_order_items','store_inventory','store_promotions','store_customers','store_settings'] loop execute format('alter table public.%I enable row level security',t); end loop; end $$;
+drop policy if exists "members tenant read" on public.store_members;
+drop policy if exists "members manager write" on public.store_members;
 create policy "members tenant read" on public.store_members for select to authenticated using(public.is_store_member(store_id));
 create policy "members manager write" on public.store_members for all to authenticated using(public.is_store_manager(store_id)) with check(public.is_store_manager(store_id));
-do $$ declare t text; begin foreach t in array array['store_categories','store_menu_items','store_tables','store_orders','store_order_items','store_inventory','store_promotions','store_customers','store_settings'] loop execute format('create policy "tenant read" on public.%I for select to authenticated using(public.is_store_member(store_id))',t);execute format('create policy "tenant write" on public.%I for all to authenticated using(public.is_store_member(store_id)) with check(public.is_store_member(store_id))',t);end loop;end $$;
+do $$ declare t text; begin foreach t in array array['store_categories','store_menu_items','store_tables','store_orders','store_order_items','store_inventory','store_promotions','store_customers','store_settings'] loop execute format('drop policy if exists "tenant read" on public.%I',t);execute format('drop policy if exists "tenant write" on public.%I',t);execute format('create policy "tenant read" on public.%I for select to authenticated using(public.is_store_member(store_id))',t);execute format('create policy "tenant write" on public.%I for all to authenticated using(public.is_store_member(store_id)) with check(public.is_store_member(store_id))',t);end loop;end $$;
 create index if not exists store_orders_tenant_time_idx on public.store_orders(store_id,created_at desc);
 create index if not exists store_menu_tenant_idx on public.store_menu_items(store_id,category_id);
 create index if not exists store_inventory_tenant_idx on public.store_inventory(store_id);
 do $$ begin alter publication supabase_realtime add table public.store_orders; exception when duplicate_object then null; end $$;
 do $$ begin alter publication supabase_realtime add table public.store_order_items; exception when duplicate_object then null; end $$;
+
+-- Canonical Store Owner API names. security_invoker keeps base-table RLS active.
+create or replace view public.orders with (security_invoker=true) as select * from public.store_orders;
+create or replace view public.order_items with (security_invoker=true) as select * from public.store_order_items;
+create or replace view public.tables with (security_invoker=true) as select * from public.store_tables;
+create or replace view public.inventory_items with (security_invoker=true) as select * from public.store_inventory;
+create or replace view public.customers with (security_invoker=true) as select * from public.store_customers;
+grant select on public.orders,public.order_items,public.tables,public.inventory_items,public.customers to authenticated;
+
+-- Categories API and database-level protection against deleting used categories.
+create or replace view public.categories with (security_invoker=true) as
+select id,store_id,name,description,image_url,sort_order,is_active,created_at,updated_at from public.store_categories;
+grant select,insert,update,delete on public.categories to authenticated;
+alter table public.store_menu_items drop constraint if exists store_menu_items_category_id_fkey;
+alter table public.store_menu_items add constraint store_menu_items_category_id_fkey foreign key(category_id) references public.store_categories(id) on delete restrict;

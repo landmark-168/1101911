@@ -4,9 +4,12 @@ const thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.'
 
 export const formatStore = row => ({
   id: row.id,
+  ownerId: row.owner_id,
   code: `SP-${row.id.slice(0, 6).toUpperCase()}`,
   name: row.name,
   owner: row.profiles?.full_name || row.email,
+  logoUrl: row.logo_url,
+  shopType: row.shop_type,
   email: row.email,
   phone: row.phone,
   package: row.package,
@@ -31,10 +34,28 @@ export async function updateStoreStatus(id, status) {
 }
 
 export async function updateStore(id, changes) {
-  const allowed = { name:changes.name?.trim(), package:changes.package }
-  const { data, error } = await supabase.from('shops').update({ ...allowed, updated_at:new Date().toISOString() }).eq('id', id).select().single()
+  const payload = {
+    name: changes.name.trim(),
+    logo_url: changes.logoUrl.trim() || null,
+    shop_type: changes.shopType.trim(),
+    phone: changes.phone.trim(),
+    email: changes.email.trim(),
+    province: changes.province.trim(),
+    address: changes.address.trim(),
+    package: changes.package,
+    status: changes.status,
+    latitude: changes.latitude === '' ? null : Number(changes.latitude),
+    longitude: changes.longitude === '' ? null : Number(changes.longitude),
+    updated_at: new Date().toISOString(),
+  }
+  const { data, error } = await supabase.from('shops').update(payload).eq('id', id).select('*, profiles!shops_owner_id_fkey(full_name)').single()
   if (error) throw error
-  return data
+  if (changes.ownerId && changes.owner.trim()) {
+    const { error: profileError } = await supabase.from('profiles').update({ full_name:changes.owner.trim(), updated_at:new Date().toISOString() }).eq('id', changes.ownerId)
+    if (profileError) throw profileError
+    data.profiles = { ...data.profiles, full_name:changes.owner.trim() }
+  }
+  return formatStore(data)
 }
 
 export async function deleteStore(id) {

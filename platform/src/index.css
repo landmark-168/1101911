@@ -28,3 +28,29 @@ button { cursor: pointer; }
 .accent-orange-500 { accent-color: var(--brand-color) !important; }
 .hover\:bg-orange-600:hover { background-color: var(--brand-color-dark) !important; }
 .hover\:text-orange-600:hover, .hover\:text-orange-500:hover { color: var(--brand-color) !important; }
+
+@media (max-width: 639px) {
+  section.mt-7.overflow-visible > .overflow-x-auto { overflow: visible; }
+  section.mt-7.overflow-visible table { min-width: 100% !important; }
+  section.mt-7.overflow-visible th:nth-child(2),
+  section.mt-7.overflow-visible th:nth-child(5),
+  section.mt-7.overflow-visible td:nth-child(2),
+  section.mt-7.overflow-visible td:nth-child(5) { display: none; }
+  section.mt-7.overflow-visible th:first-child,
+  section.mt-7.overflow-visible td:first-child { padding-left: .75rem; padding-right: .75rem; }
+  section.mt-7.overflow-visible th:last-child,
+  section.mt-7.overflow-visible td:last-child { padding-left: .75rem; padding-right: .75rem; }
+}
+
+@media (min-width: 1024px) {
+  section.mt-7.overflow-visible > .overflow-x-auto { overflow: visible; }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  section.mt-7.overflow-visible td.relative > div.absolute {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 5.25rem;
+    z-index: 50;
+  }
+}

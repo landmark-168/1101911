@@ -1,0 +1,6 @@
+import { supabase } from '../../lib/supabase'
+export async function listRows(storeId:string,table:string,order='created_at'){const {data,error}=await supabase.from(table).select('*').eq('store_id',storeId).order(order,{ascending:false});if(error)throw error;return data||[]}
+export async function insertRow(storeId:string,table:string,values:any){const {data,error}=await supabase.from(table).insert({...values,store_id:storeId}).select().single();if(error)throw error;return data}
+export async function updateRow(storeId:string,table:string,id:string,values:any){const {data,error}=await supabase.from(table).update(values).eq('store_id',storeId).eq('id',id).select().single();if(error)throw error;return data}
+export async function deleteRow(storeId:string,table:string,id:string){const {error}=await supabase.from(table).delete().eq('store_id',storeId).eq('id',id);if(error)throw error}
+export async function uploadStoreFile(storeId:string,bucket:string,file:File){const path=`${storeId}/${crypto.randomUUID()}.${file.name.split('.').pop()}`;const {error}=await supabase.storage.from(bucket).upload(path,file);if(error)throw error;return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl}

@@ -6,7 +6,7 @@ const defaultPlans = [
   {
     name: 'Starter', description: 'สำหรับร้านเล็กที่กำลังเริ่มต้น', monthly: 590, yearly: 472,
     features: ['1 สาขา', 'ผู้ใช้งาน 3 คน', 'POS และ QR Menu', 'รายงานยอดขายพื้นฐาน', 'ช่วยเหลือผ่านแชต'],
-    button: 'Subscribe Starter', accent: false,
+    button: 'เริ่มทดลองฟรี 14 วัน (Starter)', accent: false,
   },
   {
     name: 'Business', description: 'สำหรับร้านที่ต้องการเติบโต', monthly: 1290, yearly: 1032,
@@ -50,7 +50,7 @@ export default function PricingPage() {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [now, setNow] = useState(Date.now())
-  useEffect(()=>{let live=true;Promise.all([fetchCurrentUserSummary().catch(()=>null),fetchPackages()]).then(([user,rows])=>{if(!live)return;setCurrentUser(user);if(rows?.length)setPlans(rows.map((row,index)=>({id:row.id,name:row.name,description:row.description,monthly:Number(row.monthly_price),yearly:Number(row.yearly_price)/12,yearlyTotal:Number(row.yearly_price),duration:row.duration_days,features:row.features||[],button:row.name==='Enterprise'?'ติดต่อฝ่ายขาย':`Subscribe ${row.name}`,accent:row.name==='Business'||index===1})))}).catch(err=>setError(err.message));const timer=setInterval(()=>setNow(Date.now()),60000);return()=>{live=false;clearInterval(timer)}},[])
+  useEffect(()=>{let live=true;Promise.all([fetchCurrentUserSummary().catch(()=>null),fetchPackages()]).then(([user,rows])=>{if(!live)return;setCurrentUser(user);if(rows?.length)setPlans(rows.map((row,index)=>({id:row.id,name:row.name,description:row.description,monthly:Number(row.monthly_price),yearly:Number(row.yearly_price)/12,yearlyTotal:Number(row.yearly_price),duration:row.duration_days,features:row.features||[],button:row.name==='Enterprise'?'ติดต่อฝ่ายขาย':row.name==='Starter'?'เริ่มทดลองฟรี 14 วัน (Starter)':`Subscribe ${row.name}`,accent:row.name==='Business'||index===1})))}).catch(err=>setError(err.message));const timer=setInterval(()=>setNow(Date.now()),60000);return()=>{live=false;clearInterval(timer)}},[])
   const trialRemaining=(()=>{const end=currentUser?.subscription?.ends_at;if(!end)return null;const diff=Math.max(0,new Date(end).getTime()-now);return diff>0?`ทดลองเหลือ ${Math.floor(diff/86400000)} วัน ${Math.floor((diff%86400000)/3600000)} ชม.`:'หมดช่วงทดลองใช้ฟรีแล้ว'})()
   const accountStatus=[currentUser?.subscription?.package||currentUser?.shop?.package,trialRemaining].filter(Boolean).join(' · ')||currentUser?.shop?.name||'บัญชีร้านค้า'
   const choosePlan=plan=>{if(plan.name==='Enterprise'){window.location.href='mailto:sales@smartpos.co';return}const target=`/checkout?plan=${plan.name}&billing=${yearly?'yearly':'monthly'}`;window.location.href=currentUser?target:`/login?next=${encodeURIComponent(target)}`}

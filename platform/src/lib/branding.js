@@ -83,7 +83,7 @@ function renderAdminSidebarProfile(aside, identity) {
     const text=node.textContent||''
     if(text.includes(identity.name)||text.includes(identity.email)||text.includes('Super Admin')||text.includes('admin@smartpos.co')) node.style.display='none'
   })
-  const card=document.createElement('div');card.dataset.adminSidebarProfile='true';card.className='mt-auto flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3.5'
+  const card=document.createElement('div');card.dataset.adminSidebarProfile='true';card.className='mt-auto flex items-center gap-3 rounded-t-2xl border border-b-0 border-white/10 bg-white/5 p-3.5'
   const avatar=document.createElement('span');avatar.className='grid size-10 shrink-0 place-items-center rounded-xl bg-orange-500 text-xs font-black text-white';avatar.textContent=identity.initials
   const info=document.createElement('div');info.className='min-w-0 flex-1'
   const name=document.createElement('p');name.className='truncate text-xs font-bold text-white';name.textContent=identity.name

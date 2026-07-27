@@ -1,1 +1,1 @@
-export { default } from '../management/ManagementPage'
+export { default } from './Categories'
