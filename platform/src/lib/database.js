@@ -33,6 +33,11 @@ export async function updateStoreStatus(id, status) {
   if (error) throw error
 }
 
+export async function updateProfile(id, data) {
+  const { error } = await supabase.from('profiles').update(data).eq('id', id)
+  if (error) throw error
+}
+
 export async function updateStore(id, changes) {
   const payload = {
     name: changes.name.trim(),
@@ -111,23 +116,27 @@ export async function signOut() {
 export async function fetchCurrentUserSummary() {
   const { session, profile } = await getCurrentProfile()
   if (!session || !profile) return null
-  const { data:shop, error } = await supabase.from('shops').select('id,name,package,subscriptions(id,package,billing_cycle,amount,status,starts_at,ends_at)').eq('owner_id', session.user.id).order('created_at', { ascending:true }).limit(1).maybeSingle()
-  if (error) throw error
-  const subscription = shop?.subscriptions?.find(item => ['trialing','active'].includes(item.status)) || null
+  const { data:shop, error:shopError } = await supabase.from('shops').select('id,name,package,status,logo_url').eq('owner_id', session.user.id).order('created_at', { ascending:true }).limit(1).maybeSingle()
+  if (shopError) throw shopError
+  const { data:subscriptionList, error:subError } = await supabase.from('subscriptions').select('id,package,billing_cycle,amount,status,starts_at,ends_at').eq('user_id', session.user.id).order('created_at', { ascending:false })
+  if (subError) throw subError
+  const subscription = subscriptionList?.find(item => ['trialing','active'].includes(item.status)) || null
   return { user:session.user, profile, shop, subscription }
 }
 
 export async function selectSubscriptionPlan({ packageName, billingCycle, amount }) {
   const summary = await fetchCurrentUserSummary()
-  if (!summary?.shop) throw new Error('ไม่พบข้อมูลร้านค้าของบัญชีนี้')
+  if (!summary?.user) throw new Error('ไม่พบข้อมูลบัญชี กรุณาเข้าสู่ระบบใหม่')
   const existing = summary.subscription
-  const payload = { shop_id:summary.shop.id, package:packageName, billing_cycle:billingCycle, amount, status:existing?.status === 'active' ? 'active' : 'trialing' }
+  const payload = { user_id:summary.user.id, package:packageName, billing_cycle:billingCycle, amount, status:existing?.status === 'active' ? 'active' : 'trialing' }
   let result
-  if (existing) result = await supabase.from('subscriptions').update(payload).eq('shop_id', summary.shop.id).eq('id', existing.id).select().single()
+  if (existing) result = await supabase.from('subscriptions').update(payload).eq('user_id', summary.user.id).eq('id', existing.id).select().single()
   else result = await supabase.from('subscriptions').insert({ ...payload, starts_at:new Date().toISOString(), ends_at:new Date(Date.now()+14*86400000).toISOString() }).select().single()
   if (result.error) throw result.error
-  const { error:shopError } = await supabase.from('shops').update({ package:packageName, updated_at:new Date().toISOString() }).eq('id', summary.shop.id)
-  if (shopError) throw shopError
+  if (summary.shop) {
+    const { error:shopError } = await supabase.from('shops').update({ package:packageName, updated_at:new Date().toISOString() }).eq('id', summary.shop.id)
+    if (shopError) throw shopError
+  }
   return result.data
 }
 
@@ -195,9 +204,9 @@ export async function saveSettings(settings) {
 }
 
 export async function fetchAdminRevenue() {
-  const {data,error}=await supabase.from('payments').select('id,amount,status,paid_at,created_at,shops(name,email),subscriptions(package,billing_cycle)').order('created_at',{ascending:false});if(error)throw error;return data||[]
+  const {data,error}=await supabase.from('payments').select('id,amount,status,paid_at,created_at,profiles(full_name,email),subscriptions(package,billing_cycle)').order('created_at',{ascending:false});if(error)throw error;return data||[]
 }
 
 export async function fetchAdminMembers() {
-  const {data,error}=await supabase.from('profiles').select('id,email,full_name,phone,role,created_at,shops(name,package,status)').order('created_at',{ascending:false});if(error)throw error;return data||[]
+  const {data,error}=await supabase.from('profiles').select('id,email,full_name,phone,role,created_at,shops(name,status),subscriptions(package,status)').order('created_at',{ascending:false});if(error)throw error;return data||[]
 }

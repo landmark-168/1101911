@@ -4,6 +4,7 @@ import {
   MapPin, Phone, Store, Upload, X, LogOut,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
+import { fetchCurrentUserSummary } from './lib/database'
 
 const shopTypes = ['ร้านอาหาร', 'คาเฟ่ / ร้านกาแฟ', 'เบเกอรี', 'ฟู้ดทรัก', 'ร้านเครื่องดื่ม', 'ร้านค้าปลีก', 'อื่น ๆ']
 const provinces = [
@@ -51,12 +52,23 @@ export default function CreateStorePage() {
   const fileRef = useRef(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
+    fetchCurrentUserSummary().then((summary) => {
+      if (!summary?.user) {
         window.location.href = '/login?next=/create-store'
-      } else {
-        setUser(data.user)
+        return
       }
+      if (summary.shop) {
+        window.location.href = '/admin'
+        return
+      }
+      if (!summary.subscription) {
+        window.location.href = '/pricing'
+        return
+      }
+      setUser(summary.user)
+    }).catch(err => {
+      console.error(err)
+      window.location.href = '/login'
     })
   }, [])
 

@@ -2,18 +2,19 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import {
   ArrowRight, BarChart3, Bell, Check, ChefHat, ChevronRight,
   CircleDollarSign, Clock, LogOut, Menu, PackageCheck, QrCode, ShoppingBag,
-  Sparkles, Store, Truck, UserCircle, Utensils, X, Zap,
+  Sparkles, Store, Truck, UserCircle, Utensils, X, Zap, ShieldCheck
 } from 'lucide-react'
 import { Button } from './components/ui/button'
 import { Card } from './components/ui/card'
 import RegisterPage from './RegisterPage'
 import LoginPage from './LoginPage'
 import PricingPage from './PricingPage'
-import { fetchCurrentUserSummary, fetchPublicSettings, signOut } from './lib/database'
+import { fetchCurrentUserSummary, fetchPublicSettings, signOut, updateProfile } from './lib/database'
 import { applyAdminIdentity, applyBranding, readCachedBranding, watchBranding } from './lib/branding'
 const AdminDashboard = lazy(() => import('./AdminDashboard'))
 const StoreManagement = lazy(() => import('./StoreManagement'))
 const CheckoutPage = lazy(() => import('./CheckoutPage'))
+const CreateStorePage = lazy(() => import('./CreateStorePage'))
 const PackageManagement = lazy(() => import('./PackageManagement'))
 const AnalyticsPage = lazy(() => import('./AnalyticsPage'))
 const SettingsPage = lazy(() => import('./SettingsPage'))
@@ -75,10 +76,38 @@ function DashboardMockup() {
   )
 }
 
+function ProfileModal({ user, onClose, onSave }) {
+  const [name, setName] = useState(user.profile.full_name || '')
+  const [phone, setPhone] = useState(user.profile.phone || '')
+  const [saving, setSaving] = useState(false)
+  const submit = async e => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await updateProfile(user.user.id, { full_name: name, phone })
+      onSave({ ...user, profile: { ...user.profile, full_name: name, phone } })
+      onClose()
+    } catch(err) { alert(err.message) }
+    setSaving(false)
+  }
+  return <div className="fixed inset-0 z-[100] grid place-items-center bg-zinc-950/50 p-4 backdrop-blur-sm" onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <form onSubmit={submit} className="w-full max-w-sm rounded-[24px] bg-white p-6 shadow-2xl">
+      <h3 className="text-lg font-black">แก้ไขโปรไฟล์</h3>
+      <p className="mt-1 text-sm text-zinc-500">{user.user.email}</p>
+      <div className="mt-5 space-y-4">
+        <label className="block text-sm font-bold">ชื่อ-นามสกุล<input required value={name} onChange={e=>setName(e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 outline-none focus:border-orange-500" /></label>
+        <label className="block text-sm font-bold">เบอร์โทรศัพท์<input value={phone} onChange={e=>setPhone(e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 outline-none focus:border-orange-500" /></label>
+      </div>
+      <div className="mt-7 flex gap-3"><button type="button" onClick={onClose} className="h-11 flex-1 rounded-xl border border-zinc-200 font-bold">ยกเลิก</button><button disabled={saving} className="h-11 flex-1 rounded-xl bg-orange-500 font-bold text-white disabled:opacity-50">บันทึก</button></div>
+    </form>
+  </div>
+}
+
 function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
   const [now, setNow] = useState(Date.now())
+  const [profileModal, setProfileModal] = useState(false)
   useEffect(()=>{let live=true;fetchCurrentUserSummary().then(data=>{if(live)setCurrentUser(data)}).catch(()=>{});const timer=window.setInterval(()=>setNow(Date.now()),60000);return()=>{live=false;window.clearInterval(timer)}},[])
   const trialRemaining = (() => {
     const end = currentUser?.subscription?.ends_at
@@ -98,16 +127,18 @@ function LandingPage() {
         <div className="hidden items-center gap-8 md:flex">{[['home','Home'],['features','Features'],['pricing','Pricing'],['contact','Contact']].map(([id,label])=><button key={id} onClick={()=>id==='pricing' ? window.location.href='/pricing' : scrollTo(id)} className="text-sm font-medium text-zinc-600 transition hover:text-orange-600">{label}</button>)}</div>
         <div className="hidden items-center gap-2 md:flex">
           {currentUser ? <>
-            {currentUser.profile.role !== 'super_admin' && <Button className="h-10 rounded-lg px-4" onClick={()=>{ window.location.href=hasValidSub?'/store/my-store/':'/pricing' }}><Store size={16}/> {hasValidSub?'จัดการร้านค้า':'เลือกแพ็กเกจเพื่อเริ่มต้น'}</Button>}
-            <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-1.5"><span className="grid size-8 place-items-center rounded-lg bg-orange-100 text-orange-600"><UserCircle size={18}/></span><div className="text-left"><p className="max-w-36 truncate text-xs font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-orange-600"><Clock size={10}/>{accountStatus}</p></div></div>
+            {currentUser.profile.role === 'super_admin' && <Button variant="outline" className="h-10 rounded-lg px-4 border-orange-200 text-orange-600 hover:bg-orange-50" onClick={()=>{ window.location.href='/admin' }}><ShieldCheck size={16} className="mr-2"/> จัดการระบบ Admin</Button>}
+            <Button className="h-10 rounded-lg px-4" onClick={()=>{ window.location.href=hasValidSub?'/store/my-store/':'/pricing' }}><Store size={16} className="mr-2"/> {hasValidSub?'จัดการร้านค้า':'เลือกแพ็กเกจเพื่อเริ่มต้น'}</Button>
+            <button onClick={() => setProfileModal(true)} className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 transition hover:border-orange-200 hover:bg-orange-50 text-left"><span className="grid size-8 place-items-center rounded-lg bg-orange-100 text-orange-600"><UserCircle size={18}/></span><div><p className="max-w-36 truncate text-xs font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-orange-600"><Clock size={10}/>{accountStatus}</p></div></button>
             <button onClick={signOut} className="grid size-10 place-items-center rounded-xl border border-zinc-200 text-zinc-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500" aria-label="ออกจากระบบ"><LogOut size={17}/></button>
           </> : <><Button variant="ghost" onClick={()=>{ window.location.href='/login' }}>เข้าสู่ระบบ</Button><Button className="h-10 rounded-lg px-4" onClick={()=>{ window.location.href='/register' }}>สมัครร้าน <ArrowRight size={15}/></Button></>}
         </div>
         <button className="grid size-10 place-items-center rounded-xl border border-zinc-200 md:hidden" onClick={()=>setMenuOpen(!menuOpen)} aria-label="เปิดเมนู">{menuOpen?<X/>:<Menu/>}</button>
       </div>
       {menuOpen && <div className="border-t border-zinc-100 bg-white p-5 md:hidden">
-        {currentUser&&<div className="mb-3 rounded-xl bg-orange-50 p-3"><p className="text-sm font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-1 text-xs font-semibold text-orange-600">{trialRemaining||currentUser.shop?.name}</p></div>}
-        {currentUser?.profile.role !== 'super_admin' && currentUser && <Button className="mb-2 w-full" onClick={()=>{ window.location.href=hasValidSub?'/store/my-store/':'/pricing' }}><Store size={16}/> {hasValidSub?'จัดการร้านค้า':'เลือกแพ็กเกจเพื่อเริ่มต้น'}</Button>}
+        {currentUser&&<button onClick={() => setProfileModal(true)} className="mb-3 w-full rounded-xl bg-orange-50 p-3 text-left hover:bg-orange-100"><p className="text-sm font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-1 text-xs font-semibold text-orange-600">{trialRemaining||currentUser.shop?.name}</p></button>}
+        {currentUser?.profile.role === 'super_admin' && <Button variant="outline" className="mb-2 w-full border-orange-200 text-orange-600" onClick={()=>{ window.location.href='/admin' }}><ShieldCheck size={16} className="mr-2"/> จัดการระบบ Admin</Button>}
+        {currentUser && <Button className="mb-2 w-full" onClick={()=>{ window.location.href=hasValidSub?'/store/my-store/':'/pricing' }}><Store size={16} className="mr-2"/> {hasValidSub?'จัดการร้านค้า':'เลือกแพ็กเกจเพื่อเริ่มต้น'}</Button>}
         {[['home','Home'],['features','Features'],['pricing','Pricing'],['contact','Contact']].map(([id,label])=><button key={id} onClick={()=>id==='pricing' ? window.location.href='/pricing' : scrollTo(id)} className="block w-full border-b border-zinc-100 py-3 text-left font-medium">{label}</button>)}
         {currentUser?<Button className="mt-4 w-full" variant="secondary" onClick={signOut}><LogOut size={16}/> ออกจากระบบ</Button>:<div className="mt-4 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={()=>{ window.location.href='/login' }}>เข้าสู่ระบบ</Button><Button onClick={()=>{ window.location.href='/register' }}>สมัครร้าน</Button></div>}
       </div>}
@@ -121,7 +152,7 @@ function LandingPage() {
             <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700"><Sparkles size={14}/> ระบบจัดการร้านอาหาร All-in-One</div>
             <h1 className="mt-7 text-4xl font-black leading-[1.15] tracking-[-.04em] sm:text-5xl lg:text-[62px]">ระบบ POS และ<br/><span className="relative text-orange-500">เว็บสั่งอาหาร<span className="absolute -bottom-1 left-0 h-2 w-full -rotate-1 rounded-full bg-orange-200/70 -z-10"/></span><br/>สำหรับร้านอาหาร<br/>ทุกประเภท</h1>
             <p className="mt-6 max-w-xl text-base leading-8 text-zinc-600 sm:text-lg">ขายหน้าร้าน สั่งผ่าน QR Code เดลิเวอรี จัดการสต็อก รายงานยอดขาย และแจ้งเตือนผ่าน LINE OA — ครบในระบบเดียว</p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row"><Button className="h-14 px-7 text-base" onClick={()=>{ window.location.href='/register' }}>ทดลองใช้งานฟรี <ArrowRight size={18}/></Button><Button variant="secondary" className="h-14 px-7 text-base" onClick={()=>scrollTo('demo')}><Store size={18}/> ดูตัวอย่างร้านหมูกระทะ</Button></div>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row"><Button className="h-14 px-7 text-base" onClick={()=>{ window.location.href='/pricing' }}>ทดลองใช้งานฟรี <ArrowRight size={18}/></Button><Button variant="secondary" className="h-14 px-7 text-base" onClick={()=>scrollTo('demo')}><Store size={18}/> ดูตัวอย่างร้านหมูกระทะ</Button></div>
             <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-zinc-500">{['ฟรี 14 วัน','ไม่ต้องใช้บัตรเครดิต','พร้อมใช้ใน 5 นาที'].map(x=><span key={x} className="flex items-center gap-1.5"><Check size={14} className="text-orange-500"/>{x}</span>)}</div>
           </div>
           <div id="demo"><DashboardMockup/></div>
@@ -138,6 +169,7 @@ function LandingPage() {
     </main>
 
     <footer id="contact" className="border-t border-zinc-200 bg-white px-5 py-10 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-7 md:flex-row"><div><Logo/><p className="mt-3 text-sm text-zinc-500">ให้ทุกเรื่องร้านอาหาร ง่ายในระบบเดียว</p></div><div className="flex flex-wrap justify-center gap-6 text-sm font-medium text-zinc-500"><a href="#features" className="hover:text-orange-500">Features</a><a href="#pricing" className="hover:text-orange-500">Pricing</a><a href="mailto:hello@smartpos.co" className="hover:text-orange-500">hello@smartpos.co</a><a href="tel:020000000" className="hover:text-orange-500">02-000-0000</a></div><p className="text-xs text-zinc-400">© 2026 SmartPOS</p></div></footer>
+    {profileModal && currentUser && <ProfileModal user={currentUser} onClose={() => setProfileModal(false)} onSave={setCurrentUser} />}
   </div>
 }
 
@@ -150,6 +182,7 @@ export default function App() {
   if (window.location.pathname === '/login') return <LoginPage />
   if (window.location.pathname === '/pricing') return <PricingPage />
   if (window.location.pathname === '/checkout') return <Suspense fallback={<div className="grid min-h-screen place-items-center">กำลังโหลด…</div>}><CheckoutPage /></Suspense>
+  if (window.location.pathname === '/create-store') return <Suspense fallback={<div className="grid min-h-screen place-items-center">กำลังโหลด…</div>}><CreateStorePage /></Suspense>
   if (window.location.pathname === '/admin') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลด Dashboard…</div>}><AdminDashboard /></Suspense>
   if (window.location.pathname === '/admin/stores') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลดร้านค้า…</div>}><StoreManagement /></Suspense>
   if (window.location.pathname === '/admin/packages') return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลดแพ็กเกจ…</div>}><PackageManagement /></Suspense>
