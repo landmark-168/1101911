@@ -173,11 +173,14 @@ function LandingPage() {
   </div>
 }
 
+const StorefrontApp = lazy(() => import('./storefront/StorefrontApp'))
 
 export default function App() {
   const [, setBrandReady] = useState(false)
   useEffect(() => { const cached=readCachedBranding();if(cached)applyBranding(cached,false);watchBranding();fetchPublicSettings().then(settings => { if (!settings) return;applyBranding(settings);setBrandReady(true) });fetchCurrentUserSummary().then(applyAdminIdentity).catch(()=>{}) }, [])
   if (window.location.pathname.startsWith('/store/')) return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-950 text-sm font-bold text-white">กำลังเปิด Store Workspace…</div>}><StoreOwnerApp /></Suspense>
+  if (window.location.pathname.startsWith('/qr/')) return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลดหน้าร้าน…</div>}><StorefrontApp /></Suspense>
+  if (window.location.pathname.startsWith('/s/')) return <Suspense fallback={<div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลดหน้าร้าน…</div>}><StorefrontApp /></Suspense>
   if (window.location.pathname === '/register') return <RegisterPage />
   if (window.location.pathname === '/login') return <LoginPage />
   if (window.location.pathname === '/pricing') return <PricingPage />
