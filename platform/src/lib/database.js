@@ -208,5 +208,61 @@ export async function fetchAdminRevenue() {
 }
 
 export async function fetchAdminMembers() {
-  const {data,error}=await supabase.from('profiles').select('id,email,full_name,phone,role,created_at,shops(name,status),subscriptions(package,status)').order('created_at',{ascending:false});if(error)throw error;return data||[]
+  const {data,error}=await supabase.from('profiles').select('id,email,full_name,phone,role,created_at,shops(id,name,status),subscriptions(id,package,billing_cycle,status,starts_at,ends_at)').order('created_at',{ascending:false});if(error)throw error;return data||[]
+}
+
+export async function adminUpdateMemberSubscription({ userId, packageName, billingCycle = 'yearly', status = 'active', endsAt }) {
+  const { data: existingList } = await supabase.from('subscriptions').select('id').eq('user_id', userId).order('created_at', { ascending: false })
+  const existing = existingList?.[0]
+  const payload = {
+    user_id: userId,
+    package: packageName,
+    billing_cycle: billingCycle,
+    status: status,
+    ends_at: endsAt || new Date(Date.now() + 30 * 86400000).toISOString()
+  }
+
+  let subResult
+  if (existing) {
+    subResult = await supabase.from('subscriptions').update(payload).eq('id', existing.id).select().single()
+  } else {
+    payload.starts_at = new Date().toISOString()
+    subResult = await supabase.from('subscriptions').insert(payload).select().single()
+  }
+
+  if (subResult.error) throw subResult.error
+
+  const { data: shop } = await supabase.from('shops').select('id').eq('owner_id', userId).limit(1).maybeSingle()
+  if (shop) {
+    await supabase.from('shops').update({ package: packageName, updated_at: new Date().toISOString() }).eq('id', shop.id)
+  }
+
+  return subResult.data
+}
+
+export async function adminUpdateMemberFull({ userId, fullName, phone, role, packageName, billingCycle, status, endsAt }) {
+  // Update Profile info & role
+  const { error: profileError } = await supabase.from('profiles').update({
+    full_name: fullName,
+    phone: phone,
+    role: role,
+    updated_at: new Date().toISOString()
+  }).eq('id', userId)
+
+  if (profileError) throw profileError
+
+  // Update Subscription & Shop
+  if (packageName) {
+    await adminUpdateMemberSubscription({ userId, packageName, billingCycle, status, endsAt })
+  }
+}
+
+export async function adminDeleteMember(userId) {
+  // Delete subscriptions
+  await supabase.from('subscriptions').delete().eq('user_id', userId)
+  // Delete store_members
+  await supabase.from('store_members').delete().eq('user_id', userId)
+  // Delete profile
+  const { error } = await supabase.from('profiles').delete().eq('id', userId)
+  if (error) throw error
 }
