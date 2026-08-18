@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowRight, Check, Clock, LogOut, Minus, ShieldCheck, Sparkles, Store, UserCircle, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ChevronRight, Clock, LogOut, Menu, Minus, ShieldCheck, Sparkles, Store, UserCircle, X, Zap } from 'lucide-react'
 import { fetchCurrentUserSummary, fetchPackages, signOut } from './lib/database'
 
 const defaultPlans = [
   {
     name: 'Starter', description: 'สำหรับร้านเล็กที่กำลังเริ่มต้น', monthly: 590, yearly: 472,
     features: ['1 สาขา', 'ผู้ใช้งาน 3 คน', 'POS และ QR Menu', 'รายงานยอดขายพื้นฐาน', 'ช่วยเหลือผ่านแชต'],
-    button: 'เริ่มทดลองฟรี 14 วัน (Starter)', accent: false,
+    button: 'Subscribe Starter', accent: false,
   },
   {
     name: 'Business', description: 'สำหรับร้านที่ต้องการเติบโต', monthly: 1290, yearly: 1032,
@@ -50,7 +50,19 @@ export default function PricingPage() {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [now, setNow] = useState(Date.now())
-  useEffect(()=>{let live=true;Promise.all([fetchCurrentUserSummary().catch(()=>null),fetchPackages()]).then(([user,rows])=>{if(!live)return;setCurrentUser(user);if(rows?.length)setPlans(rows.map((row,index)=>({id:row.id,name:row.name,description:row.description,monthly:Number(row.monthly_price),yearly:Number(row.yearly_price)/12,yearlyTotal:Number(row.yearly_price),duration:row.duration_days,features:row.features||[],button:row.name==='Enterprise'?'ติดต่อฝ่ายขาย':row.name==='Starter'?'เริ่มทดลองฟรี 14 วัน (Starter)':`Subscribe ${row.name}`,accent:row.name==='Business'||index===1})))}).catch(err=>setError(err.message));const timer=setInterval(()=>setNow(Date.now()),60000);return()=>{live=false;clearInterval(timer)}},[])
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  useEffect(()=>{let live=true;Promise.all([fetchCurrentUserSummary().catch(()=>null),fetchPackages()]).then(([user,rows])=>{if(!live)return;setCurrentUser(user);if(rows?.length)setPlans(rows.map((row,index)=>({id:row.id,name:row.name,description:row.description,monthly:Number(row.monthly_price),yearly:Number(row.yearly_price)/12,yearlyTotal:Number(row.yearly_price),duration:row.duration_days,features:row.features||[],button:row.name==='Enterprise'?'ติดต่อฝ่ายขาย':`Subscribe ${row.name}`,accent:row.name==='Business'||index===1})))}).catch(err=>setError(err.message));const timer=setInterval(()=>setNow(Date.now()),60000);return()=>{live=false;clearInterval(timer)}},[])
+
+  useEffect(()=>{
+    const handler=(e)=>{ if(!e.target.closest('#profile-dropdown')) setDropdownOpen(false) }
+    document.addEventListener('mousedown',handler)
+    return ()=>document.removeEventListener('mousedown',handler)
+  },[])
+
+  const isTrialExpired = currentUser?.subscription?.ends_at ? (new Date(currentUser.subscription.ends_at).getTime() <= now) : false
+  const hasValidSub = currentUser?.subscription && ['active','trialing'].includes(currentUser.subscription.status) && !isTrialExpired
   const trialRemaining=(()=>{const end=currentUser?.subscription?.ends_at;if(!end)return null;const diff=Math.max(0,new Date(end).getTime()-now);return diff>0?`ทดลองเหลือ ${Math.floor(diff/86400000)} วัน ${Math.floor((diff%86400000)/3600000)} ชม.`:'หมดช่วงทดลองใช้ฟรีแล้ว'})()
   const accountStatus=[currentUser?.subscription?.package||currentUser?.shop?.package,trialRemaining].filter(Boolean).join(' · ')||currentUser?.shop?.name||'บัญชีร้านค้า'
   const choosePlan=plan=>{if(plan.name==='Enterprise'){window.location.href='mailto:sales@smartpos.co';return}const target=`/checkout?plan=${plan.name}&billing=${yearly?'yearly':'monthly'}`;window.location.href=currentUser?target:`/login?next=${encodeURIComponent(target)}`}
@@ -60,16 +72,158 @@ export default function PricingPage() {
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8">
         <Brand/>
         <div className="hidden items-center gap-7 md:flex lg:gap-9"><a href="/" className="text-sm font-medium text-zinc-600 transition hover:text-orange-600">Home</a><a href="/#features" className="text-sm font-medium text-zinc-600 transition hover:text-orange-600">Features</a><a href="/pricing" className="relative text-sm font-bold text-orange-600">Pricing<span className="absolute -bottom-2 left-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-orange-500"/></a><a href="/#contact" className="text-sm font-medium text-zinc-600 transition hover:text-orange-600">Contact</a></div>
-        <div className="flex items-center gap-2">{currentUser?<><div className="hidden items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 sm:flex"><span className="grid size-8 place-items-center rounded-lg bg-orange-100 text-orange-600"><UserCircle size={18}/></span><div><p className="max-w-36 truncate text-xs font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-orange-600"><Clock size={10}/>{accountStatus}</p></div></div><button onClick={signOut} className="grid size-10 place-items-center rounded-xl border border-zinc-200 text-zinc-400 hover:bg-red-50 hover:text-red-500" aria-label="ออกจากระบบ"><LogOut size={17}/></button></>:<><a href="/login?next=/pricing" className="hidden rounded-lg px-4 py-2 text-sm font-bold text-zinc-600 transition hover:bg-zinc-100 sm:block">เข้าสู่ระบบ</a><a href="/register" className="inline-flex h-10 items-center gap-2 rounded-lg bg-orange-500 px-4 text-sm font-bold text-white shadow-md shadow-orange-500/15 transition hover:bg-orange-600">ทดลองฟรี <ArrowRight size={15}/></a></>}</div>
+        
+        <div className="hidden md:flex items-center gap-2">
+          {currentUser ? (
+            /* Profile Dropdown */
+            <div id="profile-dropdown" className="relative">
+              <button
+                onClick={()=>setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 transition hover:border-orange-200 hover:bg-orange-50 text-left shadow-sm"
+              >
+                <span className="grid size-8 place-items-center rounded-lg bg-orange-100 text-orange-600"><UserCircle size={18}/></span>
+                <div>
+                  <p className="max-w-36 truncate text-xs font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p>
+                  <p className={`mt-0.5 flex items-center gap-1 text-[10px] font-semibold ${isTrialExpired || trialRemaining==='หมดช่วงทดลองใช้ฟรีแล้ว'?'text-red-500':'text-orange-600'}`}>
+                    <Clock size={10}/>{accountStatus}
+                  </p>
+                </div>
+                <ChevronRight size={14} className={`text-zinc-400 transition-transform ${dropdownOpen?'rotate-90':''}`}/>
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-zinc-100 bg-white shadow-2xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-zinc-100 bg-zinc-50/50">
+                    <p className="text-xs font-extrabold text-zinc-900 truncate">{currentUser.profile.full_name||currentUser.user.email}</p>
+                    <p className={`text-[10px] mt-0.5 font-semibold ${isTrialExpired || trialRemaining==='หมดช่วงทดลองใช้ฟรีแล้ว'?'text-red-500':'text-zinc-500'}`}>{accountStatus}</p>
+                  </div>
+
+                  {!hasValidSub && (
+                    <div className="px-4 py-3 bg-red-50 border-b border-red-100">
+                      <p className="text-[11px] font-bold text-red-600">⚠️ Subscription หมดอายุแล้ว</p>
+                      <p className="text-[10px] text-red-500 mt-0.5">กรุณาต่ออายุแพ็กเกจเพื่อเข้าใช้งานร้านค้า</p>
+                    </div>
+                  )}
+
+                  <div className="p-1 space-y-0.5">
+                    {currentUser.profile.role === 'super_admin' && (
+                      <button
+                        onClick={()=>{window.location.href='/admin';setDropdownOpen(false)}}
+                        className="flex w-full items-center gap-3 px-3 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50 rounded-xl"
+                      >
+                        <ShieldCheck size={16} className="text-orange-500"/> จัดการระบบ Admin
+                      </button>
+                    )}
+
+                    <button
+                      onClick={()=>{
+                        if (hasValidSub) {
+                          window.location.href='/store/my-store/'
+                        } else {
+                          window.location.href='/pricing'
+                        }
+                        setDropdownOpen(false)
+                      }}
+                      className="flex w-full items-center gap-3 px-3 py-2 text-xs font-bold text-zinc-800 hover:bg-zinc-100 rounded-xl"
+                    >
+                      <Store size={16} className="text-orange-500"/> จัดการร้านค้า
+                    </button>
+
+                    <button onClick={()=>{window.location.href='/#contact';setDropdownOpen(false)}} className="flex w-full items-center gap-3 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 rounded-xl">
+                      <UserCircle size={16} className="text-zinc-400"/> แก้ไขโปรไฟล์
+                    </button>
+                  </div>
+
+                  <div className="border-t border-zinc-100 p-1">
+                    <button onClick={signOut} className="flex w-full items-center gap-3 px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl">
+                      <LogOut size={16}/> ออกจากระบบ
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : <><a href="/login?next=/pricing" className="hidden rounded-lg px-4 py-2 text-sm font-bold text-zinc-600 transition hover:bg-zinc-100 sm:block">เข้าสู่ระบบ</a><a href="/register" className="inline-flex h-10 items-center gap-2 rounded-lg bg-orange-500 px-4 text-sm font-bold text-white shadow-md shadow-orange-500/15 transition hover:bg-orange-600">สมัครใช้งาน <ArrowRight size={15}/></a></>}
+        </div>
+
+        <button className="grid size-10 place-items-center rounded-xl border border-zinc-200 md:hidden" onClick={()=>setMenuOpen(!menuOpen)} aria-label="เปิดเมนู">{menuOpen?<X/>:<Menu/>}</button>
       </div>
+
+      {menuOpen && <div className="border-t border-zinc-100 bg-white p-5 md:hidden space-y-4 shadow-xl">
+        {currentUser && (
+          <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1 pr-2">
+                <p className="text-sm font-extrabold text-zinc-900 truncate">{currentUser.profile.full_name||currentUser.user.email}</p>
+                <p className={`text-xs font-semibold mt-0.5 ${isTrialExpired || trialRemaining==='หมดช่วงทดลองใช้ฟรีแล้ว' ? 'text-red-500' : 'text-orange-600'}`}>
+                  {accountStatus}
+                </p>
+              </div>
+            </div>
+
+            {!hasValidSub && (
+              <div className="rounded-xl bg-red-50 p-3 border border-red-100 space-y-2">
+                <p className="text-xs font-bold text-red-600">⚠️ Subscription หมดอายุแล้ว</p>
+                <button
+                  onClick={()=>{ window.location.href='/pricing'; setMenuOpen(false) }}
+                  className="w-full rounded-lg bg-red-500 py-2 text-xs font-bold text-white shadow-sm hover:bg-red-600"
+                >
+                  ต่ออายุแพ็กเกจ →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="space-y-1">
+          {currentUser?.profile.role === 'super_admin' && (
+            <button
+              onClick={()=>{ window.location.href='/admin'; setMenuOpen(false) }}
+              className="flex w-full items-center gap-3 rounded-xl bg-orange-50 px-3 py-2.5 text-sm font-bold text-orange-600 hover:bg-orange-100"
+            >
+              <ShieldCheck size={18}/> จัดการระบบ Admin
+            </button>
+          )}
+
+          {currentUser && (
+            <button
+              onClick={()=>{ window.location.href=hasValidSub?'/store/my-store/':'/pricing'; setMenuOpen(false) }}
+              className="flex w-full items-center gap-3 rounded-xl bg-zinc-900 px-3 py-2.5 text-sm font-bold text-white hover:bg-zinc-800"
+            >
+              <Store size={18}/> {hasValidSub ? 'จัดการร้านค้า' : 'เลือกแพ็กเกจ'}
+            </button>
+          )}
+        </div>
+
+        <div className="border-t border-zinc-100 pt-3 space-y-1">
+          {[['home','/'],['features','/#features'],['pricing','/pricing'],['contact','/#contact']].map(([id,path])=>(
+            <a key={id} href={path} onClick={()=>setMenuOpen(false)} className="block w-full py-2 text-left text-sm font-semibold text-zinc-700 hover:text-orange-600 capitalize">
+              {id}
+            </a>
+          ))}
+        </div>
+
+        {currentUser ? (
+          <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-100 py-2.5 text-sm font-bold text-zinc-700 hover:bg-red-50 hover:text-red-500" onClick={signOut}>
+            <LogOut size={16}/> ออกจากระบบ
+          </button>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 pt-2">
+            <a href="/login?next=/pricing" className="grid h-10 place-items-center rounded-xl bg-zinc-100 text-sm font-bold text-zinc-700">เข้าสู่ระบบ</a>
+            <a href="/register" className="grid h-10 place-items-center rounded-xl bg-orange-500 text-sm font-bold text-white">สมัครใช้งาน</a>
+          </div>
+        )}
+      </div>}
     </nav>
 
     <main>
-      <section className="relative overflow-hidden px-5 pb-16 pt-14 text-center lg:px-8 lg:pb-20 lg:pt-20">
+      <div className="mx-auto max-w-7xl px-5 pt-8 lg:px-8">
+        <a href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-zinc-900"><ArrowLeft size={16}/> กลับหน้าหลัก</a>
+      </div>
+      <section className="relative overflow-hidden px-5 pb-16 pt-6 text-center lg:px-8 lg:pb-20 lg:pt-8">
         <div className="absolute left-1/2 top-0 -z-10 size-[650px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-100/80 blur-3xl"/>
         <div className="mx-auto max-w-3xl">
-          <a href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-500 transition hover:text-zinc-900"><ArrowLeft size={16}/> กลับหน้าหลัก</a>
-          <div className="mt-7 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700"><Sparkles size={14}/> ทดลองทุกแพ็กเกจฟรี 14 วัน</div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">
+            <Sparkles size={14}/> {isTrialExpired ? 'เลือกแพ็กเกจเพื่อต่ออายุการใช้งานร้านค้า' : 'ทดลองทุกแพ็กเกจฟรี 14 วัน'}
+          </div>
           <h1 className="mt-5 text-4xl font-black tracking-[-.04em] sm:text-5xl lg:text-6xl">แพ็กเกจที่เติบโต<br className="sm:hidden"/>ไปพร้อมกับร้านคุณ</h1>
           <p className="mx-auto mt-5 max-w-2xl leading-7 text-zinc-500">เลือกแพ็กเกจที่เหมาะกับร้าน เปลี่ยนหรือยกเลิกได้ทุกเมื่อ ไม่มีค่าติดตั้ง</p>
           <div className="mt-8 inline-flex items-center rounded-xl border border-zinc-200 bg-white p-1.5 shadow-sm" role="group" aria-label="เลือกรอบการชำระเงิน">

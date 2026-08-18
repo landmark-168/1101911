@@ -108,7 +108,14 @@ function LandingPage() {
   const [currentUser, setCurrentUser] = useState(null)
   const [now, setNow] = useState(Date.now())
   const [profileModal, setProfileModal] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
   useEffect(()=>{let live=true;fetchCurrentUserSummary().then(data=>{if(live)setCurrentUser(data)}).catch(()=>{});const timer=window.setInterval(()=>setNow(Date.now()),60000);return()=>{live=false;window.clearInterval(timer)}},[])
+  // Close dropdown on outside click
+  useEffect(()=>{
+    const handler=(e)=>{ if(!e.target.closest('#profile-dropdown')) setDropdownOpen(false) }
+    document.addEventListener('mousedown',handler)
+    return ()=>document.removeEventListener('mousedown',handler)
+  },[])
   const trialRemaining = (() => {
     const end = currentUser?.subscription?.ends_at
     if (!end) return null
@@ -118,7 +125,8 @@ function LandingPage() {
     return diff > 0 ? `ทดลองเหลือ ${days} วัน ${hours} ชม.` : 'หมดช่วงทดลองใช้ฟรีแล้ว'
   })()
   const accountStatus = [currentUser?.subscription?.package || currentUser?.shop?.package, trialRemaining].filter(Boolean).join(' · ') || currentUser?.shop?.name || 'บัญชีร้านค้า'
-  const hasValidSub = currentUser?.subscription && ['active','trialing'].includes(currentUser.subscription.status)
+  const isTrialExpired = currentUser?.subscription?.ends_at ? (new Date(currentUser.subscription.ends_at).getTime() <= now) : false
+  const hasValidSub = currentUser?.subscription && ['active','trialing'].includes(currentUser.subscription.status) && !isTrialExpired
   const scrollTo = id => { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); setMenuOpen(false) }
   return <div className="min-h-screen overflow-hidden bg-[#fffdf9] text-zinc-950">
     <nav className="fixed inset-x-0 top-0 z-50 border-b border-zinc-200/60 bg-white/75 backdrop-blur-xl">
@@ -126,21 +134,145 @@ function LandingPage() {
         <Logo />
         <div className="hidden items-center gap-8 md:flex">{[['home','Home'],['features','Features'],['pricing','Pricing'],['contact','Contact']].map(([id,label])=><button key={id} onClick={()=>id==='pricing' ? window.location.href='/pricing' : scrollTo(id)} className="text-sm font-medium text-zinc-600 transition hover:text-orange-600">{label}</button>)}</div>
         <div className="hidden items-center gap-2 md:flex">
-          {currentUser ? <>
-            {currentUser.profile.role === 'super_admin' && <Button variant="outline" className="h-10 rounded-lg px-4 border-orange-200 text-orange-600 hover:bg-orange-50" onClick={()=>{ window.location.href='/admin' }}><ShieldCheck size={16} className="mr-2"/> จัดการระบบ Admin</Button>}
-            <Button className="h-10 rounded-lg px-4" onClick={()=>{ window.location.href=hasValidSub?'/store/my-store/':'/pricing' }}><Store size={16} className="mr-2"/> {hasValidSub?'จัดการร้านค้า':'เลือกแพ็กเกจเพื่อเริ่มต้น'}</Button>
-            <button onClick={() => setProfileModal(true)} className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 transition hover:border-orange-200 hover:bg-orange-50 text-left"><span className="grid size-8 place-items-center rounded-lg bg-orange-100 text-orange-600"><UserCircle size={18}/></span><div><p className="max-w-36 truncate text-xs font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-orange-600"><Clock size={10}/>{accountStatus}</p></div></button>
-            <button onClick={signOut} className="grid size-10 place-items-center rounded-xl border border-zinc-200 text-zinc-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500" aria-label="ออกจากระบบ"><LogOut size={17}/></button>
-          </> : <><Button variant="ghost" onClick={()=>{ window.location.href='/login' }}>เข้าสู่ระบบ</Button><Button className="h-10 rounded-lg px-4" onClick={()=>{ window.location.href='/register' }}>สมัครร้าน <ArrowRight size={15}/></Button></>}
+          {currentUser ? (
+            /* Profile Dropdown */
+            <div id="profile-dropdown" className="relative">
+              <button
+                onClick={()=>setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 transition hover:border-orange-200 hover:bg-orange-50 text-left shadow-sm"
+              >
+                <span className="grid size-8 place-items-center rounded-lg bg-orange-100 text-orange-600"><UserCircle size={18}/></span>
+                <div>
+                  <p className="max-w-36 truncate text-xs font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p>
+                  <p className={`mt-0.5 flex items-center gap-1 text-[10px] font-semibold ${isTrialExpired || trialRemaining==='หมดช่วงทดลองใช้ฟรีแล้ว'?'text-red-500':'text-orange-600'}`}>
+                    <Clock size={10}/>{accountStatus}
+                  </p>
+                </div>
+                <ChevronRight size={14} className={`text-zinc-400 transition-transform ${dropdownOpen?'rotate-90':''}`}/>
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-zinc-100 bg-white shadow-2xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-zinc-100 bg-zinc-50/50">
+                    <p className="text-xs font-extrabold text-zinc-900 truncate">{currentUser.profile.full_name||currentUser.user.email}</p>
+                    <p className={`text-[10px] mt-0.5 font-semibold ${isTrialExpired || trialRemaining==='หมดช่วงทดลองใช้ฟรีแล้ว'?'text-red-500':'text-zinc-500'}`}>{accountStatus}</p>
+                  </div>
+
+                  {!hasValidSub && (
+                    <div className="px-4 py-3 bg-red-50 border-b border-red-100">
+                      <p className="text-[11px] font-bold text-red-600">⚠️ Subscription หมดอายุแล้ว</p>
+                      <p className="text-[10px] text-red-500 mt-0.5">กรุณาต่ออายุแพ็กเกจเพื่อเข้าใช้งานร้านค้า</p>
+                      <button onClick={()=>{window.location.href='/pricing';setDropdownOpen(false)}} className="mt-2 w-full rounded-lg bg-red-500 py-1.5 text-[11px] font-bold text-white hover:bg-red-600 shadow-sm">ต่ออายุแพ็กเกจ →</button>
+                    </div>
+                  )}
+
+                  <div className="p-1 space-y-0.5">
+                    {currentUser.profile.role === 'super_admin' && (
+                      <button
+                        onClick={()=>{window.location.href='/admin';setDropdownOpen(false)}}
+                        className="flex w-full items-center gap-3 px-3 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50 rounded-xl"
+                      >
+                        <ShieldCheck size={16} className="text-orange-500"/> จัดการระบบ Admin
+                      </button>
+                    )}
+
+                    <button
+                      onClick={()=>{
+                        if (hasValidSub) {
+                          window.location.href='/store/my-store/'
+                        } else {
+                          window.location.href='/pricing'
+                        }
+                        setDropdownOpen(false)
+                      }}
+                      className="flex w-full items-center gap-3 px-3 py-2 text-xs font-bold text-zinc-800 hover:bg-zinc-100 rounded-xl"
+                    >
+                      <Store size={16} className="text-orange-500"/> จัดการร้านค้า
+                    </button>
+
+                    <button onClick={()=>{setProfileModal(true);setDropdownOpen(false)}} className="flex w-full items-center gap-3 px-3 py-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 rounded-xl">
+                      <UserCircle size={16} className="text-zinc-400"/> แก้ไขโปรไฟล์
+                    </button>
+                  </div>
+
+                  <div className="border-t border-zinc-100 p-1">
+                    <button onClick={signOut} className="flex w-full items-center gap-3 px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl">
+                      <LogOut size={16}/> ออกจากระบบ
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : <><Button variant="ghost" onClick={()=>{ window.location.href='/login' }}>เข้าสู่ระบบ</Button><Button className="h-10 rounded-lg px-4" onClick={()=>{ window.location.href='/register' }}>สมัครร้าน <ArrowRight size={15}/></Button></>}
         </div>
         <button className="grid size-10 place-items-center rounded-xl border border-zinc-200 md:hidden" onClick={()=>setMenuOpen(!menuOpen)} aria-label="เปิดเมนู">{menuOpen?<X/>:<Menu/>}</button>
       </div>
-      {menuOpen && <div className="border-t border-zinc-100 bg-white p-5 md:hidden">
-        {currentUser&&<button onClick={() => setProfileModal(true)} className="mb-3 w-full rounded-xl bg-orange-50 p-3 text-left hover:bg-orange-100"><p className="text-sm font-extrabold">{currentUser.profile.full_name||currentUser.user.email}</p><p className="mt-1 text-xs font-semibold text-orange-600">{trialRemaining||currentUser.shop?.name}</p></button>}
-        {currentUser?.profile.role === 'super_admin' && <Button variant="outline" className="mb-2 w-full border-orange-200 text-orange-600" onClick={()=>{ window.location.href='/admin' }}><ShieldCheck size={16} className="mr-2"/> จัดการระบบ Admin</Button>}
-        {currentUser && <Button className="mb-2 w-full" onClick={()=>{ window.location.href=hasValidSub?'/store/my-store/':'/pricing' }}><Store size={16} className="mr-2"/> {hasValidSub?'จัดการร้านค้า':'เลือกแพ็กเกจเพื่อเริ่มต้น'}</Button>}
-        {[['home','Home'],['features','Features'],['pricing','Pricing'],['contact','Contact']].map(([id,label])=><button key={id} onClick={()=>id==='pricing' ? window.location.href='/pricing' : scrollTo(id)} className="block w-full border-b border-zinc-100 py-3 text-left font-medium">{label}</button>)}
-        {currentUser?<Button className="mt-4 w-full" variant="secondary" onClick={signOut}><LogOut size={16}/> ออกจากระบบ</Button>:<div className="mt-4 grid grid-cols-2 gap-2"><Button variant="secondary" onClick={()=>{ window.location.href='/login' }}>เข้าสู่ระบบ</Button><Button onClick={()=>{ window.location.href='/register' }}>สมัครร้าน</Button></div>}
+      {menuOpen && <div className="border-t border-zinc-100 bg-white p-5 md:hidden space-y-4 shadow-xl">
+        {currentUser && (
+          <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1 pr-2">
+                <p className="text-sm font-extrabold text-zinc-900 truncate">{currentUser.profile.full_name||currentUser.user.email}</p>
+                <p className={`text-xs font-semibold mt-0.5 ${isTrialExpired || trialRemaining==='หมดช่วงทดลองใช้ฟรีแล้ว' ? 'text-red-500' : 'text-orange-600'}`}>
+                  {accountStatus}
+                </p>
+              </div>
+              <button onClick={() => { setProfileModal(true); setMenuOpen(false) }} className="text-xs font-bold text-orange-600 hover:underline shrink-0">
+                แก้ไขโปรไฟล์
+              </button>
+            </div>
+
+            {!hasValidSub && (
+              <div className="rounded-xl bg-red-50 p-3 border border-red-100 space-y-2">
+                <p className="text-xs font-bold text-red-600">⚠️ Subscription หมดอายุแล้ว</p>
+                <button
+                  onClick={()=>{ window.location.href='/pricing'; setMenuOpen(false) }}
+                  className="w-full rounded-lg bg-red-500 py-2 text-xs font-bold text-white shadow-sm hover:bg-red-600"
+                >
+                  ต่ออายุแพ็กเกจ →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="space-y-1">
+          {currentUser?.profile.role === 'super_admin' && (
+            <button
+              onClick={()=>{ window.location.href='/admin'; setMenuOpen(false) }}
+              className="flex w-full items-center gap-3 rounded-xl bg-orange-50 px-3 py-2.5 text-sm font-bold text-orange-600 hover:bg-orange-100"
+            >
+              <ShieldCheck size={18}/> จัดการระบบ Admin
+            </button>
+          )}
+
+          {currentUser && (
+            <button
+              onClick={()=>{ window.location.href=hasValidSub?'/store/my-store/':'/pricing'; setMenuOpen(false) }}
+              className="flex w-full items-center gap-3 rounded-xl bg-zinc-900 px-3 py-2.5 text-sm font-bold text-white hover:bg-zinc-800"
+            >
+              <Store size={18}/> {hasValidSub ? 'จัดการร้านค้า' : 'เลือกแพ็กเกจ'}
+            </button>
+          )}
+        </div>
+
+        <div className="border-t border-zinc-100 pt-3 space-y-1">
+          {[['home','Home'],['features','Features'],['pricing','Pricing'],['contact','Contact']].map(([id,label])=>(
+            <button key={id} onClick={()=>id==='pricing' ? (window.location.href='/pricing') : scrollTo(id)} className="block w-full py-2 text-left text-sm font-semibold text-zinc-700 hover:text-orange-600">
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {currentUser ? (
+          <Button className="w-full" variant="secondary" onClick={signOut}>
+            <LogOut size={16} className="mr-2"/> ออกจากระบบ
+          </Button>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 pt-2">
+            <Button variant="secondary" onClick={()=>{ window.location.href='/login' }}>เข้าสู่ระบบ</Button>
+            <Button onClick={()=>{ window.location.href='/register' }}>สมัครร้าน</Button>
+          </div>
+        )}
       </div>}
     </nav>
 
