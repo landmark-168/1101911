@@ -59,11 +59,11 @@ export default function TablesManagement() {
   // So old customers from yesterday who saved the link can't order.
   const openTable = useMutation({
     mutationFn: async (id: string) => {
-      // regenerate uuid by calling a function or just generating it on client
       const newToken = crypto.randomUUID()
       const { error } = await supabase.from('store_tables').update({
         status: 'occupied',
-        qr_token: newToken
+        qr_token: newToken,
+        session_opened_at: new Date().toISOString()
       }).eq('store_id', store.id).eq('id', id)
       if (error) throw error
     },
@@ -76,13 +76,16 @@ export default function TablesManagement() {
 
   const closeTable = useMutation({
     mutationFn: async (id: string) => {
+      const newToken = crypto.randomUUID()
       const { error } = await supabase.from('store_tables').update({
-        status: 'available'
+        status: 'available',
+        qr_token: newToken,
+        session_opened_at: null
       }).eq('store_id', store.id).eq('id', id)
       if (error) throw error
     },
     onSuccess: () => {
-      setMessage('ปิดโต๊ะเรียบร้อย')
+      setMessage('ปิดโต๊ะเรียบร้อย QR Code เก่าถูกรีเซ็ตแล้ว')
       setTimeout(() => setMessage(''), 3000)
       qc.invalidateQueries({ queryKey: key })
     }

@@ -3,12 +3,24 @@
 
 @theme {
   --font-sans: "Manrope", "Noto Sans Thai", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Playfair Display", serif;
   --color-orange-50: #fff7ed;
   --color-orange-100: #ffedd5;
   --color-orange-200: #fed7aa;
   --color-orange-500: #f65a1b;
   --color-orange-600: #e6490d;
   --color-orange-700: #bd360c;
+  
+  /* Premium Storefront Theme Colors */
+  --color-ink: #241c15;
+  --color-paper: #f6eedc;
+  --color-soft: #fffaf0;
+  --color-coal: #171310;
+  --color-ember: #ff5b24;
+  --color-deep: #c8380f;
+  --color-copper: #c98a46;
+  --color-smoke: #796f60;
+  --color-line: #ded1b9;
 }
 
 html { scroll-behavior: smooth; }
