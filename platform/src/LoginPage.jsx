@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { ArrowLeft, Check, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, Store } from 'lucide-react'
 import { supabase } from './lib/supabase'
-import { getCurrentProfile } from './lib/database'
 
 function Brand({ inverted = false }) {
   return <a href="/" className="inline-flex items-center gap-3" aria-label="SmartPOS">
@@ -42,19 +41,13 @@ export default function LoginPage() {
     }
     setMessage('เข้าสู่ระบบสำเร็จ กำลังพาคุณไปยังหน้าหลัก…')
     const requestedNext = new URLSearchParams(window.location.search).get('next')
-    let destination = requestedNext?.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/'
-    try {
-      const { profile } = await getCurrentProfile()
-      if (profile?.role === 'super_admin') destination = '/admin'
-    } catch {
-      destination = '/'
-    }
+    const destination = requestedNext?.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/'
     window.setTimeout(() => { window.location.href = destination }, 600)
   }
 
   const loginWithGoogle = async () => {
     setAuthError('')
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/admin` } })
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/` } })
     if (error) setAuthError(error.message)
   }
 
