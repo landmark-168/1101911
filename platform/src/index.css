@@ -23,14 +23,19 @@
   --color-line: #ded1b9;
 }
 
-html { scroll-behavior: smooth; }
-body { margin: 0; min-width: 320px; font-family: var(--font-sans); }
+html { scroll-behavior: smooth; overflow-x: hidden; }
+body { margin: 0; min-width: 320px; overflow-x: hidden; font-family: var(--font-sans); }
 @layer base {
   *, ::before, ::after { border-color: #e4e4e7; }
 }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 ::selection { background: #fed7aa; color: #18181b; }
+
+/* Safe area for iOS bottom bar */
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
 
 /* Runtime brand color from Admin > Setting > Brand */
 :root { --brand-color: #f65a1b; --brand-color-dark: #e6490d; }
@@ -65,4 +70,48 @@ button { cursor: pointer; }
     bottom: 5.25rem;
     z-index: 50;
   }
+}
+
+/* Custom Background Animations */
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-14px) rotate(2.5deg); }
+}
+
+@keyframes floatReverse {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(14px) rotate(-2.5deg); }
+}
+
+@keyframes emberRise {
+  0% { transform: translateY(0) scale(0.4); opacity: 0; }
+  20% { opacity: 0.85; }
+  80% { opacity: 0.5; }
+  100% { transform: translateY(-180px) scale(1.1) translateX(15px); opacity: 0; }
+}
+
+@keyframes ambientPulse {
+  0%, 100% { transform: scale(1) translate(0, 0); opacity: 0.3; }
+  50% { transform: scale(1.2) translate(-15px, 10px); opacity: 0.55; }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-float-slow {
+  animation: floatSlow 5.5s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: floatReverse 6.5s ease-in-out infinite;
+}
+
+.animate-ambient-pulse {
+  animation: ambientPulse 7s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spinSlow 24s linear infinite;
 }
