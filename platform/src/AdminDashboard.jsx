@@ -66,9 +66,6 @@ function Sidebar({ open, onClose, active, setActive, storeCount }) {
       <div className="mt-8 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-zinc-600">System</div>
       <a href="/admin/settings" className="mt-3 flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold text-zinc-400 transition hover:bg-white/5 hover:text-white"><Settings size={19}/>Setting</a>
       <button onClick={signOut} className="mt-1 flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-semibold text-zinc-400 transition hover:bg-red-500/10 hover:text-red-400"><LogOut size={19}/>ออกจากระบบ</button>
-      <div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-3.5">
-        <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-orange-500 font-black">SA</span><div className="min-w-0"><p className="truncate text-xs font-bold">Super Admin</p><p className="mt-0.5 truncate text-[10px] text-zinc-500">admin@smartpos.co</p></div><ChevronRight size={15} className="ml-auto text-zinc-600"/></div>
-      </div>
     </aside>
   </>
 }
