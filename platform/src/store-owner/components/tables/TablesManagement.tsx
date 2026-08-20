@@ -1,27 +1,54 @@
 import { useState, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Trash2, QrCode, Power, PowerOff, RefreshCw, Download, X, Copy, Check, LayoutGrid, List } from 'lucide-react'
+import {
+  Plus, Search, Trash2, QrCode, Power, PowerOff, RefreshCw, Download,
+  X, Copy, Check, LayoutGrid, List, Receipt, Utensils, Sparkles,
+  Clock, ArrowRight, CheckCircle2, AlertCircle
+} from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
-import { PageHeader, Panel } from '../PageKit'
 
-// ─── QR Modal ────────────────────────────────────────────────────────────────
-interface QRModalProps {
-  table: { id: string; table_number: string; qr_token: string } | null
+// ─── Table Detail & Actions Modal (เมนูจัดการโต๊ะทั้งหมด) ─────────────────────
+interface TableActionModalProps {
+  table: any | null
+  activeItemsCount: number
+  activeOrders: any[]
   onClose: () => void
-  onRegenerate: (id: string) => void
-  regenerating: boolean
+  onOpenTable: (id: string) => void
+  onCloseTable: (id: string) => void
+  onRegenerateQR: (id: string) => void
+  onRemove: (id: string) => void
+  isOpening: boolean
+  isClosing: boolean
+  isRegenerating: boolean
+  storeSlug: string
 }
 
-function QRModal({ table, onClose, onRegenerate, regenerating }: QRModalProps) {
+function TableActionModal({
+  table,
+  activeItemsCount,
+  activeOrders,
+  onClose,
+  onOpenTable,
+  onCloseTable,
+  onRegenerateQR,
+  onRemove,
+  isOpening,
+  isClosing,
+  isRegenerating,
+  storeSlug
+}: TableActionModalProps) {
   const [copied, setCopied] = useState(false)
 
   if (!table) return null
 
-  const qrUrl = `${window.location.origin}/qr/${table.qr_token}`
+  const occupied = table.status === 'occupied'
+  const qrUrl = table.qr_token ? `${window.location.origin}/qr/${table.qr_token}` : ''
+  const tableTotal = activeOrders.reduce((sum, o) => sum + Number(o.total || 0), 0)
 
   const handleCopy = () => {
+    if (!qrUrl) return
     navigator.clipboard.writeText(qrUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -59,94 +86,198 @@ function QRModal({ table, onClose, onRegenerate, regenerating }: QRModalProps) {
     img.src = url
   }
 
+  const handleCloseOrCheckout = () => {
+    if (activeItemsCount > 0) {
+      window.location.href = `/store/${storeSlug}/pos?table_id=${table.id}`
+    } else {
+      onCloseTable(table.id)
+      onClose()
+    }
+  }
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-sm rounded-3xl bg-white p-8 shadow-2xl dark:bg-zinc-900"
+        className="relative w-full max-w-md rounded-3xl bg-white p-6 sm:p-7 shadow-2xl dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 space-y-5 animate-scale-up max-h-[92vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-orange-500">QR Code</p>
-            <h2 className="mt-1 text-2xl font-black dark:text-white">โต๊ะ {table.table_number}</h2>
+        <div className="flex items-start justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
+          <div className="flex items-center gap-3.5">
+            <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-xl font-black shadow-inner ${
+              occupied
+                ? 'bg-orange-500 text-white shadow-orange-500/30'
+                : 'bg-emerald-500 text-white shadow-emerald-500/30'
+            }`}>
+              {table.table_number}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-black text-zinc-950 dark:text-white">โต๊ะ {table.table_number}</h2>
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${
+                  occupied
+                    ? 'bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300 border border-red-200 dark:border-red-800'
+                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                }`}>
+                  {occupied ? '🔴 มีลูกค้า' : '🟢 ว่าง'}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 font-medium mt-0.5">
+                {occupied && table.session_opened_at
+                  ? `เปิดโต๊ะเมื่อ ${new Date(table.session_opened_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`
+                  : 'ยังไม่เปิดรอบบริการ'}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+            className="rounded-full p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 transition cursor-pointer"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* QR Code */}
-        <div className="flex flex-col items-center gap-4">
-          <div className="rounded-2xl bg-white p-4 shadow-lg ring-1 ring-zinc-100 dark:ring-zinc-700">
-            <QRCodeSVG
-              id={`qr-svg-${table.id}`}
-              value={qrUrl}
-              size={220}
-              level="H"
-              includeMargin={false}
-            />
-          </div>
+        {/* QR Section */}
+        {occupied && table.qr_token ? (
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-gradient-to-b from-zinc-50 to-zinc-100/60 p-4 border border-zinc-200/80 dark:from-zinc-800/40 dark:to-zinc-800/80 dark:border-zinc-700">
+            <div className="rounded-2xl bg-white p-3.5 shadow-md ring-1 ring-zinc-100 dark:ring-zinc-700">
+              <QRCodeSVG
+                id={`qr-svg-${table.id}`}
+                value={qrUrl}
+                size={170}
+                level="H"
+                includeMargin={false}
+              />
+            </div>
 
-          {/* URL display */}
-          <div className="flex w-full items-center gap-2 rounded-xl border bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">
-            <p className="flex-1 truncate text-xs text-zinc-500 dark:text-zinc-400">{qrUrl}</p>
+            {/* URL Copy */}
+            <div className="flex w-full items-center gap-2 rounded-xl border border-zinc-200/80 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900 shadow-2xs">
+              <p className="flex-1 truncate text-[11px] font-mono text-zinc-500 dark:text-zinc-400">{qrUrl}</p>
+              <button
+                onClick={handleCopy}
+                className="shrink-0 rounded-lg px-2 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                title="คัดลอกลิงก์"
+              >
+                {copied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                <span>{copied ? 'คัดลอกแล้ว' : 'คัดลอก'}</span>
+              </button>
+            </div>
+
+            <div className="flex w-full gap-2 pt-1">
+              <button
+                onClick={handleDownload}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition shadow-sm cursor-pointer dark:bg-zinc-700 dark:hover:bg-zinc-600"
+              >
+                <Download size={14} /> โหลดรูป QR
+              </button>
+              <button
+                onClick={() => onRegenerateQR(table.id)}
+                disabled={isRegenerating}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-orange-300 text-orange-600 hover:bg-orange-50 text-xs font-bold transition disabled:opacity-50 cursor-pointer dark:border-orange-500/30 dark:text-orange-400 dark:hover:bg-orange-500/10"
+              >
+                <RefreshCw size={14} className={isRegenerating ? 'animate-spin' : ''} /> รีเซ็ต QR ใหม่
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-8 px-4 rounded-3xl bg-zinc-50 border-2 border-dashed border-zinc-200 text-center space-y-2.5 dark:bg-zinc-800/40 dark:border-zinc-700">
+            <span className="grid size-14 place-items-center rounded-2xl bg-emerald-100 text-emerald-700 text-2xl dark:bg-emerald-950/60 dark:text-emerald-400">
+              🪑
+            </span>
+            <p className="text-sm font-black text-zinc-800 dark:text-zinc-200">โต๊ะนี้พร้อมให้บริการ</p>
+            <p className="text-xs text-zinc-400 max-w-xs">กดปุ่ม "เปิดโต๊ะ" เพื่อเริ่มเปิดรอบบริการและสร้าง QR Code สำหรับสั่งอาหาร</p>
+          </div>
+        )}
+
+        {/* Live Orders Summary Preview (If Occupied) */}
+        {occupied && activeItemsCount > 0 && (
+          <div className="rounded-2xl border border-orange-200/80 bg-orange-50/50 p-4 dark:border-orange-900/40 dark:bg-orange-950/20 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-orange-950 dark:text-orange-200 flex items-center gap-1.5">
+                <Utensils size={14} className="text-orange-500" /> รายการอาหารในรอบนี้
+              </span>
+              <span className="text-xs font-black text-orange-600 dark:text-orange-400">
+                {activeItemsCount} รายการ · ฿{tableTotal.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Action Menu (เมนูการจัดการ) */}
+        <div className="space-y-2.5 pt-1">
+          {occupied ? (
+            <>
+              {/* POS Checkout */}
+              <button
+                onClick={handleCloseOrCheckout}
+                disabled={isClosing}
+                className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white font-black text-sm shadow-lg transition cursor-pointer active:scale-98 ${
+                  activeItemsCount > 0
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-orange-500/25'
+                    : 'bg-zinc-800 hover:bg-zinc-900'
+                }`}
+              >
+                {activeItemsCount > 0 ? (
+                  <>
+                    <Receipt size={17} /> ไปหน้าเช็คบิล POS (฿{tableTotal.toLocaleString()})
+                  </>
+                ) : (
+                  <>
+                    <PowerOff size={16} /> ปิดโต๊ะนี้ (ไม่มีรายการอาหาร)
+                  </>
+                )}
+              </button>
+            </>
+          ) : (
+            /* Open Table */
             <button
-              onClick={handleCopy}
-              className="shrink-0 rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-700"
+              onClick={() => {
+                onOpenTable(table.id)
+                onClose()
+              }}
+              disabled={isOpening}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition cursor-pointer"
             >
-              {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+              <Power size={17} /> เปิดโต๊ะเพื่อรับลูกค้า
             </button>
-          </div>
+          )}
 
-          <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
-            สแกน QR Code เพื่อเข้าสู่เมนูสั่งอาหาร
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="mt-6 flex flex-col gap-2.5">
+          {/* Delete Table */}
           <button
-            onClick={handleDownload}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-zinc-900 py-3 text-sm font-bold text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100"
+            onClick={() => {
+              onRemove(table.id)
+              onClose()
+            }}
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-zinc-400 hover:text-red-500 hover:bg-red-50 text-xs font-bold transition cursor-pointer dark:hover:bg-red-950/20"
           >
-            <Download size={16} />
-            ดาวน์โหลด QR Code
-          </button>
-          <button
-            onClick={() => onRegenerate(table.id)}
-            disabled={regenerating}
-            className="flex items-center justify-center gap-2 rounded-2xl border-2 border-orange-500 py-3 text-sm font-bold text-orange-500 hover:bg-orange-50 disabled:opacity-50 dark:hover:bg-orange-500/10"
-          >
-            <RefreshCw size={16} className={regenerating ? 'animate-spin' : ''} />
-            {regenerating ? 'กำลังรีเซ็ต...' : 'รีเซ็ต QR Code ใหม่'}
+            <Trash2 size={13} /> ลบโต๊ะนี้ออกจากระบบ
           </button>
         </div>
-
-        <p className="mt-3 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
-          ⚠️ การรีเซ็ตจะทำให้ QR Code เก่าใช้งานไม่ได้ทันที
-        </p>
       </div>
     </div>
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Main Tables Management Component ─────────────────────────────────────────
 export default function TablesManagement() {
   const { store } = useStore()
   const qc = useQueryClient()
-  const [search, setSearch] = useState('')
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
-  const [qrModal, setQrModal] = useState<{ id: string; table_number: string; qr_token: string } | null>(null)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const key = ['store_tables', store.id]
 
+  const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
+  const [selectedTable, setSelectedTable] = useState<any | null>(null)
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  const showMsg = (text: string, type: 'success' | 'error' = 'success') => {
+    setMessage({ text, type })
+    setTimeout(() => setMessage(null), 3500)
+  }
+
+  // Fetch Tables
   const query = useQuery({
     queryKey: key,
     queryFn: async () => {
@@ -154,49 +285,81 @@ export default function TablesManagement() {
         .from('store_tables')
         .select('*')
         .eq('store_id', store.id)
-        .order('table_number', { ascending: true })
+        .order('table_number')
       if (error) throw error
       return data || []
     }
   })
 
-  const rows = useMemo(() =>
-    (query.data || []).filter((x: any) => x.table_number.toLowerCase().includes(search.toLowerCase())),
-    [query.data, search]
-  )
+  // Fetch Active Orders to count items per table
+  const activeOrdersQuery = useQuery({
+    queryKey: ['active-table-orders-count', store.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('store_orders')
+        .select('id, table_id, status, total, created_at, store_order_items(id, name, quantity, unit_price)')
+        .eq('store_id', store.id)
+        .neq('status', 'cancelled')
+      if (error) return []
+      return data || []
+    },
+    refetchInterval: 4000
+  })
 
-  const showMsg = (text: string, type: 'success' | 'error' = 'success') => {
-    setMessage({ text, type })
-    setTimeout(() => setMessage(null), 3500)
+  // Helper: Get active orders for table
+  const getTableActiveOrders = (tableId: string, sessionOpenedAt?: string) => {
+    if (!sessionOpenedAt) return []
+    return (activeOrdersQuery.data || []).filter((o: any) => {
+      if (o.table_id !== tableId) return false
+      if (sessionOpenedAt && new Date(o.created_at).getTime() < new Date(sessionOpenedAt).getTime()) return false
+      if (o.order_number?.startsWith('INV') || o.order_number?.startsWith('SRV') || o.order_number?.startsWith('BILL')) return false
+      return true
+    })
   }
 
+  // Helper: Count active items for a table
+  const getTableActiveItemsCount = (tableId: string, sessionOpenedAt?: string) => {
+    const orders = getTableActiveOrders(tableId, sessionOpenedAt)
+    return orders.reduce((sum: number, o: any) => {
+      const itemsCount = (o.store_order_items || []).reduce((s: number, it: any) => s + (it.quantity || 1), 0)
+      return sum + itemsCount
+    }, 0)
+  }
+
+  // Add Table
   const add = useMutation({
     mutationFn: async () => {
-      const name = prompt('กรอกหมายเลขโต๊ะ (เช่น T01, โต๊ะ 1)')
+      const name = prompt('กรอกหมายเลขโต๊ะ (เช่น 1, 2, A1)')
       if (!name) return
-      const capacity = Number(prompt('จำนวนที่นั่ง (เช่น 2, 4)') || 2)
       const { error } = await supabase.from('store_tables').insert({
         store_id: store.id,
         table_number: name.trim(),
-        capacity: capacity
+        capacity: 4
       })
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    onSuccess: () => {
+      showMsg('เพิ่มโต๊ะเรียบร้อย')
+      qc.invalidateQueries({ queryKey: key })
+    },
     onError: e => showMsg((e as Error).message, 'error')
   })
 
+  // Delete Table
   const remove = useMutation({
     mutationFn: async (id: string) => {
       if (!confirm('ยืนยันการลบโต๊ะนี้?')) return
       const { error } = await supabase.from('store_tables').delete().eq('store_id', store.id).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: key })
+    onSuccess: () => {
+      showMsg('ลบโต๊ะเรียบร้อย')
+      qc.invalidateQueries({ queryKey: key })
+    },
+    onError: e => showMsg((e as Error).message, 'error')
   })
 
-  // Open table means setting status to 'occupied' and regenerating the QR token
-  // So old customers from yesterday who saved the link can't order.
+  // Open Table
   const openTable = useMutation({
     mutationFn: async (id: string) => {
       const newToken = crypto.randomUUID()
@@ -210,9 +373,12 @@ export default function TablesManagement() {
     onSuccess: () => {
       showMsg('เปิดโต๊ะเรียบร้อย ระบบได้สร้าง QR Code ให้ใหม่แล้ว')
       qc.invalidateQueries({ queryKey: key })
-    }
+      qc.invalidateQueries({ queryKey: ['active-table-orders-count', store.id] })
+    },
+    onError: e => showMsg((e as Error).message, 'error')
   })
 
+  // Close Table
   const closeTable = useMutation({
     mutationFn: async (id: string) => {
       const newToken = crypto.randomUUID()
@@ -224,11 +390,14 @@ export default function TablesManagement() {
       if (error) throw error
     },
     onSuccess: () => {
-      showMsg('ปิดโต๊ะเรียบร้อย QR Code เก่าถูกรีเซ็ตแล้ว')
+      showMsg('ปิดโต๊ะเรียบร้อย')
       qc.invalidateQueries({ queryKey: key })
-    }
+      qc.invalidateQueries({ queryKey: ['active-table-orders-count', store.id] })
+    },
+    onError: e => showMsg((e as Error).message, 'error')
   })
 
+  // Regenerate QR
   const regenerateQR = useMutation({
     mutationFn: async (id: string) => {
       if (!confirm('ต้องการสร้าง QR Code ใหม่อีกครั้งหรือไม่?\nลิงก์เก่าจะใช้งานไม่ได้ทันที')) return
@@ -242,179 +411,252 @@ export default function TablesManagement() {
     onSuccess: (result) => {
       showMsg('สร้าง QR Code ใหม่สำเร็จ')
       qc.invalidateQueries({ queryKey: key }).then(() => {
-        // Update modal token if it's open for this table
-        if (result && qrModal?.id === result.id) {
-          setQrModal(prev => prev ? { ...prev, qr_token: result.newToken } : null)
+        if (result && selectedTable?.id === result.id) {
+          setSelectedTable((prev: any) => prev ? { ...prev, qr_token: result.newToken } : null)
         }
       })
     },
     onError: e => showMsg((e as Error).message, 'error')
   })
 
-  const getQRLink = (token: string) => `${window.location.origin}/qr/${token}`
+  const rows = useMemo(() => {
+    const list = query.data || []
+    if (!search) return list
+    return list.filter((x: any) => x.table_number.toLowerCase().includes(search.toLowerCase()))
+  }, [query.data, search])
 
-  // Sync modal with latest data from query
-  const currentRow = query.data?.find((x: any) => x.id === qrModal?.id)
-  const liveModal = qrModal && currentRow
-    ? { ...qrModal, qr_token: currentRow.qr_token }
-    : qrModal
+  const storeSlug = typeof window !== 'undefined' ? (window.location.pathname.split('/')[2] || store.slug || store.id) : (store.slug || store.id)
+  const liveTable = selectedTable ? rows.find((x: any) => x.id === selectedTable.id) || selectedTable : null
+  const liveTableOrders = liveTable ? getTableActiveOrders(liveTable.id, liveTable.session_opened_at) : []
+  const liveItemsCount = liveTable ? getTableActiveItemsCount(liveTable.id, liveTable.session_opened_at) : 0
+
+  // Stats calculation
+  const totalTables = rows.length
+  const occupiedTables = rows.filter((x: any) => x.status === 'occupied').length
+  const availableTables = totalTables - occupiedTables
+
+  // Handle Quick Toggle (เปิด/ปิด โต๊ะ)
+  const handleToggleTable = (e: React.MouseEvent, x: any) => {
+    e.stopPropagation()
+    if (x.status === 'occupied') {
+      const count = getTableActiveItemsCount(x.id, x.session_opened_at)
+      if (count > 0) {
+        window.location.href = `/store/${storeSlug}/pos?table_id=${x.id}`
+      } else {
+        closeTable.mutate(x.id)
+      }
+    } else {
+      openTable.mutate(x.id)
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Table Management" description="จัดการโต๊ะ เปิดโต๊ะ และสร้าง QR Code สั่งอาหาร" />
+      {/* Toast message */}
+      {message && (
+        <div className={`fixed top-4 right-4 z-50 rounded-2xl px-5 py-3 text-sm font-bold text-white shadow-xl transition-all ${
+          message.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'
+        }`}>
+          {message.text}
+        </div>
+      )}
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3">
-        {/* View toggle */}
-        <div className="flex items-center rounded-xl border border-zinc-200 bg-white p-1 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all ${
-              viewMode === 'grid'
-                ? 'bg-orange-500 text-white shadow-sm'
-                : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700'
-            }`}
-          >
-            <LayoutGrid size={15} />
-            Grid
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all ${
-              viewMode === 'list'
-                ? 'bg-orange-500 text-white shadow-sm'
-                : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700'
-            }`}
-          >
-            <List size={15} />
-            Table
-          </button>
+      {/* Header & Stats Banner */}
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <span className="text-xs font-black tracking-widest text-orange-500 uppercase">Live Store Workspace</span>
+          <h1 className="text-2xl sm:text-3xl font-black text-zinc-950 dark:text-white tracking-tight">
+            ผังโต๊ะ & จัดการโต๊ะ (Tables)
+          </h1>
         </div>
 
+        {/* Add Table Button */}
         <button
           onClick={() => add.mutate()}
-          className="flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-600 transition-colors"
+          className="flex h-11 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-5 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:bg-orange-600 transition active:scale-95 cursor-pointer"
         >
-          <Plus size={16} />เพิ่มโต๊ะ
+          <Plus size={18} strokeWidth={3} /> เพิ่มโต๊ะใหม่
         </button>
       </div>
 
-      <Panel>
-        <div className="border-b p-4 dark:border-zinc-800">
-          <label className="flex h-11 items-center gap-2 rounded-xl bg-zinc-100 px-3 dark:bg-zinc-800">
-            <Search size={16} className="text-zinc-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none dark:text-white" placeholder="ค้นหาโต๊ะ..." />
-          </label>
+      {/* Quick KPI Stat Chips */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="flex items-center gap-3 rounded-2xl border border-zinc-200/80 bg-white p-3.5 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="grid size-10 place-items-center rounded-xl bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white font-black text-base">
+            {totalTables}
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-zinc-400">โต๊ะทั้งหมด</p>
+            <p className="text-xs font-extrabold text-zinc-900 dark:text-white">{totalTables} โต๊ะในร้าน</p>
+          </div>
         </div>
 
-        {message && (
-          <p className={`m-4 rounded-xl p-3 text-sm ${
-            message.type === 'error'
-              ? 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
-              : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
-          }`}>
-            {message.text}
-          </p>
-        )}
+        <div className="flex items-center gap-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-3.5 shadow-2xs dark:border-emerald-900/40 dark:bg-emerald-950/20">
+          <div className="grid size-10 place-items-center rounded-xl bg-emerald-500 text-white font-black text-base shadow-sm">
+            {availableTables}
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">โต๊ะว่าง (พร้อมรับ)</p>
+            <p className="text-xs font-extrabold text-emerald-900 dark:text-emerald-200">{availableTables} โต๊ะ</p>
+          </div>
+        </div>
 
+        <div className="flex items-center gap-3 rounded-2xl border border-red-200/80 bg-red-50/50 p-3.5 shadow-2xs dark:border-red-900/40 dark:bg-red-950/20 col-span-2 sm:col-span-1">
+          <div className="grid size-10 place-items-center rounded-xl bg-red-500 text-white font-black text-base shadow-sm">
+            {occupiedTables}
+          </div>
+          <div>
+            <p className="text-[11px] font-bold text-red-600 dark:text-red-400">กำลังรับประทาน</p>
+            <p className="text-xs font-extrabold text-red-900 dark:text-red-200">{occupiedTables} โต๊ะมีลูกค้า</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Control Bar: View Toggle + Search */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+        {/* View Toggle */}
+        <div className="flex rounded-2xl border border-zinc-200/80 bg-white p-1 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-black transition cursor-pointer ${
+              viewMode === 'grid'
+                ? 'bg-zinc-900 text-white shadow-xs dark:bg-white dark:text-zinc-900'
+                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+            }`}
+          >
+            <LayoutGrid size={14} /> มุมมองการ์ด (Grid)
+          </button>
+          <button
+            onClick={() => setViewMode('table')}
+            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-black transition cursor-pointer ${
+              viewMode === 'table'
+                ? 'bg-zinc-900 text-white shadow-xs dark:bg-white dark:text-zinc-900'
+                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
+            }`}
+          >
+            <List size={14} /> มุมมองตาราง (List)
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="relative min-w-64">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="ค้นหาเบอร์โต๊ะ…"
+            className="h-10 w-full rounded-2xl border border-zinc-200/80 bg-white pl-10 pr-4 text-xs font-bold shadow-2xs outline-none focus:border-orange-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white"
+          />
+        </div>
+      </div>
+
+      {/* Main Container */}
+      <div className="rounded-3xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden">
         {query.isLoading ? (
-          <p className="p-12 text-center text-zinc-400">กำลังโหลด…</p>
+          <p className="p-16 text-center text-xs font-bold text-zinc-400">กำลังโหลดข้อมูลผังโต๊ะ…</p>
         ) : query.error ? (
-          <p className="p-8 text-center text-red-500">{(query.error as Error).message}</p>
+          <p className="p-8 text-center text-xs font-bold text-red-500">{(query.error as Error).message}</p>
         ) : viewMode === 'grid' ? (
-          /* ── Grid View ── */
-          <div className="p-5">
+          /* ── Premium Modern Grid View ── */
+          <div className="p-5 sm:p-7">
             {rows.length === 0 ? (
-              <p className="py-16 text-center text-sm text-zinc-400">ยังไม่มีข้อมูลโต๊ะ</p>
+              <div className="py-16 text-center space-y-3">
+                <span className="text-4xl block opacity-40">🪑</span>
+                <p className="text-sm font-bold text-zinc-400">ยังไม่มีข้อมูลโต๊ะในระบบ</p>
+                <button
+                  onClick={() => add.mutate()}
+                  className="px-4 py-2 rounded-xl bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 transition"
+                >
+                  + เพิ่มโต๊ะแรก
+                </button>
+              </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                 {rows.map((x: any) => {
                   const occupied = x.status === 'occupied'
+                  const itemsCount = getTableActiveItemsCount(x.id, x.session_opened_at)
+                  const orders = getTableActiveOrders(x.id, x.session_opened_at)
+                  const totalAmt = orders.reduce((sum: number, o: any) => sum + Number(o.total || 0), 0)
+
                   return (
                     <div
                       key={x.id}
-                      className={`group relative flex flex-col overflow-hidden rounded-2xl border-2 transition-all ${
+                      onClick={() => setSelectedTable(x)}
+                      className={`group relative flex flex-col justify-between rounded-3xl border-2 p-5 transition-all duration-300 cursor-pointer select-none hover:-translate-y-1 hover:shadow-xl ${
                         occupied
-                          ? 'border-red-300 bg-red-50 dark:border-red-800/60 dark:bg-red-950/30'
-                          : 'border-emerald-300 bg-emerald-50 dark:border-emerald-800/60 dark:bg-emerald-950/30'
+                          ? 'border-orange-200 bg-gradient-to-b from-orange-50/80 to-white hover:border-orange-400 dark:border-orange-900/60 dark:from-orange-950/30 dark:to-zinc-900'
+                          : 'border-emerald-100 bg-gradient-to-b from-emerald-50/50 to-white hover:border-emerald-300 dark:border-emerald-950/60 dark:from-emerald-950/20 dark:to-zinc-900'
                       }`}
                     >
-                      {/* Status bar */}
-                      <div className={`h-1 w-full ${ occupied ? 'bg-red-400' : 'bg-emerald-400' }`} />
-
-                      <div className="flex flex-col items-center gap-3 p-4">
-                        {/* Table number */}
-                        <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-xl font-black shadow-inner ${
+                      {/* Top Row: Label & Status Dot */}
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-zinc-400">
+                          TABLE
+                        </span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black ${
                           occupied
-                            ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
-                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
+                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                        }`}>
+                          <span className={`size-1.5 rounded-full ${occupied ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
+                          {occupied ? 'ไม่ว่าง' : 'ว่าง'}
+                        </span>
+                      </div>
+
+                      {/* Middle: Big Table Number + Subtitle */}
+                      <div className="my-4 flex flex-col items-center justify-center text-center">
+                        <span className={`text-4xl sm:text-5xl font-black tracking-tight transition group-hover:scale-110 duration-300 ${
+                          occupied ? 'text-orange-600 dark:text-orange-400' : 'text-zinc-900 dark:text-white'
                         }`}>
                           {x.table_number}
-                        </div>
-
-                        {/* Capacity */}
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">{x.capacity} ที่นั่ง</p>
-
-                        {/* Status badge */}
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                          occupied
-                            ? 'bg-red-200 text-red-700 dark:bg-red-800/50 dark:text-red-300'
-                            : 'bg-emerald-200 text-emerald-700 dark:bg-emerald-800/50 dark:text-emerald-300'
-                        }`}>
-                          {occupied ? '● ไม่ว่าง' : '● ว่าง'}
                         </span>
 
-                        {/* Mini QR */}
-                        <button
-                          onClick={() => setQrModal({ id: x.id, table_number: x.table_number, qr_token: x.qr_token })}
-                          className="rounded-xl border-2 border-white bg-white p-1.5 shadow-md hover:scale-105 transition-transform dark:border-zinc-700 dark:bg-zinc-800"
-                          title="ดู QR Code"
-                        >
-                          <QRCodeSVG value={getQRLink(x.qr_token)} size={56} level="M" />
-                        </button>
+                        <div className="mt-2 min-h-5 flex items-center justify-center">
+                          {occupied ? (
+                            itemsCount > 0 ? (
+                              <span className="text-xs font-black text-orange-600 dark:text-orange-400">
+                                {itemsCount} รายการ · ฿{totalAmt.toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-semibold text-zinc-400">
+                                เปิดโต๊ะแล้ว (ยังไม่สั่ง)
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              พร้อมเปิดรับลูกค้า
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Action row */}
-                      <div className="mt-auto flex border-t border-zinc-200/60 dark:border-zinc-700/60">
-                        {/* Open/Close */}
+                      {/* Bottom Action Button */}
+                      <button
+                        onClick={(e) => handleToggleTable(e, x)}
+                        className={`w-full py-2.5 px-3 rounded-2xl text-xs font-black flex items-center justify-center gap-1.5 shadow-md transition duration-200 active:scale-95 cursor-pointer ${
+                          occupied
+                            ? itemsCount > 0
+                              ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/25'
+                              : 'bg-zinc-800 hover:bg-zinc-900 text-white'
+                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                        }`}
+                      >
                         {occupied ? (
-                          <button
-                            onClick={() => closeTable.mutate(x.id)}
-                            className="flex flex-1 items-center justify-center gap-1 py-2.5 text-[11px] font-bold text-zinc-500 hover:bg-zinc-100 transition-colors dark:text-zinc-400 dark:hover:bg-zinc-800"
-                          >
-                            <PowerOff size={12} /> ปิด
-                          </button>
+                          itemsCount > 0 ? (
+                            <>
+                              <Receipt size={14} /> เช็คบิล POS
+                            </>
+                          ) : (
+                            <>
+                              <PowerOff size={13} /> ปิดโต๊ะ
+                            </>
+                          )
                         ) : (
-                          <button
-                            onClick={() => openTable.mutate(x.id)}
-                            className="flex flex-1 items-center justify-center gap-1 py-2.5 text-[11px] font-bold text-orange-600 hover:bg-orange-50 transition-colors dark:text-orange-400 dark:hover:bg-orange-900/20"
-                          >
-                            <Power size={12} /> เปิด
-                          </button>
+                          <>
+                            <Power size={13} /> เปิดโต๊ะ
+                          </>
                         )}
-
-                        <div className="w-px bg-zinc-200/60 dark:bg-zinc-700/60" />
-
-                        {/* Regen QR */}
-                        <button
-                          onClick={() => regenerateQR.mutate(x.id)}
-                          disabled={regenerateQR.isPending}
-                          title="รีเซ็ต QR"
-                          className="flex flex-1 items-center justify-center gap-1 py-2.5 text-[11px] font-bold text-orange-500 hover:bg-orange-50 transition-colors disabled:opacity-40 dark:hover:bg-orange-900/20"
-                        >
-                          <RefreshCw size={12} className={regenerateQR.isPending ? 'animate-spin' : ''} /> รี QR
-                        </button>
-
-                        <div className="w-px bg-zinc-200/60 dark:bg-zinc-700/60" />
-
-                        {/* Delete */}
-                        <button
-                          onClick={() => remove.mutate(x.id)}
-                          className="flex flex-1 items-center justify-center py-2.5 text-red-400 hover:bg-red-50 transition-colors dark:hover:bg-red-900/20"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
+                      </button>
                     </div>
                   )
                 })}
@@ -422,99 +664,101 @@ export default function TablesManagement() {
             )}
           </div>
         ) : (
-          /* ── List/Table View ── */
+          /* ── Modern Table / List View ── */
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[640px] text-left text-xs">
               <thead>
-                <tr className="border-b bg-zinc-50 text-[11px] uppercase text-zinc-400 dark:border-zinc-800 dark:bg-zinc-800/50">
-                  <th className="px-5 py-3">เบอร์โต๊ะ</th>
-                  <th className="px-5 py-3">ความจุ (ที่นั่ง)</th>
-                  <th className="px-5 py-3">สถานะ</th>
-                  <th className="px-5 py-3">QR Code</th>
-                  <th className="px-5 py-3 text-right">การจัดการ</th>
+                <tr className="border-b border-zinc-100 bg-zinc-50 text-[11px] uppercase font-black tracking-wider text-zinc-400 dark:border-zinc-800 dark:bg-zinc-800/40">
+                  <th className="px-6 py-4">หมายเลขโต๊ะ</th>
+                  <th className="px-6 py-4">สถานะโต๊ะ</th>
+                  <th className="px-6 py-4">รายการอาหาร</th>
+                  <th className="px-6 py-4 text-right">การจัดการ</th>
                 </tr>
               </thead>
-              <tbody>
-                {rows.map((x: any) => (
-                  <tr key={x.id} className="border-b last:border-0 dark:border-zinc-800 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
-                    <td className="px-5 py-4 font-bold dark:text-white">{x.table_number}</td>
-                    <td className="px-5 py-4 text-zinc-600 dark:text-zinc-400">{x.capacity}</td>
-                    <td className="px-5 py-4">
-                      {x.status === 'occupied' ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700 dark:bg-red-500/20 dark:text-red-400">
-                          ไม่ว่าง
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700 dark:bg-green-500/20 dark:text-green-400">
-                          ว่าง
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-5 py-4">
-                      {/* Mini QR preview + action buttons */}
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setQrModal({ id: x.id, table_number: x.table_number, qr_token: x.qr_token })}
-                          className="shrink-0 cursor-pointer rounded-xl border bg-white p-1.5 shadow-sm hover:shadow-md transition-all dark:border-zinc-700 dark:bg-zinc-800"
-                          title="คลิกเพื่อดู QR Code เต็ม"
-                        >
-                          <QRCodeSVG
-                            value={getQRLink(x.qr_token)}
-                            size={40}
-                            level="M"
-                          />
-                        </button>
-                        <div className="flex flex-col gap-1">
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {rows.map((x: any) => {
+                  const occupied = x.status === 'occupied'
+                  const itemsCount = getTableActiveItemsCount(x.id, x.session_opened_at)
+                  const orders = getTableActiveOrders(x.id, x.session_opened_at)
+                  const totalAmt = orders.reduce((sum: number, o: any) => sum + Number(o.total || 0), 0)
+
+                  return (
+                    <tr key={x.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors">
+                      <td className="px-6 py-4 font-black text-sm text-zinc-900 dark:text-white">
+                        โต๊ะ {x.table_number}
+                      </td>
+                      <td className="px-6 py-4">
+                        {occupied ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-bold text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-300">
+                            <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />
+                            ไม่ว่าง (เปิดแล้ว)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300">
+                            <span className="size-1.5 rounded-full bg-emerald-500" />
+                            โต๊ะว่าง
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        {occupied ? (
+                          itemsCount > 0 ? (
+                            <span className="font-extrabold text-orange-600 dark:text-orange-400">
+                              {itemsCount} รายการ (฿{totalAmt.toLocaleString()})
+                            </span>
+                          ) : (
+                            <span className="text-zinc-400 font-medium">ยังไม่มีรายการ</span>
+                          )
+                        ) : (
+                          <span className="text-zinc-400 font-medium">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end items-center gap-2">
                           <button
-                            onClick={() => setQrModal({ id: x.id, table_number: x.table_number, qr_token: x.qr_token })}
-                            className="flex items-center gap-1.5 rounded-lg bg-zinc-100 px-2.5 py-1.5 text-xs font-semibold text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                            onClick={(e) => handleToggleTable(e, x)}
+                            className={`px-4 py-2 rounded-xl text-xs font-black text-white transition shadow-xs cursor-pointer ${
+                              occupied
+                                ? itemsCount > 0
+                                  ? 'bg-orange-500 hover:bg-orange-600'
+                                  : 'bg-zinc-800 hover:bg-zinc-700'
+                                : 'bg-emerald-600 hover:bg-emerald-700'
+                            }`}
                           >
-                            <QrCode size={12} />
-                            ดู QR
+                            {occupied ? (itemsCount > 0 ? '💵 เช็คบิล POS' : 'ปิดโต๊ะ') : 'เปิดโต๊ะ'}
                           </button>
                           <button
-                            onClick={() => regenerateQR.mutate(x.id)}
-                            disabled={regenerateQR.isPending}
-                            title="รีเซ็ต QR ใหม่ (ลิงก์เก่าจะใช้ไม่ได้)"
-                            className="flex items-center gap-1.5 rounded-lg bg-orange-100 px-2.5 py-1.5 text-xs font-semibold text-orange-600 hover:bg-orange-200 dark:bg-orange-500/20 dark:text-orange-400 dark:hover:bg-orange-500/30 disabled:opacity-50 transition-colors"
+                            onClick={() => setSelectedTable(x)}
+                            className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold transition cursor-pointer dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
                           >
-                            <RefreshCw size={12} className={regenerateQR.isPending ? 'animate-spin' : ''} />
-                            รี QR
+                            เมนูโต๊ะ
                           </button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex justify-end gap-2">
-                        {x.status === 'available' ? (
-                          <button onClick={() => openTable.mutate(x.id)} className="flex items-center gap-1 rounded-lg bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-600 hover:bg-orange-100 dark:bg-orange-500/10 dark:text-orange-400">
-                            <Power size={14} /> เปิดโต๊ะ
-                          </button>
-                        ) : (
-                          <button onClick={() => closeTable.mutate(x.id)} className="flex items-center gap-1 rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-bold text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400">
-                            <PowerOff size={14} /> ปิดโต๊ะ
-                          </button>
-                        )}
-                        <button onClick={() => remove.mutate(x.id)} className="p-1.5 text-red-400 hover:text-red-500">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
             {!rows.length && <p className="p-12 text-center text-sm text-zinc-400">ยังไม่มีข้อมูลโต๊ะ</p>}
           </div>
         )}
-      </Panel>
+      </div>
 
-      {/* QR Modal */}
-      <QRModal
-        table={liveModal}
-        onClose={() => setQrModal(null)}
-        onRegenerate={id => regenerateQR.mutate(id)}
-        regenerating={regenerateQR.isPending}
+      {/* ── Table Action & Details Modal ── */}
+      <TableActionModal
+        table={liveTable}
+        activeItemsCount={liveItemsCount}
+        activeOrders={liveTableOrders}
+        onClose={() => setSelectedTable(null)}
+        onOpenTable={id => openTable.mutate(id)}
+        onCloseTable={id => closeTable.mutate(id)}
+        onRegenerateQR={id => regenerateQR.mutate(id)}
+        onRemove={id => remove.mutate(id)}
+        isOpening={openTable.isPending}
+        isClosing={closeTable.isPending}
+        isRegenerating={regenerateQR.isPending}
+        storeSlug={storeSlug}
       />
     </div>
   )

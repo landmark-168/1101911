@@ -5,7 +5,8 @@ import {
   Flame, ShoppingCart, Utensils, User, LogOut, Tag, MessageSquare,
   Clock, Compass, ArrowLeft, Check, MapPin, Search, Store, Navigation,
   Trash2, ChevronRight, Phone, Info, AlertCircle, Copy, Plus, Minus,
-  Bell, Receipt, QrCode, DollarSign, X, CheckCircle2, Send, Sparkles, RefreshCw
+  Bell, Receipt, QrCode, DollarSign, X, CheckCircle2, Send, Sparkles, RefreshCw,
+  ClipboardList
 } from 'lucide-react'
 
 const qc = new QueryClient()
@@ -922,17 +923,17 @@ function ProductDetailModal({
 function OrderProcessStepper({ status, orderType = 'dine_in' }: { status: string; orderType?: string }) {
   const isDelivery = orderType === 'delivery'
   const steps = [
-    { step: 1, label: 'รับออเดอร์', icon: '📝' },
-    { step: 2, label: 'กำลังปรุง', icon: '🍳' },
-    { step: 3, label: isDelivery ? 'กำลังจัดส่ง' : 'พร้อมเสิร์ฟ', icon: isDelivery ? '🛵' : '🍽️' },
-    { step: 4, label: isDelivery ? 'จัดส่งสำเร็จ' : 'เสิร์ฟเรียบร้อย', icon: '✨' }
+    { step: 1, label: 'รับออเดอร์', Icon: ClipboardList },
+    { step: 2, label: 'กำลังปรุง', Icon: Flame },
+    { step: 3, label: isDelivery ? 'กำลังจัดส่ง' : 'พร้อมเสิร์ฟ', Icon: Utensils },
+    { step: 4, label: isDelivery ? 'จัดส่งสำเร็จ' : 'เสิร์ฟเรียบร้อย', Icon: Sparkles }
   ]
 
   let currentStep = 1
-  if (['pending', 'accepted'].includes(status)) currentStep = 1
+  if (['pending', 'accepted', 'waiting'].includes(status)) currentStep = 1
   else if (status === 'preparing') currentStep = 2
   else if (status === 'ready') currentStep = 3
-  else if (status === 'completed') currentStep = 4
+  else if (['completed', 'delivered', 'served'].includes(status)) currentStep = 4
 
   if (status === 'cancelled') {
     return (
@@ -975,7 +976,7 @@ function OrderProcessStepper({ status, orderType = 'dine_in' }: { status: string
                 {isDone ? (
                   <Check size={14} strokeWidth={3} className="text-white" />
                 ) : (
-                  <span>{s.icon}</span>
+                  <s.Icon size={14} strokeWidth={2.3} />
                 )}
               </div>
               <span
@@ -1016,10 +1017,18 @@ function StorefrontApp() {
   })
 
   const [cart, setCart] = useState<{ item: any; quantity: number; notes: string }[]>(() => {
-    const saved = localStorage.getItem('sfCart')
-    return saved ? JSON.parse(saved) : []
+    try {
+      if (typeof window !== 'undefined' && window.location.pathname.startsWith('/qr/')) {
+        return []
+      }
+      const saved = localStorage.getItem('sfCart')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
   })
   const [lastOrder, setLastOrder] = useState<any>(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/qr/')) {
+      return null
+    }
     const saved = localStorage.getItem('sfLastOrder')
     return saved ? JSON.parse(saved) : null
   })
@@ -1039,8 +1048,18 @@ function StorefrontApp() {
     setTimeout(() => setToast({ show: false, message: '' }), 2500)
   }
 
-  useEffect(() => { localStorage.setItem('sfCart', JSON.stringify(cart)) }, [cart])
-  useEffect(() => { localStorage.setItem('sfLastOrder', JSON.stringify(lastOrder)) }, [lastOrder])
+  useEffect(() => {
+    if (!window.location.pathname.startsWith('/qr/')) {
+      localStorage.setItem('sfCart', JSON.stringify(cart))
+    }
+  }, [cart])
+
+  useEffect(() => {
+    if (!window.location.pathname.startsWith('/qr/')) {
+      localStorage.setItem('sfLastOrder', JSON.stringify(lastOrder))
+    }
+  }, [lastOrder])
+
   useEffect(() => {
     if (customer) localStorage.setItem('sfCustomer', JSON.stringify(customer))
     else localStorage.removeItem('sfCustomer')
@@ -1053,6 +1072,13 @@ function StorefrontApp() {
       supabase.from('store_tables').select('id, store_id, table_number, status, session_opened_at').eq('qr_token', param).maybeSingle().then(({ data, error }) => {
         if (error || !data) return setErrorMsg('QR Code ไม่ถูกต้อง หรือหมดอายุแล้ว')
         if (data.status !== 'occupied') return setErrorMsg('โต๊ะนี้ปิดแล้ว กรุณาติดต่อพนักงาน')
+        
+        // Clear all previous cart items on table QR entry to ensure clean session
+        setCart([])
+        setLastOrder(null)
+        localStorage.removeItem('sfCart')
+        localStorage.removeItem('sfLastOrder')
+
         setStoreId(data.store_id)
         setTableId(data.id)
         setTableName(data.table_number)
@@ -1221,8 +1247,27 @@ function StorefrontApp() {
     }
   }
 
-  if (errorMsg) return <div className="grid min-h-screen place-items-center bg-zinc-50 p-5 text-center font-bold text-red-500">{errorMsg}</div>
-  if (!storeId || storeQuery.isLoading || menuQuery.isLoading) return <div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-400">กำลังโหลดข้อมูลร้าน…</div>
+  if (errorMsg) {
+    const isClosed = errorMsg.includes('ปิดแล้ว') || errorMsg.includes('หมดอายุ')
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-[#faf7f2] text-center font-sans">
+        <div className="max-w-sm w-full bg-white rounded-3xl p-8 border border-zinc-200 shadow-xl space-y-4">
+          <div className="size-16 mx-auto rounded-full bg-orange-50 text-orange-600 flex items-center justify-center text-3xl shadow-inner border border-orange-200">
+            {isClosed ? '🍽️' : '⚠️'}
+          </div>
+          <h2 className="text-xl font-black text-zinc-900">
+            {isClosed ? 'โต๊ะนี้ยังไม่ได้เปิดให้บริการ' : 'เกิดข้อผิดพลาด'}
+          </h2>
+          <p className="text-xs text-zinc-500 font-medium leading-relaxed">
+            {isClosed
+              ? 'โต๊ะนี้ยังไม่เปิดใช้งาน หรือเช็คบิลปิดโต๊ะเรียบร้อยแล้ว กรุณาติดต่อพนักงานเพื่อเปิดโต๊ะใหม่ครับ'
+              : errorMsg}
+          </p>
+        </div>
+      </div>
+    )
+  }
+  if (!storeId || storeQuery.isLoading || menuQuery.isLoading) return <div className="grid min-h-screen place-items-center bg-[#faf7f2] text-sm font-bold text-zinc-400">กำลังโหลดข้อมูลร้าน…</div>
 
   const shop = storeQuery.data?.shop
   const settings = storeQuery.data?.settings
@@ -2073,26 +2118,37 @@ function StorefrontApp() {
                 )}
 
                 {/* Payment Channel Selection */}
-                <div className="bg-white border border-line rounded-2xl p-4 sm:p-6 shadow-sm space-y-3 sm:space-y-4">
-                  <h2 className="text-sm sm:text-base font-black text-ink">เลือกช่องทางชำระเงิน</h2>
-                  <div className="space-y-3">
-                    <label className="flex items-start gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-xl border border-line hover:bg-soft cursor-pointer transition">
-                      <input type="radio" name="payment" value="cash" defaultChecked className="mt-1 accent-ember size-4 cursor-pointer" />
-                      <div>
-                        <b className="text-xs sm:text-sm text-ink flex items-center gap-1">💵 ชำระเงินสด / เก็บเงินปลายทาง (COD)</b>
-                        <p className="text-[10px] sm:text-[11px] text-smoke font-medium">ชำระเงินสดกับไรเดอร์เมื่อได้รับอาหารเรียบร้อยแล้ว</p>
-                      </div>
-                    </label>
-
-                    <label className="flex items-start gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-xl border border-line hover:bg-soft cursor-pointer transition">
-                      <input type="radio" name="payment" value="promptpay" className="mt-1 accent-ember size-4 cursor-pointer" />
-                      <div>
-                        <b className="text-xs sm:text-sm text-ink flex items-center gap-1">📱 PromptPay สแกนจ่าย</b>
-                        <p className="text-[10px] sm:text-[11px] text-smoke font-medium">สแกนคิวอาร์โค้ดชำระเงินได้ทันทีเพื่อความสะดวก</p>
-                      </div>
-                    </label>
+                {tableId ? (
+                  <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 sm:p-5 text-xs text-amber-950 space-y-1.5 shadow-xs">
+                    <p className="font-black flex items-center gap-1.5 text-sm text-amber-900">
+                      🔔 การชำระเงิน: ชำระที่เคาน์เตอร์ / หน้า POS
+                    </p>
+                    <p className="text-amber-800 leading-relaxed font-medium">
+                      รายการอาหารนี้จะถูกส่งเข้าห้องครัวทันที และท่านสามารถชำระเงินกับพนักงานหรือที่เคาน์เตอร์ POS เมื่อรับประทานเสร็จสิ้น
+                    </p>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-white border border-line rounded-2xl p-4 sm:p-6 shadow-sm space-y-3 sm:space-y-4">
+                    <h2 className="text-sm sm:text-base font-black text-ink">เลือกช่องทางชำระเงิน</h2>
+                    <div className="space-y-3">
+                      <label className="flex items-start gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-xl border border-line hover:bg-soft cursor-pointer transition">
+                        <input type="radio" name="payment" value="cash" defaultChecked className="mt-1 accent-ember size-4 cursor-pointer" />
+                        <div>
+                          <b className="text-xs sm:text-sm text-ink flex items-center gap-1">💵 ชำระเงินสด / เก็บเงินปลายทาง (COD)</b>
+                          <p className="text-[10px] sm:text-[11px] text-smoke font-medium">ชำระเงินสดกับไรเดอร์เมื่อได้รับอาหารเรียบร้อยแล้ว</p>
+                        </div>
+                      </label>
+
+                      <label className="flex items-start gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-xl border border-line hover:bg-soft cursor-pointer transition">
+                        <input type="radio" name="payment" value="promptpay" className="mt-1 accent-ember size-4 cursor-pointer" />
+                        <div>
+                          <b className="text-xs sm:text-sm text-ink flex items-center gap-1">📱 PromptPay สแกนจ่าย</b>
+                          <p className="text-[10px] sm:text-[11px] text-smoke font-medium">สแกนคิวอาร์โค้ดชำระเงินได้ทันทีเพื่อความสะดวก</p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </section>
 
               <aside className="space-y-6">

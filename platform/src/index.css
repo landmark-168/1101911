@@ -131,3 +131,26 @@ button { cursor: pointer; }
   animation: breathing 2s ease-in-out infinite;
 }
 
+/* Print Styles for POS Thermal Receipt Slip */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-slip, #printable-slip * {
+    visibility: visible;
+  }
+  #printable-slip {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 0;
+    width: 80mm;
+    margin: 0;
+    padding: 8px;
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+  }
+}
+
