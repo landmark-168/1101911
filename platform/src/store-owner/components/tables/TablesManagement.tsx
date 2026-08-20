@@ -236,12 +236,19 @@ function TableActionModal({
             <button
               onClick={() => {
                 onOpenTable(table.id)
-                onClose()
               }}
               disabled={isOpening}
               className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition cursor-pointer"
             >
-              <Power size={17} /> เปิดโต๊ะเพื่อรับลูกค้า
+              {isOpening ? (
+                <>
+                  <RefreshCw size={17} className="animate-spin" /> กำลังเปิดโต๊ะ…
+                </>
+              ) : (
+                <>
+                  <Power size={17} /> เปิดโต๊ะเพื่อรับลูกค้า
+                </>
+              )}
             </button>
           )}
 
@@ -363,17 +370,27 @@ export default function TablesManagement() {
   const openTable = useMutation({
     mutationFn: async (id: string) => {
       const newToken = crypto.randomUUID()
+      const sessionOpenedAt = new Date().toISOString()
       const { error } = await supabase.from('store_tables').update({
         status: 'occupied',
         qr_token: newToken,
-        session_opened_at: new Date().toISOString()
+        session_opened_at: sessionOpenedAt
       }).eq('store_id', store.id).eq('id', id)
       if (error) throw error
+      return { id, newToken, sessionOpenedAt }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       showMsg('เปิดโต๊ะเรียบร้อย ระบบได้สร้าง QR Code ให้ใหม่แล้ว')
       qc.invalidateQueries({ queryKey: key })
       qc.invalidateQueries({ queryKey: ['active-table-orders-count', store.id] })
+      if (result) {
+        setSelectedTable((prev: any) => prev ? {
+          ...prev,
+          status: 'occupied',
+          qr_token: result.newToken,
+          session_opened_at: result.sessionOpenedAt
+        } : null)
+      }
     },
     onError: e => showMsg((e as Error).message, 'error')
   })
@@ -582,7 +599,7 @@ export default function TablesManagement() {
                     <div
                       key={x.id}
                       onClick={() => setSelectedTable(x)}
-                      className={`group relative flex flex-col justify-between rounded-3xl border-2 p-5 transition-all duration-300 cursor-pointer select-none hover:-translate-y-1 hover:shadow-xl ${
+                      className={`group relative flex flex-col justify-between rounded-3xl border-2 p-5 sm:p-6 transition-all duration-300 cursor-pointer select-none hover:-translate-y-1 hover:shadow-xl active:scale-98 ${
                         occupied
                           ? 'border-orange-200 bg-gradient-to-b from-orange-50/80 to-white hover:border-orange-400 dark:border-orange-900/60 dark:from-orange-950/30 dark:to-zinc-900'
                           : 'border-emerald-100 bg-gradient-to-b from-emerald-50/50 to-white hover:border-emerald-300 dark:border-emerald-950/60 dark:from-emerald-950/20 dark:to-zinc-900'
@@ -593,7 +610,7 @@ export default function TablesManagement() {
                         <span className="text-[11px] font-black uppercase tracking-wider text-zinc-400">
                           TABLE
                         </span>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black ${
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black ${
                           occupied
                             ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
                             : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
@@ -604,59 +621,31 @@ export default function TablesManagement() {
                       </div>
 
                       {/* Middle: Big Table Number + Subtitle */}
-                      <div className="my-4 flex flex-col items-center justify-center text-center">
-                        <span className={`text-4xl sm:text-5xl font-black tracking-tight transition group-hover:scale-110 duration-300 ${
+                      <div className="my-5 flex flex-col items-center justify-center text-center">
+                        <span className={`text-5xl sm:text-6xl font-black tracking-tight transition group-hover:scale-110 duration-300 ${
                           occupied ? 'text-orange-600 dark:text-orange-400' : 'text-zinc-900 dark:text-white'
                         }`}>
                           {x.table_number}
                         </span>
 
-                        <div className="mt-2 min-h-5 flex items-center justify-center">
+                        <div className="mt-3 min-h-6 flex items-center justify-center">
                           {occupied ? (
                             itemsCount > 0 ? (
-                              <span className="text-xs font-black text-orange-600 dark:text-orange-400">
+                              <span className="text-xs font-black text-orange-600 dark:text-orange-400 bg-orange-100/80 dark:bg-orange-950/60 px-3 py-1 rounded-full">
                                 {itemsCount} รายการ · ฿{totalAmt.toLocaleString()}
                               </span>
                             ) : (
-                              <span className="text-[11px] font-semibold text-zinc-400">
-                                เปิดโต๊ะแล้ว (ยังไม่สั่ง)
+                              <span className="text-xs font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-3 py-1 rounded-full">
+                                เปิดโต๊ะแล้ว
                               </span>
                             )
                           ) : (
-                            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 rounded-full">
                               พร้อมเปิดรับลูกค้า
                             </span>
                           )}
                         </div>
                       </div>
-
-                      {/* Bottom Action Button */}
-                      <button
-                        onClick={(e) => handleToggleTable(e, x)}
-                        className={`w-full py-2.5 px-3 rounded-2xl text-xs font-black flex items-center justify-center gap-1.5 shadow-md transition duration-200 active:scale-95 cursor-pointer ${
-                          occupied
-                            ? itemsCount > 0
-                              ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/25'
-                              : 'bg-zinc-800 hover:bg-zinc-900 text-white'
-                            : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
-                        }`}
-                      >
-                        {occupied ? (
-                          itemsCount > 0 ? (
-                            <>
-                              <Receipt size={14} /> เช็คบิล POS
-                            </>
-                          ) : (
-                            <>
-                              <PowerOff size={13} /> ปิดโต๊ะ
-                            </>
-                          )
-                        ) : (
-                          <>
-                            <Power size={13} /> เปิดโต๊ะ
-                          </>
-                        )}
-                      </button>
                     </div>
                   )
                 })}
@@ -666,13 +655,12 @@ export default function TablesManagement() {
         ) : (
           /* ── Modern Table / List View ── */
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-xs">
+            <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-zinc-100 bg-zinc-50 text-[11px] uppercase font-black tracking-wider text-zinc-400 dark:border-zinc-800 dark:bg-zinc-800/40">
-                  <th className="px-6 py-4">หมายเลขโต๊ะ</th>
-                  <th className="px-6 py-4">สถานะโต๊ะ</th>
-                  <th className="px-6 py-4">รายการอาหาร</th>
-                  <th className="px-6 py-4 text-right">การจัดการ</th>
+                  <th className="px-3 sm:px-5 py-3.5">โต๊ะ</th>
+                  <th className="px-2 sm:px-4 py-3.5">สถานะ</th>
+                  <th className="px-3 sm:px-5 py-3.5 text-right">การจัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -684,52 +672,48 @@ export default function TablesManagement() {
 
                   return (
                     <tr key={x.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors">
-                      <td className="px-6 py-4 font-black text-sm text-zinc-900 dark:text-white">
-                        โต๊ะ {x.table_number}
-                      </td>
-                      <td className="px-6 py-4">
-                        {occupied ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-bold text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-300">
-                            <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />
-                            ไม่ว่าง (เปิดแล้ว)
+                      <td className="px-3 sm:px-5 py-3">
+                        <div className="flex flex-col">
+                          <span className="font-black text-sm text-zinc-900 dark:text-white">
+                            โต๊ะ {x.table_number}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300">
-                            <span className="size-1.5 rounded-full bg-emerald-500" />
-                            โต๊ะว่าง
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {occupied ? (
-                          itemsCount > 0 ? (
-                            <span className="font-extrabold text-orange-600 dark:text-orange-400">
-                              {itemsCount} รายการ (฿{totalAmt.toLocaleString()})
+                          {occupied && itemsCount > 0 && (
+                            <span className="text-[11px] font-extrabold text-orange-600 dark:text-orange-400">
+                              {itemsCount} รายการ · ฿{totalAmt.toLocaleString()}
                             </span>
-                          ) : (
-                            <span className="text-zinc-400 font-medium">ยังไม่มีรายการ</span>
-                          )
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2 sm:px-4 py-3">
+                        {occupied ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 px-2 sm:px-2.5 py-0.5 text-[11px] font-bold text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-300 whitespace-nowrap">
+                            <span className="size-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                            <span>ไม่ว่าง</span>
+                          </span>
                         ) : (
-                          <span className="text-zinc-400 font-medium">—</span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 sm:px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300 whitespace-nowrap">
+                            <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            <span>ว่าง</span>
+                          </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end items-center gap-2">
+                      <td className="px-3 sm:px-5 py-3 text-right">
+                        <div className="flex justify-end items-center gap-1.5">
                           <button
                             onClick={(e) => handleToggleTable(e, x)}
-                            className={`px-4 py-2 rounded-xl text-xs font-black text-white transition shadow-xs cursor-pointer ${
+                            className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-black text-white transition shadow-2xs cursor-pointer whitespace-nowrap ${
                               occupied
                                 ? itemsCount > 0
-                                  ? 'bg-orange-500 hover:bg-orange-600'
-                                  : 'bg-zinc-800 hover:bg-zinc-700'
-                                : 'bg-emerald-600 hover:bg-emerald-700'
+                                ? 'bg-orange-500 hover:bg-orange-600'
+                                : 'bg-zinc-800 hover:bg-zinc-700'
+                              : 'bg-emerald-600 hover:bg-emerald-700'
                             }`}
                           >
-                            {occupied ? (itemsCount > 0 ? '💵 เช็คบิล POS' : 'ปิดโต๊ะ') : 'เปิดโต๊ะ'}
+                            {occupied ? (itemsCount > 0 ? 'เช็คบิล POS' : 'ปิดโต๊ะ') : 'เปิดโต๊ะ'}
                           </button>
                           <button
                             onClick={() => setSelectedTable(x)}
-                            className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold transition cursor-pointer dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                            className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-bold transition cursor-pointer dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 whitespace-nowrap"
                           >
                             เมนูโต๊ะ
                           </button>
