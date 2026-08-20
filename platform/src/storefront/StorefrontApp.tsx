@@ -1329,8 +1329,8 @@ function StorefrontApp() {
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {tableId ? (
             <>
-              <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-orange-50 border border-orange-200 text-orange-600 font-bold text-[11px] sm:text-xs flex items-center gap-1">
-                <MapPin size={12} className="shrink-0" /> โต๊ะ {tableName}
+              <div className="px-3.5 py-1.5 sm:py-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md shrink-0">
+                <MapPin size={14} className="shrink-0" /> โต๊ะ {tableName}
               </div>
               <button
                 onClick={() => {
@@ -1341,7 +1341,7 @@ function StorefrontApp() {
                 title="เรียกพนักงาน"
               >
                 <Bell size={13} />
-                <span>เรียกพนักงาน</span>
+                <span className="hidden sm:inline">เรียกพนักงาน</span>
               </button>
             </>
           ) : customer ? (
@@ -1666,7 +1666,38 @@ function StorefrontApp() {
 
         {/* ── VIEW: Order / Menu (Grab / LINEMAN Clean Modern Style) ── */}
         {view === 'order' && (
-          <div className="max-w-4xl mx-auto px-3.5 sm:px-6 py-4 space-y-6 pb-36">
+          <div className="max-w-4xl mx-auto px-3.5 sm:px-6 py-2.5 sm:py-4 space-y-3.5 sm:space-y-6 pb-36">
+            
+            {/* Slim & Sleek Table Session Banner */}
+            {tableId && (
+              <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 px-3.5 py-2 sm:px-5 sm:py-3 text-white shadow-md shadow-orange-500/15">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex size-8 sm:size-9 items-center justify-center rounded-xl bg-white text-orange-600 text-sm sm:text-base font-black shadow-xs shrink-0">
+                    {tableName}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs sm:text-sm font-black truncate">โต๊ะ {tableName}</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-bold shrink-0">
+                        <span className="size-1 rounded-full bg-emerald-300 animate-pulse" /> ทานที่ร้าน
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-orange-100 font-medium truncate">สั่งอาหารส่งตรงเข้าครัว</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setCallStaffDefaultReason('💵 เรียกเก็บเงิน / เช็คบิล')
+                    setIsCallStaffOpen(true)
+                  }}
+                  className="flex items-center gap-1 rounded-xl bg-white px-2.5 sm:px-3 py-1.5 text-[11px] font-black text-orange-600 shadow-xs hover:bg-orange-50 active:scale-95 transition cursor-pointer shrink-0 ml-2"
+                >
+                  <Bell size={11} />
+                  <span>เรียกพนักงาน</span>
+                </button>
+              </div>
+            )}
+
             {/* Search & Category Filter Pills */}
             <div className="space-y-3">
               {/* Search Bar */}
@@ -1927,8 +1958,19 @@ function StorefrontApp() {
         {/* ── VIEW: Cart ── */}
         {view === 'cart' && (
           <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 bg-paper">
-            <h1 className="text-2xl sm:text-3xl font-black text-ink">ตะกร้าของคุณ</h1>
-            <p className="text-xs font-semibold text-smoke mt-1">ตรวจสอบรายการอาหารก่อนสั่งซื้อ</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-black text-ink">ตะกร้าของคุณ</h1>
+                <p className="text-xs font-semibold text-smoke mt-1">
+                  {tableId ? `รายการอาหารสำหรับ โต๊ะ ${tableName}` : 'ตรวจสอบรายการอาหารก่อนสั่งซื้อ'}
+                </p>
+              </div>
+              {tableId && (
+                <span className="px-3.5 py-1.5 rounded-2xl bg-orange-500 text-white font-black text-xs sm:text-sm shadow-md">
+                  📍 โต๊ะ {tableName}
+                </span>
+              )}
+            </div>
 
             {cart.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-6 lg:gap-8 mt-6 sm:mt-8 items-start">
