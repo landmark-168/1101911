@@ -1,50 +1,929 @@
-import { useEffect, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useEffect, useState, useRef } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  ExternalLink, Copy, Check, Upload, Image as ImageIcon,
+  Trash2, Sparkles, Store, Palette, Receipt, MapPin, Phone,
+  FileText, Percent, DollarSign, RefreshCw, CheckCircle2,
+  Clock, Eye, Smartphone, Monitor, ChevronRight, Bell, Flame,
+  Layers, SlidersHorizontal
+} from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
-import { PageHeader, Panel } from '../PageKit'
-import { ExternalLink, Copy, Check } from 'lucide-react'
 
-const empty={description:'',phone:'',address:'',google_maps_url:'',line_oa:'',delivery_fee:0,tax_percent:7,service_charge_percent:0,theme_color:'#F97316',opening_hours:{}}
-export default function Settings(){
-  const {store}=useStore();
-  const [form,setForm]=useState<any>(empty);
-  const [copied, setCopied] = useState(false);
-  const query=useQuery({queryKey:['settings',store.id],queryFn:async()=>{const {data,error}=await supabase.from('store_settings').select('*').eq('store_id',store.id).maybeSingle();if(error)throw error;return data||empty}});
-  useEffect(()=>{if(query.data)setForm(query.data)},[query.data]);
-  const save=useMutation({mutationFn:async()=>{const {error}=await supabase.from('store_settings').upsert({...form,store_id:store.id,updated_at:new Date().toISOString()});if(error)throw error;const {error:shopError}=await supabase.from('shops').update({name:form.store_name||store.name,slug:form.store_slug||store.slug,phone:form.phone,address:form.address,updated_at:new Date().toISOString()}).eq('id',store.id);if(shopError)throw shopError},onSuccess:()=>alert('บันทึกการตั้งค่าร้านแล้ว')});
-  
-  const storeLink = `${window.location.origin}/s/${store.id}`
-  const copyLink = () => { navigator.clipboard.writeText(storeLink); setCopied(true); setTimeout(() => setCopied(false), 2000) }
-  
-  const fields=[['store_name','Store Name',store.name],['store_slug','Store Slug',store.slug],['phone','Phone',''],['address','Address',''],['description','Description',''],['google_maps_url','Google Maps',''],['line_oa','LINE OA',''],['delivery_fee','Delivery Fee','number'],['tax_percent','Tax (%)','number'],['service_charge_percent','Service Charge (%)','number'],['theme_color','Theme Color','color']];
-  
-  return <div className="space-y-6">
-    <PageHeader title="Store settings" description="ข้อมูลนี้บันทึกลง Supabase สำหรับร้านนี้เท่านั้น"/>
-    
-    <Panel className="p-5 sm:p-7">
-      <h3 className="mb-4 text-sm font-bold text-zinc-900 dark:text-white">ลิงก์สั่งเดลิเวอรี (Delivery)</h3>
-      <div className="flex items-center gap-3 rounded-xl border p-3 dark:border-zinc-800 dark:bg-zinc-900/50">
-        <input readOnly value={storeLink} className="flex-1 bg-transparent text-sm text-zinc-500 outline-none" />
-        <button onClick={copyLink} className="grid size-8 place-items-center rounded-lg bg-zinc-100 text-zinc-500 transition hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700">
-          {copied ? <Check size={14} className="text-emerald-500"/> : <Copy size={14}/>}
-        </button>
-        <a href={storeLink} target="_blank" rel="noreferrer" className="grid size-8 place-items-center rounded-lg bg-zinc-100 text-zinc-500 transition hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700">
-          <ExternalLink size={14}/>
-        </a>
-      </div>
-    </Panel>
+const PRESET_COLORS = [
+  { name: 'ส้มสด (Orange)', hex: '#F97316' },
+  { name: 'แดงเพลิง (Crimson)', hex: '#EF4444' },
+  { name: 'เขียวมรกต (Emerald)', hex: '#10B981' },
+  { name: 'ฟ้าน้ำทะเล (Cyan)', hex: '#06B6D4' },
+  { name: 'น้ำเงินรอยัล (Blue)', hex: '#3B82F6' },
+  { name: 'ม่วงพรีเมียม (Purple)', hex: '#8B5CF6' },
+  { name: 'ชมพูโรส (Pink)', hex: '#EC4899' },
+  { name: 'ทองอำพัน (Amber)', hex: '#F59E0B' },
+  { name: 'ดำคลาสสิก (Slate)', hex: '#0F172A' }
+]
 
-    <Panel className="p-5 sm:p-7">
-      <div className="grid gap-4 sm:grid-cols-2">
-        {fields.map(([key,label,type])=><label key={key} className={['address','description'].includes(key)?'sm:col-span-2':''}><span className="mb-1.5 block text-xs font-bold dark:text-zinc-300">{label}</span>{['address','description'].includes(key)?<textarea rows={3} value={form[key]??''} onChange={e=>setForm({...form,[key]:e.target.value})} className="w-full rounded-xl border bg-transparent p-3 dark:border-zinc-700 dark:text-white"/>:<input type={type||'text'} value={form[key]??(key==='store_name'?store.name:key==='store_slug'?store.slug:'')} onChange={e=>setForm({...form,[key]:type==='number'?Number(e.target.value):e.target.value})} className="h-11 w-full rounded-xl border bg-transparent px-3 dark:border-zinc-700 dark:text-white"/>}</label>)}
-      </div>
-      {save.error&&<p className="mt-4 text-sm text-red-500">{(save.error as Error).message}</p>}
-      <div className="mt-6 flex justify-end">
-        <button disabled={save.isPending} onClick={()=>save.mutate()} className="rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">
-          {save.isPending?'กำลังบันทึก…':'Save changes'}
+const OPENING_HOURS_PRESETS = [
+  'เปิดให้บริการทุกวัน 11:00 – 23:00 น.',
+  'เปิดให้บริการทุกวัน 10:00 – 22:00 น.',
+  'เปิดทุกวัน 09:00 – 21:00 น.',
+  'เปิดให้บริการ 24 ชั่วโมง',
+  'จันทร์ - ศุกร์ 10:00 – 22:00 น. (หยุด ส.-อา.)'
+]
+
+const CATEGORY_TABS = [
+  { id: 'all', label: 'ทั้งหมด (All)', icon: Layers },
+  { id: 'branding', label: 'ภาพลักษณ์และธีมสี', icon: Palette },
+  { id: 'info', label: 'ข้อมูลร้านและเวลาทำการ', icon: Store },
+  { id: 'taxes', label: 'ภาษีและค่าธรรมเนียม', icon: Receipt },
+  { id: 'link', label: 'ลิงก์ร้านค้า', icon: ExternalLink }
+]
+
+const emptySettings = {
+  store_name: '',
+  store_slug: '',
+  logo_url: '',
+  banner_url: '',
+  description: '',
+  phone: '',
+  address: '',
+  google_maps_url: '',
+  line_oa: '',
+  delivery_fee: 0,
+  tax_percent: 7,
+  service_charge_percent: 0,
+  theme_color: '#F97316',
+  opening_hours_text: 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.'
+}
+
+export default function Settings() {
+  const { store } = useStore()
+  const qc = useQueryClient()
+  const [form, setForm] = useState<any>(emptySettings)
+  const [activeTab, setActiveTab] = useState<string>('all')
+  const [copied, setCopied] = useState(false)
+  const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingBanner, setUploadingBanner] = useState(false)
+  const [previewMode, setPreviewMode] = useState<'mobile' | 'desktop'>('mobile')
+
+  const logoFileRef = useRef<HTMLInputElement>(null)
+  const bannerFileRef = useRef<HTMLInputElement>(null)
+
+  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+    setToast({ text, type })
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  // Fetch Store Settings
+  const query = useQuery({
+    queryKey: ['settings', store.id],
+    queryFn: async () => {
+      // Fetch settings
+      const { data: settingsData, error: sErr } = await supabase
+        .from('store_settings')
+        .select('*')
+        .eq('store_id', store.id)
+        .maybeSingle()
+
+      // Fetch shop data
+      const { data: shopData, error: shErr } = await supabase
+        .from('shops')
+        .select('*')
+        .eq('id', store.id)
+        .maybeSingle()
+
+      if (sErr && sErr.code !== 'PGRST116') throw sErr
+      if (shErr) throw shErr
+
+      const openingHoursRaw = settingsData?.opening_hours
+      const openingHoursText = typeof openingHoursRaw === 'string'
+        ? openingHoursRaw
+        : (openingHoursRaw?.text || 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.')
+
+      return {
+        ...emptySettings,
+        ...(settingsData || {}),
+        store_name: shopData?.name || settingsData?.store_name || store.name || '',
+        store_slug: shopData?.slug || settingsData?.store_slug || store.slug || '',
+        logo_url: settingsData?.logo_url || shopData?.logo_url || '',
+        banner_url: settingsData?.banner_url || '',
+        phone: settingsData?.phone || shopData?.phone || '',
+        address: settingsData?.address || shopData?.address || '',
+        description: settingsData?.description || '',
+        google_maps_url: settingsData?.google_maps_url || '',
+        line_oa: settingsData?.line_oa || '',
+        delivery_fee: Number(settingsData?.delivery_fee ?? 0),
+        tax_percent: Number(settingsData?.tax_percent ?? 7),
+        service_charge_percent: Number(settingsData?.service_charge_percent ?? 0),
+        theme_color: settingsData?.theme_color || '#F97316',
+        opening_hours_text: openingHoursText
+      }
+    }
+  })
+
+  useEffect(() => {
+    if (query.data) {
+      setForm(query.data)
+    }
+  }, [query.data])
+
+  // Image Uploader Helper
+  const handleUploadImage = async (file: File, target: 'logo_url' | 'banner_url') => {
+    try {
+      if (target === 'logo_url') setUploadingLogo(true)
+      else setUploadingBanner(true)
+
+      const ext = file.name.split('.').pop() || 'png'
+      const path = `${store.id}/${target}-${Date.now()}.${ext}`
+
+      // Attempt upload to Supabase storage bucket 'store-assets' or 'public'
+      const { error: uploadErr } = await supabase.storage
+        .from('store-assets')
+        .upload(path, file, { upsert: true })
+
+      if (!uploadErr) {
+        const { data } = supabase.storage.from('store-assets').getPublicUrl(path)
+        setForm((prev: any) => ({ ...prev, [target]: data.publicUrl }))
+        showToast('อัปโหลดรูปภาพสำเร็จ')
+      } else {
+        // Fallback: Read as base64 Data URL if storage bucket is not configured
+        const reader = new FileReader()
+        reader.onload = () => {
+          setForm((prev: any) => ({ ...prev, [target]: reader.result as string }))
+          showToast('บันทึกรูปภาพเรียบร้อย')
+        }
+        reader.readAsDataURL(file)
+      }
+    } catch (err: any) {
+      showToast(err.message || 'ไม่สามารถอัปโหลดรูปภาพได้', 'error')
+    } finally {
+      setUploadingLogo(false)
+      setUploadingBanner(false)
+    }
+  }
+
+  // Save Mutation
+  const save = useMutation({
+    mutationFn: async () => {
+      const now = new Date().toISOString()
+
+      // 1. Update shops table safely (phone and address have not-null constraints in shops)
+      const shopPayload: any = {
+        name: form.store_name?.trim() || store.name,
+        slug: form.store_slug?.trim() || store.slug,
+        logo_url: form.logo_url || null,
+        phone: form.phone?.trim() || '0800000000',
+        address: form.address?.trim() || '-',
+        updated_at: now
+      }
+
+      const { error: shopError } = await supabase
+        .from('shops')
+        .update(shopPayload)
+        .eq('id', store.id)
+
+      if (shopError) throw shopError
+
+      // 2. Upsert store_settings table
+      const { error: settingsError } = await supabase
+        .from('store_settings')
+        .upsert({
+          store_id: store.id,
+          logo_url: form.logo_url || null,
+          banner_url: form.banner_url || null,
+          description: form.description?.trim() || null,
+          phone: form.phone?.trim() || null,
+          address: form.address?.trim() || null,
+          google_maps_url: form.google_maps_url?.trim() || null,
+          line_oa: form.line_oa?.trim() || null,
+          delivery_fee: Number(form.delivery_fee || 0),
+          tax_percent: Number(form.tax_percent || 0),
+          service_charge_percent: Number(form.service_charge_percent || 0),
+          theme_color: form.theme_color || '#F97316',
+          opening_hours: { text: form.opening_hours_text?.trim() || 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.' },
+          updated_at: now
+        }, { onConflict: 'store_id' })
+
+      if (settingsError) throw settingsError
+    },
+    onSuccess: () => {
+      showToast('บันทึกข้อมูลการตั้งค่าร้านสำเร็จ')
+      qc.invalidateQueries({ queryKey: ['settings', store.id] })
+      qc.invalidateQueries({ queryKey: ['store-access'] })
+    },
+    onError: (e: any) => {
+      showToast(e.message || 'เกิดข้อผิดพลาดในการบันทึก', 'error')
+    }
+  })
+
+  const storefrontLink = `${window.location.origin}/s/${form.store_slug || store.slug || store.id}`
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(storefrontLink)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+    showToast('คัดลอกลิงก์ร้านค้าออนไลน์แล้ว')
+  }
+
+  const activeThemeColor = form.theme_color || '#F97316'
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto pb-24">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 rounded-2xl px-5 py-3 text-sm font-bold text-white shadow-2xl transition-all ${
+          toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'
+        }`}>
+          {toast.text}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <span className="text-xs font-black tracking-widest uppercase" style={{ color: activeThemeColor }}>
+            Configuration
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-black text-zinc-950 dark:text-white tracking-tight">
+            ตั้งค่าร้านค้า (Store Settings)
+          </h1>
+          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 font-medium">
+            จัดการภาพลักษณ์ สโลแกน เวลาทำการ ภาษี และช่องทางติดต่อ
+          </p>
+        </div>
+
+        {/* Top Save Button */}
+        <button
+          disabled={save.isPending}
+          onClick={() => save.mutate()}
+          style={{ backgroundColor: activeThemeColor }}
+          className="flex h-11 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-black text-white shadow-lg transition active:scale-95 disabled:opacity-50 cursor-pointer hover:brightness-95"
+        >
+          {save.isPending ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+          <span>{save.isPending ? 'กำลังบันทึก…' : 'บันทึกการเปลี่ยนแปลง'}</span>
         </button>
       </div>
-    </Panel>
-  </div>
+
+      {/* ── Category Tabs Navigation ── */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {CATEGORY_TABS.map(tab => {
+          const Icon = tab.icon
+          const isActive = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              style={isActive ? { backgroundColor: activeThemeColor, borderColor: activeThemeColor } : {}}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition whitespace-nowrap cursor-pointer border ${
+                isActive
+                  ? 'text-white shadow-md shadow-zinc-950/10'
+                  : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 hover:text-zinc-950 dark:hover:text-white'
+              }`}
+            >
+              <Icon size={14} />
+              <span>{tab.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── CATEGORY 1: STOREFRONT LINK ── */}
+      {(activeTab === 'all' || activeTab === 'link') && (
+        <div className="rounded-3xl border border-zinc-200/80 bg-white p-5 sm:p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-3 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-black uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+              <Store size={15} style={{ color: activeThemeColor }} /> ลิงก์สำหรับเว็บร้านค้าออนไลน์ (Online Storefront URL)
+            </h3>
+            <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full dark:bg-emerald-950/40 dark:text-emerald-300">
+              ● สำหรับส่งให้ลูกค้าสั่งอาหาร
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-zinc-50/80 p-2.5 dark:border-zinc-700/80 dark:bg-zinc-800/60">
+            <input
+              readOnly
+              value={storefrontLink}
+              className="flex-1 bg-transparent px-2 font-mono text-xs font-bold text-zinc-700 dark:text-zinc-300 outline-none truncate"
+            />
+            <button
+              onClick={copyLink}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-bold shadow-2xs border border-zinc-200 transition cursor-pointer dark:bg-zinc-700 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-600"
+              title="คัดลอกลิงก์"
+            >
+              {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+              <span>{copied ? 'คัดลอกแล้ว' : 'คัดลอก'}</span>
+            </button>
+            <a
+              href={storefrontLink}
+              target="_blank"
+              rel="noreferrer"
+              style={{ backgroundColor: activeThemeColor }}
+              className="grid size-8 place-items-center rounded-xl text-white shadow-xs transition hover:brightness-95 cursor-pointer"
+              title="เปิดหน้าร้าน"
+            >
+              <ExternalLink size={14} />
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* ── CATEGORY 2: BRANDING, THEME, SLOGAN & LIVE PREVIEW (การ์ดเดียวกัน) ── */}
+      {(activeTab === 'all' || activeTab === 'branding') && (
+        <div className="rounded-3xl border border-zinc-200/80 bg-white p-5 sm:p-7 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-6 animate-fade-in">
+          {/* Card Header */}
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center gap-2">
+              <Palette size={18} style={{ color: activeThemeColor }} />
+              <h2 className="text-base font-black text-zinc-950 dark:text-white">
+                ภาพลักษณ์ ธีมสี และตัวอย่างหน้าร้าน (Branding, Theme & Preview)
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setPreviewMode('mobile')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                  previewMode === 'mobile'
+                    ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-white'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400'
+                }`}
+              >
+                <Smartphone size={12} /> มือถือ
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewMode('desktop')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                  previewMode === 'desktop'
+                    ? 'bg-white text-zinc-900 shadow-xs dark:bg-zinc-700 dark:text-white'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400'
+                }`}
+              >
+                <Monitor size={12} /> เต็มจอ
+              </button>
+            </div>
+          </div>
+
+          {/* Unified Two-Column Layout (Controls Left + Live Preview Right) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
+            
+            {/* Left: Branding Controls (7 cols) */}
+            <div className="lg:col-span-7 space-y-6">
+              
+              {/* Logo & Banner Pickers */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {/* Logo Picker */}
+                <div className="space-y-2.5">
+                  <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                    โลโก้ร้านค้า (Store Logo)
+                  </label>
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="relative size-20 rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 overflow-hidden grid place-items-center shrink-0 shadow-inner group">
+                      {form.logo_url ? (
+                        <img src={form.logo_url} alt="Logo" className="size-full object-cover" />
+                      ) : (
+                        <ImageIcon size={24} className="text-zinc-400" />
+                      )}
+                      {uploadingLogo && (
+                        <div className="absolute inset-0 bg-black/60 grid place-items-center text-white text-xs font-bold">
+                          <RefreshCw size={14} className="animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 space-y-1.5 min-w-0">
+                      <input
+                        type="file"
+                        ref={logoFileRef}
+                        accept="image/*"
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          if (f) handleUploadImage(f, 'logo_url')
+                        }}
+                        className="hidden"
+                      />
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => logoFileRef.current?.click()}
+                          disabled={uploadingLogo}
+                          className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition shadow-xs cursor-pointer dark:bg-zinc-700 dark:hover:bg-zinc-600 truncate"
+                        >
+                          <Upload size={12} /> {uploadingLogo ? 'กำลังโหลด…' : 'เลือกรูปโลโก้'}
+                        </button>
+                        {form.logo_url && (
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, logo_url: '' })}
+                            className="p-1.5 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold transition cursor-pointer dark:border-red-900/50 shrink-0"
+                            title="ลบรูปโลโก้"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="ลิงก์รูปภาพ (URL)..."
+                        value={form.logo_url || ''}
+                        onChange={e => setForm({ ...form, logo_url: e.target.value })}
+                        className="h-8 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 text-[10px] font-mono outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Banner Picker */}
+                <div className="space-y-2.5">
+                  <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                    ภาพแบนเนอร์ร้าน (Banner Cover)
+                  </label>
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-28 h-20 rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 overflow-hidden grid place-items-center shrink-0 shadow-inner">
+                      {form.banner_url ? (
+                        <img src={form.banner_url} alt="Banner" className="size-full object-cover" />
+                      ) : (
+                        <ImageIcon size={24} className="text-zinc-400" />
+                      )}
+                      {uploadingBanner && (
+                        <div className="absolute inset-0 bg-black/60 grid place-items-center text-white text-xs font-bold">
+                          <RefreshCw size={14} className="animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 space-y-1.5 min-w-0">
+                      <input
+                        type="file"
+                        ref={bannerFileRef}
+                        accept="image/*"
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          if (f) handleUploadImage(f, 'banner_url')
+                        }}
+                        className="hidden"
+                      />
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => bannerFileRef.current?.click()}
+                          disabled={uploadingBanner}
+                          className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition shadow-xs cursor-pointer dark:bg-zinc-700 dark:hover:bg-zinc-600 truncate"
+                        >
+                          <Upload size={12} /> {uploadingBanner ? 'กำลังโหลด…' : 'เลือกรูปแบนเนอร์'}
+                        </button>
+                        {form.banner_url && (
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, banner_url: '' })}
+                            className="p-1.5 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold transition cursor-pointer dark:border-red-900/50 shrink-0"
+                            title="ลบรูปแบนเนอร์"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="ลิงก์แบนเนอร์ (URL)..."
+                        value={form.banner_url || ''}
+                        onChange={e => setForm({ ...form, banner_url: e.target.value })}
+                        className="h-8 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 text-[10px] font-mono outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Theme Color Picker */}
+              <div className="space-y-2.5 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                  สีประจำร้าน (Brand Theme Color)
+                </label>
+                
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-1.5 dark:border-zinc-700 dark:bg-zinc-800">
+                    <input
+                      type="color"
+                      value={form.theme_color || '#F97316'}
+                      onChange={e => setForm({ ...form, theme_color: e.target.value })}
+                      className="size-7 rounded-lg cursor-pointer border-0 p-0 bg-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={form.theme_color || '#F97316'}
+                      onChange={e => setForm({ ...form, theme_color: e.target.value })}
+                      className="w-20 bg-transparent font-mono text-xs font-black text-zinc-800 dark:text-white outline-none uppercase"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {PRESET_COLORS.map(c => (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        onClick={() => setForm({ ...form, theme_color: c.hex })}
+                        style={{ backgroundColor: c.hex }}
+                        className={`size-7 rounded-lg shadow-2xs transition hover:scale-110 active:scale-95 cursor-pointer ring-offset-2 dark:ring-offset-zinc-900 ${
+                          form.theme_color?.toLowerCase() === c.hex.toLowerCase()
+                            ? 'ring-2 ring-zinc-900 dark:ring-white scale-110'
+                            : ''
+                        }`}
+                        title={c.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Description & Slogan */}
+              <div className="space-y-2 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                    คำอธิบายร้านค้า / สโลแกน (Description & Slogan)
+                  </label>
+                  <span className="text-[11px] text-zinc-400 font-medium">
+                    * แสดงเป็นสโลแกนใต้ชื่อร้านในหน้าแรกของลูกค้า
+                  </span>
+                </div>
+                <textarea
+                  rows={2}
+                  value={form.description || ''}
+                  onChange={e => setForm({ ...form, description: e.target.value })}
+                  placeholder="เช่น สดทุกคำ ร้อนทุกเตา หรือ บุฟเฟต์หมูกระทะพรีเมียม น้ำจิ้มสูตรเด็ด..."
+                  className="w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 p-3.5 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                />
+              </div>
+            </div>
+
+            {/* Right: Live Interactive Storefront Preview (5 cols) */}
+            <div className="lg:col-span-5 bg-zinc-950 rounded-2xl p-3.5 sm:p-5 flex flex-col items-center justify-center border border-zinc-800 shadow-xl lg:sticky lg:top-24">
+              <div className="w-full flex items-center justify-between pb-2 mb-2 border-b border-zinc-800 text-zinc-400">
+                <span className="text-[11px] font-bold flex items-center gap-1.5">
+                  <Eye size={13} style={{ color: activeThemeColor }} /> ตัวอย่างหน้าจอลูกค้าแบบสด
+                </span>
+                <span className="text-[10px] font-mono text-emerald-400">● Live Updates</span>
+              </div>
+
+              {/* Preview Container */}
+              <div className={`w-full transition-all duration-300 ${previewMode === 'mobile' ? 'max-w-xs' : 'max-w-full'}`}>
+                
+                {/* Mockup Header */}
+                <div className="bg-white/95 backdrop-blur-md rounded-t-xl p-2.5 border-b border-zinc-200 flex items-center justify-between shadow-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {form.logo_url ? (
+                      <img src={form.logo_url} alt="Logo" className="size-6 rounded-full object-cover border border-zinc-200 shrink-0" />
+                    ) : (
+                      <span
+                        style={{ backgroundColor: activeThemeColor }}
+                        className="grid size-6 place-items-center rounded-full text-white text-[10px] font-black shadow-xs shrink-0"
+                      >
+                        🔥
+                      </span>
+                    )}
+                    <span className="font-extrabold text-[11px] text-zinc-900 truncate">
+                      {form.store_name || store.name || 'ชื่อร้านค้า'}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{ backgroundColor: activeThemeColor }}
+                    className="px-2 py-0.5 rounded-lg text-white font-black text-[9px] flex items-center gap-1 shadow-xs shrink-0"
+                  >
+                    <MapPin size={9} /> โต๊ะ 1
+                  </div>
+                </div>
+
+                {/* Mockup Hero Banner */}
+                <div
+                  className="relative overflow-hidden bg-zinc-900 text-white p-4 rounded-b-xl border-x border-b border-white/10 shadow-2xl flex flex-col items-start gap-2.5"
+                  style={{
+                    backgroundImage: form.banner_url ? `linear-gradient(rgba(0,0,0,0.65), rgba(0,0,0,0.85)), url(${form.banner_url})` : undefined,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                >
+                  {/* Opening Hours Tag */}
+                  <span
+                    style={{ color: activeThemeColor, borderColor: `${activeThemeColor}50`, backgroundColor: `${activeThemeColor}20` }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold backdrop-blur-md"
+                  >
+                    <span className="size-1 rounded-full animate-ping" style={{ backgroundColor: activeThemeColor }} />
+                    {form.opening_hours_text || 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.'}
+                  </span>
+
+                  {/* Title & Slogan */}
+                  <div>
+                    <h3 className="text-base font-black font-sans leading-tight">
+                      {form.store_name || store.name || 'ชื่อร้านค้า'}
+                    </h3>
+                    <p className="text-xs font-extrabold mt-0.5" style={{ color: activeThemeColor }}>
+                      {form.description || 'สดทุกคำ ร้อนทุกเตา'}
+                    </p>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex items-center gap-1.5 pt-1 w-full">
+                    <button
+                      type="button"
+                      style={{ backgroundColor: activeThemeColor }}
+                      className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-white font-bold text-[10px] shadow-md"
+                    >
+                      เริ่มสั่งอาหาร <ChevronRight size={11} />
+                    </button>
+                    <button
+                      type="button"
+                      className="px-2.5 py-1.5 rounded-lg bg-white/10 text-white font-bold text-[10px] border border-white/15"
+                    >
+                      โปรโมชั่น
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CATEGORY 3: STORE INFO & OPERATING HOURS ── */}
+      {(activeTab === 'all' || activeTab === 'info') && (
+        <div className="rounded-3xl border border-zinc-200/80 bg-white p-5 sm:p-7 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-6 animate-fade-in">
+          <div className="flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800">
+            <Store size={18} style={{ color: activeThemeColor }} />
+            <h2 className="text-base font-black text-zinc-950 dark:text-white">ข้อมูลพื้นฐานและเวลาทำการ (Store Information & Hours)</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {/* Store Name */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                ชื่อร้าน (Store Name) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={form.store_name || ''}
+                onChange={e => setForm({ ...form, store_name: e.target.value })}
+                placeholder="เช่น ครัวน้องยีน"
+                className="h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-4 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+              />
+            </div>
+
+            {/* Store Slug */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                สลัก URL ร้านค้า (Store Slug) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={form.store_slug || ''}
+                onChange={e => setForm({ ...form, store_slug: e.target.value })}
+                placeholder="เช่น krua-nong-yeen-19d794"
+                className="h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-4 text-xs font-mono font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+              />
+            </div>
+
+            {/* Opening Hours */}
+            <div className="sm:col-span-2 space-y-2.5 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-700">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                  <Clock size={14} style={{ color: activeThemeColor }} /> เวลาเปิด-ปิดร้าน (Opening Hours)
+                </label>
+                <span className="text-[11px] text-zinc-400 font-medium">
+                  * แสดงบนหน้าแรกของลูกค้า
+                </span>
+              </div>
+
+              <input
+                type="text"
+                value={form.opening_hours_text || ''}
+                onChange={e => setForm({ ...form, opening_hours_text: e.target.value })}
+                placeholder="เช่น เปิดให้บริการทุกวัน 11:00 – 23:00 น."
+                className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-4 text-xs font-bold outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+              />
+
+              {/* Quick Opening Hours Presets */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {OPENING_HOURS_PRESETS.map(preset => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setForm({ ...form, opening_hours_text: preset })}
+                    style={form.opening_hours_text === preset ? { backgroundColor: activeThemeColor, borderColor: activeThemeColor } : {}}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
+                      form.opening_hours_text === preset
+                        ? 'text-white shadow-xs'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                เบอร์โทรศัพท์ร้าน (Phone)
+              </label>
+              <input
+                type="tel"
+                value={form.phone || ''}
+                onChange={e => setForm({ ...form, phone: e.target.value })}
+                placeholder="เช่น 081-234-5678"
+                className="h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-4 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+              />
+            </div>
+
+            {/* Line OA */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                LINE Official Account
+              </label>
+              <input
+                type="text"
+                value={form.line_oa || ''}
+                onChange={e => setForm({ ...form, line_oa: e.target.value })}
+                placeholder="เช่น @yourstore"
+                className="h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-4 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+              />
+            </div>
+
+            {/* Address */}
+            <div className="sm:col-span-2 space-y-1.5">
+              <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                ที่อยู่ร้านค้า (Address)
+              </label>
+              <textarea
+                rows={2}
+                value={form.address || ''}
+                onChange={e => setForm({ ...form, address: e.target.value })}
+                placeholder="ระบุที่อยู่และทำเลของร้าน..."
+                className="w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 p-3.5 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+              />
+            </div>
+
+            {/* Google Maps URL */}
+            <div className="sm:col-span-2 space-y-1.5">
+              <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                พิกัด Google Maps (Location URL)
+              </label>
+              <input
+                type="url"
+                value={form.google_maps_url || ''}
+                onChange={e => setForm({ ...form, google_maps_url: e.target.value })}
+                placeholder="เช่น https://maps.google.com/..."
+                className="h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-4 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CATEGORY 4: TAXES, SERVICE CHARGE & FEES ── */}
+      {(activeTab === 'all' || activeTab === 'taxes') && (
+        <div className="rounded-3xl border border-zinc-200/80 bg-white p-5 sm:p-7 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-6 animate-fade-in">
+          <div className="flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800">
+            <Receipt size={18} style={{ color: activeThemeColor }} />
+            <h2 className="text-base font-black text-zinc-950 dark:text-white">ภาษีและค่าธรรมเนียม (Tax & Fees)</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {/* Tax Percent */}
+            <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                  ภาษีมูลค่าเพิ่ม (VAT / Tax)
+                </label>
+                <Percent size={14} style={{ color: activeThemeColor }} />
+              </div>
+              
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  value={form.tax_percent ?? 7}
+                  onChange={e => setForm({ ...form, tax_percent: Number(e.target.value) })}
+                  className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 pr-8 text-sm font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-400">%</span>
+              </div>
+
+              {/* Quick tax presets */}
+              <div className="flex gap-1.5 pt-1">
+                {[0, 7].map(pct => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => setForm({ ...form, tax_percent: pct })}
+                    style={form.tax_percent === pct ? { backgroundColor: activeThemeColor, borderColor: activeThemeColor } : {}}
+                    className={`flex-1 py-1 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
+                      form.tax_percent === pct
+                        ? 'text-white shadow-xs'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
+                    }`}
+                  >
+                    {pct === 0 ? 'ไม่มีภาษี (0%)' : 'VAT 7%'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Service Charge Percent */}
+            <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                  ค่าบริการ (Service Charge)
+                </label>
+                <Percent size={14} style={{ color: activeThemeColor }} />
+              </div>
+
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={form.service_charge_percent ?? 0}
+                  onChange={e => setForm({ ...form, service_charge_percent: Number(e.target.value) })}
+                  className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 pr-8 text-sm font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-400">%</span>
+              </div>
+
+              {/* Quick service charge presets */}
+              <div className="flex gap-1.5 pt-1">
+                {[0, 10].map(pct => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => setForm({ ...form, service_charge_percent: pct })}
+                    style={form.service_charge_percent === pct ? { backgroundColor: activeThemeColor, borderColor: activeThemeColor } : {}}
+                    className={`flex-1 py-1 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
+                      form.service_charge_percent === pct
+                        ? 'text-white shadow-xs'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
+                    }`}
+                  >
+                    {pct === 0 ? 'ไม่มี (0%)' : '10%'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Delivery Fee */}
+            <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                  ค่าจัดส่งเริ่มต้น (Delivery Fee)
+                </label>
+                <DollarSign size={14} style={{ color: activeThemeColor }} />
+              </div>
+
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-400">฿</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="5"
+                  value={form.delivery_fee ?? 0}
+                  onChange={e => setForm({ ...form, delivery_fee: Number(e.target.value) })}
+                  className="h-11 w-full rounded-xl border border-zinc-200 bg-white pl-8 pr-3 text-sm font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                />
+              </div>
+
+              <p className="text-[10px] text-zinc-400 pt-1">
+                ค่าจัดส่งพื้นฐานสำหรับออเดอร์ประเภทจัดส่งเดลิเวอรี
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bottom Save Action Bar ── */}
+      <div className="flex items-center justify-between p-5 rounded-3xl border border-zinc-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-900 shadow-sm">
+        <div className="text-xs text-zinc-400 font-medium">
+          ข้อมูลจะถูกซิงค์ตรงไปยังฐานข้อมูลและอัปเดตหน้าร้านทันที
+        </div>
+
+        <button
+          disabled={save.isPending}
+          onClick={() => save.mutate()}
+          style={{ backgroundColor: activeThemeColor }}
+          className="flex h-12 items-center justify-center gap-2 rounded-2xl px-8 text-sm font-black text-white shadow-lg transition active:scale-95 disabled:opacity-50 cursor-pointer hover:brightness-95"
+        >
+          {save.isPending ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+          <span>{save.isPending ? 'กำลังบันทึกข้อมูล…' : 'บันทึกการตั้งค่าทั้งหมด'}</span>
+        </button>
+      </div>
+    </div>
+  )
 }

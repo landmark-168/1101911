@@ -1086,8 +1086,21 @@ function StorefrontApp() {
         setView('order')
       })
     } else if (path.startsWith('/s/')) {
-      setStoreId(param)
-      setView('home')
+      const decodedParam = decodeURIComponent(param)
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decodedParam)
+      
+      let q = supabase.from('shops').select('id, slug')
+      if (isUUID) {
+        q = q.eq('id', decodedParam)
+      } else {
+        q = q.or(`slug.eq.${decodedParam},slug.eq.${param}`)
+      }
+      
+      q.maybeSingle().then(({ data, error }) => {
+        if (error || !data) return setErrorMsg('ไม่พบร้านค้า หรือลิงก์ไม่ถูกต้อง')
+        setStoreId(data.id)
+        setView('home')
+      })
     } else {
       setErrorMsg('ลิงก์ไม่ถูกต้อง')
     }
@@ -1145,7 +1158,7 @@ function StorefrontApp() {
       if (cart.length === 0) throw new Error('ไม่มีสินค้าในตะกร้า')
       if (!customer && !tableId) throw new Error('กรุณาล็อกอินก่อนทำการสั่งซื้อ')
 
-      const totalPrice = cart.reduce((sum, c) => sum + c.item.price * c.quantity, 0)
+      const totalPrice = cartGrandTotal
       const mapUrl = `https://maps.google.com/?q=${address.lat},${address.lng}`
       const deliveryNotes = tableId
         ? `ทานที่ร้าน โต๊ะ ${tableName}`
@@ -1157,8 +1170,9 @@ function StorefrontApp() {
         order_number: 'ORD' + Math.floor(1000 + Math.random() * 9000),
         order_type: tableId ? 'dine_in' : 'delivery',
         status: 'pending',
-        subtotal: totalPrice,
-        total: totalPrice,
+        subtotal: cartSubtotal,
+        tax: taxAmount,
+        total: cartGrandTotal,
         customer_name: tableId ? `โต๊ะ ${tableName}` : (address.name || customer?.name || 'เดลิเวอรี'),
         notes: deliveryNotes
       }
@@ -1203,7 +1217,7 @@ function StorefrontApp() {
       const newLastOrder = {
         id: `#ORD-${order.order_number || order.id.slice(0, 5)}`,
         orderId: order.id,
-        total: cart.reduce((sum, c) => sum + c.item.price * c.quantity, 0),
+        total: cartGrandTotal,
         status: 'กำลังปรุงอาหาร',
         items: [...cart],
         address: { ...address },
@@ -1235,7 +1249,40 @@ function StorefrontApp() {
     setCart(cart.map(x => x.item.id === id ? { ...x, quantity: Math.max(0, x.quantity + delta) } : x).filter(x => x.quantity > 0))
   }
 
-  const getCartTotal = () => cart.reduce((sum, c) => sum + c.item.price * c.quantity, 0)
+  const shop = storeQuery.data?.shop
+  const settings = storeQuery.data?.settings
+
+  const taxPercent = Number(settings?.tax_percent ?? 0)
+  const serviceChargePercent = Number(settings?.service_charge_percent ?? 0)
+  const deliveryFee = tableId ? 0 : Number(settings?.delivery_fee ?? 0)
+  const themeColor = settings?.theme_color || '#F97316'
+
+  useEffect(() => {
+    if (themeColor) {
+      document.documentElement.style.setProperty('--brand-color', themeColor)
+      document.documentElement.style.setProperty('--brand-color-dark', themeColor)
+      document.documentElement.style.setProperty('--color-ember', themeColor)
+      document.documentElement.style.setProperty('--color-deep', themeColor)
+
+      // Update mobile browser status bar color dynamically
+      let metaTheme = document.querySelector('meta[name="theme-color"]')
+      if (metaTheme) {
+        metaTheme.setAttribute('content', themeColor)
+      } else {
+        metaTheme = document.createElement('meta')
+        metaTheme.setAttribute('name', 'theme-color')
+        metaTheme.setAttribute('content', themeColor)
+        document.head.appendChild(metaTheme)
+      }
+    }
+  }, [themeColor])
+
+  const cartSubtotal = cart.reduce((sum, c) => sum + c.item.price * c.quantity, 0)
+  const serviceChargeAmount = Math.round(cartSubtotal * (serviceChargePercent / 100) * 100) / 100
+  const taxAmount = Math.round((cartSubtotal + serviceChargeAmount) * (taxPercent / 100) * 100) / 100
+  const cartGrandTotal = cartSubtotal + serviceChargeAmount + taxAmount + deliveryFee
+
+  const getCartTotal = () => cartGrandTotal
   const getCartCount = () => cart.reduce((sum, c) => sum + c.quantity, 0)
 
   const requireAuthAndNavigate = (targetView: typeof view) => {
@@ -1269,8 +1316,6 @@ function StorefrontApp() {
   }
   if (!storeId || storeQuery.isLoading || menuQuery.isLoading) return <div className="grid min-h-screen place-items-center bg-[#faf7f2] text-sm font-bold text-zinc-400">กำลังโหลดข้อมูลร้าน…</div>
 
-  const shop = storeQuery.data?.shop
-  const settings = storeQuery.data?.settings
   const categories = menuQuery.data?.categories || []
   let items = menuQuery.data?.items || []
   if (activeCat !== 'all') items = items.filter(x => x.category_id === activeCat)
@@ -1293,7 +1338,10 @@ function StorefrontApp() {
           {settings?.logo_url ? (
             <img src={settings.logo_url} className="size-8 sm:size-9 rounded-full object-cover border border-zinc-200 shrink-0" />
           ) : (
-            <span className="grid size-8 sm:size-9 place-items-center rounded-full bg-orange-500 text-white shadow-md shrink-0">
+            <span
+              style={{ backgroundColor: themeColor }}
+              className="grid size-8 sm:size-9 place-items-center rounded-full text-white shadow-md shrink-0"
+            >
               <Flame size={16} fill="currentColor" />
             </span>
           )}
@@ -1329,7 +1377,10 @@ function StorefrontApp() {
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {tableId ? (
             <>
-              <div className="px-3.5 py-1.5 sm:py-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md shrink-0">
+              <div
+                style={{ backgroundColor: themeColor }}
+                className="px-3 py-1.5 sm:py-2 rounded-2xl text-white font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md shrink-0"
+              >
                 <MapPin size={14} className="shrink-0" /> โต๊ะ {tableName}
               </div>
               <button
@@ -1500,13 +1551,18 @@ function StorefrontApp() {
               </div>
 
               <div className="relative z-10 space-y-2 xs:space-y-3 sm:space-y-4 max-w-xl text-left flex flex-col items-start flex-1 min-w-0 pr-1 sm:pr-0">
-                <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-ember/10 border border-ember/30 text-[10px] sm:text-xs font-bold text-ember">
-                  <span className="size-1.5 sm:size-2 rounded-full bg-ember animate-ping" />
-                  เปิดให้บริการทุกวัน 11:00 – 23:00 น.
+                <span
+                  style={{ color: themeColor, borderColor: `${themeColor}40`, backgroundColor: `${themeColor}15` }}
+                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border text-[10px] sm:text-xs font-bold"
+                >
+                  <span className="size-1.5 sm:size-2 rounded-full animate-ping" style={{ backgroundColor: themeColor }} />
+                  {settings?.opening_hours?.text || (typeof settings?.opening_hours === 'string' ? settings.opening_hours : '') || 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.'}
                 </span>
                 <h1 className="text-base xs:text-xl sm:text-3xl lg:text-5xl font-black font-sans leading-tight">
-                  {shop?.name || 'หมูกระทะพรีเมียม'} <br />
-                  <span className="text-ember">สดทุกคำ ร้อนทุกเตา</span>
+                  {shop?.name || 'ร้านอาหาร'} <br />
+                  <span className="text-ember" style={{ color: themeColor }}>
+                    {settings?.description || 'สดทุกคำ ร้อนทุกเตา'}
+                  </span>
                 </h1>
                 <p className="hidden md:block text-xs sm:text-sm text-smoke leading-relaxed max-w-md line-clamp-2">
                   {settings?.description || 'คัดสรรวัตถุดิบคุณภาพพรีเมียมจากแหล่งที่ดีที่สุด ส่งตรงถึงบ้านด้วยไรเดอร์มืออาชีพ หรือสำรองโต๊ะนั่งอร่อยฟินหน้าร้าน'}
@@ -1670,9 +1726,15 @@ function StorefrontApp() {
             
             {/* Slim & Sleek Table Session Banner */}
             {tableId && (
-              <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 px-3.5 py-2 sm:px-5 sm:py-3 text-white shadow-md shadow-orange-500/15">
+              <div
+                style={{ backgroundColor: themeColor }}
+                className="flex items-center justify-between rounded-2xl px-3.5 py-2 sm:px-5 sm:py-3 text-white shadow-md"
+              >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="flex size-8 sm:size-9 items-center justify-center rounded-xl bg-white text-orange-600 text-sm sm:text-base font-black shadow-xs shrink-0">
+                  <div
+                    style={{ color: themeColor }}
+                    className="flex size-8 sm:size-9 items-center justify-center rounded-xl bg-white text-sm sm:text-base font-black shadow-xs shrink-0"
+                  >
                     {tableName}
                   </div>
                   <div className="min-w-0">
@@ -1682,7 +1744,7 @@ function StorefrontApp() {
                         <span className="size-1 rounded-full bg-emerald-300 animate-pulse" /> ทานที่ร้าน
                       </span>
                     </div>
-                    <p className="text-[10px] text-orange-100 font-medium truncate">สั่งอาหารส่งตรงเข้าครัว</p>
+                    <p className="text-[10px] text-white/90 font-medium truncate">สั่งอาหารส่งตรงเข้าครัว</p>
                   </div>
                 </div>
                 <button
@@ -1690,7 +1752,8 @@ function StorefrontApp() {
                     setCallStaffDefaultReason('💵 เรียกเก็บเงิน / เช็คบิล')
                     setIsCallStaffOpen(true)
                   }}
-                  className="flex items-center gap-1 rounded-xl bg-white px-2.5 sm:px-3 py-1.5 text-[11px] font-black text-orange-600 shadow-xs hover:bg-orange-50 active:scale-95 transition cursor-pointer shrink-0 ml-2"
+                  style={{ color: themeColor }}
+                  className="flex items-center gap-1 rounded-xl bg-white px-2.5 sm:px-3 py-1.5 text-[11px] font-black shadow-xs hover:bg-zinc-100 active:scale-95 transition cursor-pointer shrink-0 ml-2"
                 >
                   <Bell size={11} />
                   <span>เรียกพนักงาน</span>
@@ -1966,7 +2029,10 @@ function StorefrontApp() {
                 </p>
               </div>
               {tableId && (
-                <span className="px-3.5 py-1.5 rounded-2xl bg-orange-500 text-white font-black text-xs sm:text-sm shadow-md">
+                <span
+                  style={{ backgroundColor: themeColor }}
+                  className="px-3.5 py-1.5 rounded-2xl text-white font-black text-xs sm:text-sm shadow-md"
+                >
                   📍 โต๊ะ {tableName}
                 </span>
               )}
@@ -2034,19 +2100,35 @@ function StorefrontApp() {
                     <h2 className="text-sm sm:text-base font-black text-ink border-b border-line pb-3">สรุปออเดอร์</h2>
                     <div className="space-y-2 text-xs font-semibold text-smoke">
                       <div className="flex justify-between">
-                        <span>ราคาค่าอาหาร</span>
-                        <span className="text-ink">฿{getCartTotal().toLocaleString()}</span>
+                        <span>ค่าอาหาร (Subtotal)</span>
+                        <span className="text-ink">฿{cartSubtotal.toLocaleString()}</span>
                       </div>
+                      {serviceChargePercent > 0 && (
+                        <div className="flex justify-between">
+                          <span>ค่าบริการ (Service Charge {serviceChargePercent}%)</span>
+                          <span className="text-ink">฿{serviceChargeAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {taxPercent > 0 && (
+                        <div className="flex justify-between">
+                          <span>ภาษีมูลค่าเพิ่ม (VAT {taxPercent}%)</span>
+                          <span className="text-ink">฿{taxAmount.toFixed(2)}</span>
+                        </div>
+                      )}
                       {!tableId && (
                         <div className="flex justify-between">
-                          <span>ราคาค่าจัดส่ง</span>
-                          <span className="text-emerald-600 font-bold">ฟรี (โปรโมชั่น)</span>
+                          <span>ค่าจัดส่ง</span>
+                          <span className={deliveryFee > 0 ? "text-ink" : "text-emerald-600 font-bold"}>
+                            {deliveryFee > 0 ? `฿${deliveryFee.toLocaleString()}` : 'ฟรี (โปรโมชั่น)'}
+                          </span>
                         </div>
                       )}
                     </div>
                     <div className="border-t border-line/60 pt-3 flex justify-between items-center">
                       <span className="font-black text-ink text-xs sm:text-sm">ยอดรวมจ่ายทั้งหมด</span>
-                      <span className="font-black text-base sm:text-lg text-deep">฿{getCartTotal().toLocaleString()}</span>
+                      <span className="font-black text-base sm:text-lg text-deep" style={{ color: themeColor }}>
+                        ฿{cartGrandTotal.toLocaleString()}
+                      </span>
                     </div>
 
                     <button
@@ -2058,7 +2140,8 @@ function StorefrontApp() {
                         }
                       }}
                       disabled={checkout.isPending}
-                      className="w-full h-11 sm:h-12 rounded-xl bg-ember hover:bg-deep text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                      style={{ backgroundColor: themeColor }}
+                      className="w-full h-11 sm:h-12 rounded-xl text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer hover:brightness-95"
                     >
                       {tableId
                         ? (checkout.isPending ? 'กำลังส่งคำสั่งซื้อ...' : `ยืนยันสั่งเลย (โต๊ะ ${tableName})`)
@@ -2205,15 +2288,42 @@ function StorefrontApp() {
                     ))}
                   </div>
 
-                  <div className="border-t border-line/60 pt-3 flex justify-between items-center">
-                    <span className="font-black text-ink text-xs sm:text-sm">ยอดชำระสุทธิ</span>
-                    <span className="font-black text-base sm:text-lg text-deep">฿{getCartTotal().toLocaleString()}</span>
+                  <div className="border-t border-line/60 pt-3 space-y-1.5 text-xs text-smoke">
+                    <div className="flex justify-between">
+                      <span>ค่าอาหาร</span>
+                      <span>฿{cartSubtotal.toLocaleString()}</span>
+                    </div>
+                    {serviceChargePercent > 0 && (
+                      <div className="flex justify-between">
+                        <span>Service Charge ({serviceChargePercent}%)</span>
+                        <span>฿{serviceChargeAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {taxPercent > 0 && (
+                      <div className="flex justify-between">
+                        <span>VAT ({taxPercent}%)</span>
+                        <span>฿{taxAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {!tableId && (
+                      <div className="flex justify-between">
+                        <span>ค่าจัดส่ง</span>
+                        <span>{deliveryFee > 0 ? `฿${deliveryFee.toLocaleString()}` : 'ฟรี'}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-sm font-black text-ink pt-1 border-t border-line/40">
+                      <span>ยอดชำระสุทธิ</span>
+                      <span className="text-base text-deep" style={{ color: themeColor }}>
+                        ฿{cartGrandTotal.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
 
                   <button
                     onClick={() => checkout.mutate()}
                     disabled={checkout.isPending}
-                    className="w-full h-11 sm:h-12 rounded-xl bg-ember hover:bg-deep text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                    style={{ backgroundColor: themeColor }}
+                    className="w-full h-11 sm:h-12 rounded-xl text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer hover:brightness-95"
                   >
                     {checkout.isPending ? 'กำลังส่งคำสั่งซื้อ...' : tableId ? `ยืนยันสั่งอาหาร โต๊ะ ${tableName}` : 'ยืนยันสั่งซื้อเดลิเวอรี'}
                   </button>
@@ -2486,7 +2596,8 @@ function StorefrontApp() {
         <div className="fixed bottom-20 sm:bottom-22 md:bottom-8 right-4 sm:right-6 z-40 animate-scale-up">
           <button
             onClick={() => requireAuthAndNavigate('cart')}
-            className="relative grid size-13 sm:size-15 place-items-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white shadow-2xl shadow-orange-500/50 transition hover:scale-105 active:scale-95 cursor-pointer"
+            style={{ backgroundColor: themeColor }}
+            className="relative grid size-13 sm:size-15 place-items-center rounded-full text-white shadow-2xl transition hover:scale-105 active:scale-95 cursor-pointer"
             title="ดูตะกร้าสินค้า"
           >
             <ShoppingCart size={22} strokeWidth={2.5} />

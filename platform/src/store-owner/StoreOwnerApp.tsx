@@ -12,7 +12,7 @@ import Kitchen from './components/kitchen/Kitchen'
 import ManagementPage from './components/management/ManagementPage'
 import Reports from './components/reports/Reports'
 import StoreSettings from './components/settings/Settings'
-import { StoreProvider } from './StoreContext'
+import { StoreProvider, useStore } from './StoreContext'
 import { fetchCurrentUserSummary } from '../lib/database'
 
 const queryClient = new QueryClient({
@@ -73,6 +73,8 @@ function SubscriptionExpiredWall() {
 }
 
 function App() {
+  const { store } = useStore()
+  const themeColor = (store as any)?.theme_color || '#F97316'
   const getPathSegments = () => {
     if (typeof window === 'undefined') return { slug: 'demo', key: 'dashboard' }
     const parts = window.location.pathname.split('/')
@@ -134,7 +136,12 @@ function App() {
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-zinc-950 text-white transition-transform lg:translate-x-0 ${mobile ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex h-18 items-center justify-between border-b border-white/10 px-5">
           <div className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-xl bg-orange-500 text-lg">🍊</span>
+            <span
+              style={{ backgroundColor: themeColor }}
+              className="grid size-9 place-items-center rounded-xl text-lg text-white"
+            >
+              🔥
+            </span>
             <div>
               <b className="block text-sm">SmartPOS</b>
               <span className="text-[10px] text-zinc-500">STORE OWNER</span>
@@ -146,7 +153,12 @@ function App() {
         </div>
 
         <div className="mx-3 mt-3 flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-          <span className="grid size-9 place-items-center rounded-lg bg-orange-500/15">OT</span>
+          <span
+            style={{ backgroundColor: `${themeColor}25`, color: themeColor }}
+            className="grid size-9 place-items-center rounded-lg font-black text-xs"
+          >
+            OT
+          </span>
           <div className="min-w-0 flex-1">
             <b className="block truncate text-xs">{slug}</b>
             <span className="text-[10px] text-emerald-400">● Open now</span>
@@ -159,8 +171,9 @@ function App() {
             <button
               key={id}
               onClick={() => go(id)}
+              style={active === id ? { backgroundColor: themeColor } : {}}
               className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition cursor-pointer ${
-                active === id ? 'bg-orange-500 text-white shadow-lg shadow-orange-950/30' : 'text-zinc-400 hover:bg-white/5 hover:text-white'
+                active === id ? 'text-white shadow-lg shadow-zinc-950/30' : 'text-zinc-400 hover:bg-white/5 hover:text-white'
               }`}
             >
               <Icon size={17} />
@@ -182,7 +195,11 @@ function App() {
             <button onClick={() => setDark(!dark)} className="grid size-10 place-items-center rounded-xl border bg-white text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 cursor-pointer">
               {dark ? <Sun size={17} /> : <Moon size={17} />}
             </button>
-            <button onClick={() => go('pos')} className="hidden h-10 items-center gap-2 rounded-xl bg-orange-500 px-4 text-xs font-bold text-white sm:flex cursor-pointer">
+            <button
+              onClick={() => go('pos')}
+              style={{ backgroundColor: themeColor }}
+              className="hidden h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white sm:flex cursor-pointer shadow-md hover:brightness-95"
+            >
               <CircleDollarSign size={16} /> Open POS
             </button>
           </div>

@@ -37,13 +37,18 @@ button { cursor: pointer; }
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 
-/* Runtime brand color from Admin > Setting > Brand */
-:root { --brand-color: #f65a1b; --brand-color-dark: #e6490d; }
-.bg-orange-500 { background-color: var(--brand-color) !important; }
-.text-orange-500, .text-orange-600 { color: var(--brand-color) !important; }
-.border-orange-500 { border-color: var(--brand-color) !important; }
-.accent-orange-500 { accent-color: var(--brand-color) !important; }
-.hover\:bg-orange-600:hover { background-color: var(--brand-color-dark) !important; }
+/* Runtime brand color from Store Settings */
+:root { 
+  --brand-color: #f65a1b; 
+  --brand-color-dark: #e6490d; 
+  --color-ember: var(--brand-color);
+  --color-deep: var(--brand-color-dark);
+}
+.bg-orange-500, .bg-ember { background-color: var(--brand-color) !important; }
+.text-orange-500, .text-orange-600, .text-ember, .text-deep { color: var(--brand-color) !important; }
+.border-orange-500, .border-ember { border-color: var(--brand-color) !important; }
+.accent-orange-500, .accent-ember { accent-color: var(--brand-color) !important; }
+.hover\:bg-orange-600:hover, .hover\:bg-deep:hover { background-color: var(--brand-color-dark) !important; }
 .hover\:text-orange-600:hover, .hover\:text-orange-500:hover { color: var(--brand-color) !important; }
 
 @media (max-width: 639px) {

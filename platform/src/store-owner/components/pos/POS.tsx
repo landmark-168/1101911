@@ -168,9 +168,14 @@ export default function POS() {
     }
   }, [tableOrders.data, tableId, type])
 
+  const taxPercent = Number(settings.data?.tax_percent ?? 0)
+  const serviceChargePercent = Number(settings.data?.service_charge_percent ?? 0)
+  const themeColor = settings.data?.theme_color || '#F97316'
+
   const subtotal = cart.reduce((s, x) => s + Number(x.price) * x.qty, 0)
-  const tax = Math.round(subtotal * 0.07 * 100) / 100
-  const total = subtotal + tax
+  const serviceCharge = Math.round(subtotal * (serviceChargePercent / 100) * 100) / 100
+  const tax = Math.round((subtotal + serviceCharge) * (taxPercent / 100) * 100) / 100
+  const total = subtotal + serviceCharge + tax
 
   const promptPayPhone = settings.data?.phone || store.phone || '0812345678'
   const promptPayPayload = generatePromptPayPayload(promptPayPhone, total)
@@ -189,8 +194,12 @@ export default function POS() {
         storeAddress: settings.data?.address || store.address || '',
         items: [...cart],
         subtotal,
+        serviceCharge,
+        serviceChargePercent,
         tax,
+        taxPercent,
         total,
+        themeColor,
         createdAt: new Date().toLocaleString('th-TH'),
         promptPayPayload
       }
@@ -362,16 +371,24 @@ export default function POS() {
 
         <div className="space-y-2 border-y py-4 text-sm dark:border-zinc-700">
           <div className="flex justify-between text-zinc-500">
-            <span>Subtotal</span>
+            <span>รวมค่าอาหาร (Subtotal)</span>
             <span>฿{subtotal.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between text-zinc-500">
-            <span>VAT 7%</span>
-            <span>฿{tax.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-xl font-black dark:text-white">
-            <span>Total</span>
-            <span>฿{total.toLocaleString()}</span>
+          {serviceChargePercent > 0 && (
+            <div className="flex justify-between text-zinc-500">
+              <span>ค่าบริการ (Service Charge {serviceChargePercent}%)</span>
+              <span>฿{serviceCharge.toFixed(2)}</span>
+            </div>
+          )}
+          {taxPercent > 0 && (
+            <div className="flex justify-between text-zinc-500">
+              <span>ภาษี (VAT {taxPercent}%)</span>
+              <span>฿{tax.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-xl font-black dark:text-white pt-1">
+            <span>ยอดสุทธิ (Total)</span>
+            <span style={{ color: themeColor }}>฿{total.toLocaleString()}</span>
           </div>
         </div>
 
@@ -380,7 +397,8 @@ export default function POS() {
         <button
           disabled={checkout.isPending || !cart.length}
           onClick={() => checkout.mutate()}
-          className="mt-4 h-12 w-full rounded-xl bg-orange-500 font-bold text-white transition hover:bg-orange-600 disabled:opacity-40 cursor-pointer"
+          style={{ backgroundColor: themeColor }}
+          className="mt-4 h-12 w-full rounded-xl font-bold text-white shadow-md transition hover:brightness-95 disabled:opacity-40 cursor-pointer"
         >
           {checkout.isPending ? 'กำลังสร้างออเดอร์…' : `ยืนยันเช็คบิล ฿${total.toLocaleString()}`}
         </button>
@@ -436,16 +454,24 @@ export default function POS() {
                 {/* Totals */}
                 <div className="space-y-1 text-right text-xs pt-1">
                   <div className="flex justify-between text-zinc-500">
-                    <span>ยอดรวม:</span>
+                    <span>ยอดรวมอาหาร:</span>
                     <span>฿{completedBill.subtotal.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-zinc-500">
-                    <span>VAT 7%:</span>
-                    <span>฿{completedBill.tax.toFixed(2)}</span>
-                  </div>
+                  {completedBill.serviceChargePercent > 0 && (
+                    <div className="flex justify-between text-zinc-500">
+                      <span>Service Charge {completedBill.serviceChargePercent}%:</span>
+                      <span>฿{completedBill.serviceCharge.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {completedBill.taxPercent > 0 && (
+                    <div className="flex justify-between text-zinc-500">
+                      <span>VAT {completedBill.taxPercent}%:</span>
+                      <span>฿{completedBill.tax.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm font-black text-zinc-950 dark:text-white pt-1 border-t border-zinc-300 dark:border-zinc-700">
                     <span>ยอดชำระทั้งสิ้น:</span>
-                    <span className="text-orange-600 dark:text-orange-400">฿{completedBill.total.toLocaleString()}</span>
+                    <span style={{ color: completedBill.themeColor || '#F97316' }}>฿{completedBill.total.toLocaleString()}</span>
                   </div>
                 </div>
 

@@ -61,6 +61,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         store = data
       }
 
+      // Fetch store_settings to get theme_color
+      const { data: setts } = await supabase
+        .from('store_settings')
+        .select('theme_color')
+        .eq('store_id', store.id)
+        .maybeSingle()
+
+      const themeColor = setts?.theme_color || '#F97316'
+      store.theme_color = themeColor
+
+      if (typeof document !== 'undefined') {
+        document.documentElement.style.setProperty('--brand-color', themeColor)
+        document.documentElement.style.setProperty('--brand-color-dark', themeColor)
+        document.documentElement.style.setProperty('--color-ember', themeColor)
+        document.documentElement.style.setProperty('--color-deep', themeColor)
+        let metaTheme = document.querySelector('meta[name="theme-color"]')
+        if (metaTheme) metaTheme.setAttribute('content', themeColor)
+      }
+
       return { store: store as Store, userId: user.id }
     },
     retry: false
