@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Trash2, QrCode, Power, PowerOff, RefreshCw, Download, X, Copy, Check } from 'lucide-react'
+import { Plus, Search, Trash2, QrCode, Power, PowerOff, RefreshCw, Download, X, Copy, Check, LayoutGrid, List } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
@@ -144,6 +144,7 @@ export default function TablesManagement() {
   const [search, setSearch] = useState('')
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [qrModal, setQrModal] = useState<{ id: string; table_number: string; qr_token: string } | null>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const key = ['store_tables', store.id]
 
   const query = useQuery({
@@ -261,8 +262,39 @@ export default function TablesManagement() {
   return (
     <div className="space-y-6">
       <PageHeader title="Table Management" description="จัดการโต๊ะ เปิดโต๊ะ และสร้าง QR Code สั่งอาหาร" />
-      <div className="flex justify-end">
-        <button onClick={() => add.mutate()} className="flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-600 transition-colors">
+
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-3">
+        {/* View toggle */}
+        <div className="flex items-center rounded-xl border border-zinc-200 bg-white p-1 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all ${
+              viewMode === 'grid'
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700'
+            }`}
+          >
+            <LayoutGrid size={15} />
+            Grid
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all ${
+              viewMode === 'list'
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700'
+            }`}
+          >
+            <List size={15} />
+            Table
+          </button>
+        </div>
+
+        <button
+          onClick={() => add.mutate()}
+          className="flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-600 transition-colors"
+        >
           <Plus size={16} />เพิ่มโต๊ะ
         </button>
       </div>
@@ -289,7 +321,108 @@ export default function TablesManagement() {
           <p className="p-12 text-center text-zinc-400">กำลังโหลด…</p>
         ) : query.error ? (
           <p className="p-8 text-center text-red-500">{(query.error as Error).message}</p>
+        ) : viewMode === 'grid' ? (
+          /* ── Grid View ── */
+          <div className="p-5">
+            {rows.length === 0 ? (
+              <p className="py-16 text-center text-sm text-zinc-400">ยังไม่มีข้อมูลโต๊ะ</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                {rows.map((x: any) => {
+                  const occupied = x.status === 'occupied'
+                  return (
+                    <div
+                      key={x.id}
+                      className={`group relative flex flex-col overflow-hidden rounded-2xl border-2 transition-all ${
+                        occupied
+                          ? 'border-red-300 bg-red-50 dark:border-red-800/60 dark:bg-red-950/30'
+                          : 'border-emerald-300 bg-emerald-50 dark:border-emerald-800/60 dark:bg-emerald-950/30'
+                      }`}
+                    >
+                      {/* Status bar */}
+                      <div className={`h-1 w-full ${ occupied ? 'bg-red-400' : 'bg-emerald-400' }`} />
+
+                      <div className="flex flex-col items-center gap-3 p-4">
+                        {/* Table number */}
+                        <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-xl font-black shadow-inner ${
+                          occupied
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                        }`}>
+                          {x.table_number}
+                        </div>
+
+                        {/* Capacity */}
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">{x.capacity} ที่นั่ง</p>
+
+                        {/* Status badge */}
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                          occupied
+                            ? 'bg-red-200 text-red-700 dark:bg-red-800/50 dark:text-red-300'
+                            : 'bg-emerald-200 text-emerald-700 dark:bg-emerald-800/50 dark:text-emerald-300'
+                        }`}>
+                          {occupied ? '● ไม่ว่าง' : '● ว่าง'}
+                        </span>
+
+                        {/* Mini QR */}
+                        <button
+                          onClick={() => setQrModal({ id: x.id, table_number: x.table_number, qr_token: x.qr_token })}
+                          className="rounded-xl border-2 border-white bg-white p-1.5 shadow-md hover:scale-105 transition-transform dark:border-zinc-700 dark:bg-zinc-800"
+                          title="ดู QR Code"
+                        >
+                          <QRCodeSVG value={getQRLink(x.qr_token)} size={56} level="M" />
+                        </button>
+                      </div>
+
+                      {/* Action row */}
+                      <div className="mt-auto flex border-t border-zinc-200/60 dark:border-zinc-700/60">
+                        {/* Open/Close */}
+                        {occupied ? (
+                          <button
+                            onClick={() => closeTable.mutate(x.id)}
+                            className="flex flex-1 items-center justify-center gap-1 py-2.5 text-[11px] font-bold text-zinc-500 hover:bg-zinc-100 transition-colors dark:text-zinc-400 dark:hover:bg-zinc-800"
+                          >
+                            <PowerOff size={12} /> ปิด
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => openTable.mutate(x.id)}
+                            className="flex flex-1 items-center justify-center gap-1 py-2.5 text-[11px] font-bold text-orange-600 hover:bg-orange-50 transition-colors dark:text-orange-400 dark:hover:bg-orange-900/20"
+                          >
+                            <Power size={12} /> เปิด
+                          </button>
+                        )}
+
+                        <div className="w-px bg-zinc-200/60 dark:bg-zinc-700/60" />
+
+                        {/* Regen QR */}
+                        <button
+                          onClick={() => regenerateQR.mutate(x.id)}
+                          disabled={regenerateQR.isPending}
+                          title="รีเซ็ต QR"
+                          className="flex flex-1 items-center justify-center gap-1 py-2.5 text-[11px] font-bold text-orange-500 hover:bg-orange-50 transition-colors disabled:opacity-40 dark:hover:bg-orange-900/20"
+                        >
+                          <RefreshCw size={12} className={regenerateQR.isPending ? 'animate-spin' : ''} /> รี QR
+                        </button>
+
+                        <div className="w-px bg-zinc-200/60 dark:bg-zinc-700/60" />
+
+                        {/* Delete */}
+                        <button
+                          onClick={() => remove.mutate(x.id)}
+                          className="flex flex-1 items-center justify-center py-2.5 text-red-400 hover:bg-red-50 transition-colors dark:hover:bg-red-900/20"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         ) : (
+          /* ── List/Table View ── */
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
