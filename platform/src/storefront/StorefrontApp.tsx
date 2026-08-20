@@ -245,7 +245,7 @@ function HeroAnimatedBackground({ bannerUrl }: { bannerUrl?: string }) {
   )
 }
 
-function HeroProductShowcase({ items = [], onAddToCart }: { items?: any[], onAddToCart?: (item: any) => void }) {
+function HeroProductShowcase({ items = [], onAddToCart, onSelectItem }: { items?: any[], onAddToCart?: (item: any) => void, onSelectItem?: (item: any) => void }) {
   const fallbackItems = [
     {
       id: 'fallback-1',
@@ -309,15 +309,15 @@ function HeroProductShowcase({ items = [], onAddToCart }: { items?: any[], onAdd
   }, [displayItems.length])
 
   return (
-    <div className="relative w-full max-w-[260px] xs:max-w-[290px] sm:max-w-[340px] md:max-w-[380px] aspect-square shrink-0 mx-auto flex items-center justify-center select-none">
+    <div className="relative w-40 xs:w-48 sm:w-64 md:w-80 lg:w-96 aspect-square shrink-0 flex items-center justify-center select-none">
       {/* Outer ambient pulsing glow */}
-      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-ember/35 via-orange-500/20 to-transparent blur-2xl animate-pulse" />
+      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-ember/35 via-orange-500/20 to-transparent blur-xl sm:blur-2xl animate-pulse" />
       
       {/* Outer decorative glowing ring */}
-      <div className="absolute -inset-1 sm:-inset-2 rounded-full border-2 border-ember/30 opacity-70 pointer-events-none" />
+      <div className="absolute -inset-0.5 sm:-inset-2 rounded-full border border-ember/30 sm:border-2 opacity-70 pointer-events-none" />
 
       {/* Main Round Showcase Window with sliding horizontal reel */}
-      <div className="relative size-full rounded-full bg-coal/95 border-2 border-white/15 shadow-2xl overflow-hidden">
+      <div className="relative size-full rounded-full bg-coal/95 border sm:border-2 border-white/15 shadow-2xl overflow-hidden">
         {/* Horizontal sliding track */}
         <div
           className="flex size-full transition-transform duration-700 ease-in-out"
@@ -326,17 +326,18 @@ function HeroProductShowcase({ items = [], onAddToCart }: { items?: any[], onAdd
           {displayItems.map((item, index) => (
             <div
               key={item.id || index}
-              className="relative size-full shrink-0 overflow-hidden flex items-center justify-center"
+              onClick={() => onSelectItem && onSelectItem(item)}
+              className="relative size-full shrink-0 overflow-hidden flex items-center justify-center cursor-pointer group"
             >
               {/* Product Image */}
               {item.image_url ? (
                 <img
                   src={item.image_url}
                   alt={item.name}
-                  className="size-full object-cover filter brightness-95 contrast-105 transition duration-700 hover:scale-105"
+                  className="size-full object-cover filter brightness-95 contrast-105 transition duration-700 group-hover:scale-105"
                 />
               ) : (
-                <div className="size-full flex items-center justify-center text-5xl sm:text-7xl bg-black/40">
+                <div className="size-full flex items-center justify-center text-4xl sm:text-7xl bg-black/40">
                   🥩
                 </div>
               )}
@@ -345,19 +346,19 @@ function HeroProductShowcase({ items = [], onAddToCart }: { items?: any[], onAdd
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/35 pointer-events-none" />
 
               {/* Top Badge */}
-              <div className="absolute top-3 sm:top-5 md:top-6 z-20 pointer-events-none">
-                <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold tracking-wide text-white bg-ember/90 backdrop-blur-md shadow-md border border-white/20">
+              <div className="absolute top-2.5 sm:top-5 z-20 pointer-events-none">
+                <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[9px] xs:text-[10px] sm:text-[11px] font-extrabold tracking-wide text-white bg-ember/90 backdrop-blur-md shadow-md border border-white/20">
                   {item.badge}
                 </span>
               </div>
 
               {/* Bottom Product Info */}
-              <div className="absolute bottom-4 sm:bottom-6 md:bottom-7 inset-x-4 sm:inset-x-6 z-20 text-center flex flex-col items-center gap-1 sm:gap-1.5">
-                <h3 className="text-xs sm:text-sm md:text-base font-black text-white drop-shadow-md truncate max-w-[180px] sm:max-w-[220px]">
+              <div className="absolute bottom-2.5 xs:bottom-3.5 sm:bottom-6 inset-x-2 sm:inset-x-6 z-20 text-center flex flex-col items-center gap-0.5 sm:gap-1.5">
+                <h3 className="text-xs xs:text-sm sm:text-base font-black text-white drop-shadow-md truncate max-w-[120px] xs:max-w-[150px] sm:max-w-[220px]">
                   {item.name}
                 </h3>
                 <div className="flex items-center gap-1.5 sm:gap-2">
-                  <span className="text-xs sm:text-sm md:text-base font-black text-amber-400 drop-shadow">
+                  <span className="text-xs xs:text-sm sm:text-base font-black text-amber-400 drop-shadow">
                     ฿{Number(item.price).toLocaleString()}
                   </span>
                   {onAddToCart && (
@@ -366,7 +367,7 @@ function HeroProductShowcase({ items = [], onAddToCart }: { items?: any[], onAdd
                         e.stopPropagation()
                         onAddToCart(item)
                       }}
-                      className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-ember hover:bg-deep text-white text-[10px] sm:text-[11px] font-bold shadow-md transition active:scale-95 flex items-center gap-1 cursor-pointer"
+                      className="px-2 xs:px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-lg bg-ember hover:bg-deep text-white text-[9px] xs:text-[10px] sm:text-[11px] font-bold shadow-md transition active:scale-95 flex items-center gap-0.5 cursor-pointer"
                     >
                       <Plus size={11} /> สั่งเลย
                     </button>
@@ -396,23 +397,23 @@ function HeroProductShowcase({ items = [], onAddToCart }: { items?: any[], onAdd
             </button>
           </>
         )}
-
-        {/* Dot Pagination */}
-        {displayItems.length > 1 && (
-          <div className="absolute bottom-2 sm:bottom-2.5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 rounded-full bg-black/50 backdrop-blur-sm border border-white/10">
-            {displayItems.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentIndex(idx)}
-                className={`h-1 sm:h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                  idx === currentIndex ? 'w-3 sm:w-4 bg-ember' : 'w-1 sm:w-1.5 bg-white/40 hover:bg-white/75'
-                }`}
-                aria-label={`Go to slide ${idx + 1}`}
-              />
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* Dot Pagination Below Circle */}
+      {displayItems.length > 1 && (
+        <div className="absolute -bottom-4 sm:-bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 shadow-md">
+          {displayItems.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentIndex(idx)}
+              className={`h-1 sm:h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                idx === currentIndex ? 'w-3 sm:w-4 bg-ember' : 'w-1 sm:w-1.5 bg-white/40 hover:bg-white/75'
+              }`}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -436,47 +437,79 @@ function CallStaffModal({
   defaultReason?: string
   onSuccess: (reason: string) => void
 }) {
-  const [selectedReason, setSelectedReason] = useState(defaultReason || '💵 เรียกเก็บเงิน / เช็คบิล')
+  const [selectedType, setSelectedType] = useState<'service' | 'bill'>('service')
   const [customNote, setCustomNote] = useState('')
 
   useEffect(() => {
-    if (defaultReason) setSelectedReason(defaultReason)
+    if (defaultReason) {
+      if (defaultReason.includes('เก็บเงิน') || defaultReason.includes('เช็คบิล') || defaultReason.includes('ชำระ')) {
+        setSelectedType('bill')
+      } else {
+        setSelectedType('service')
+      }
+    }
   }, [defaultReason, isOpen])
 
-  // Calculate total ordered amount
-  const totalAmount = tableOrders.reduce((sum, ord) => sum + Number(ord.total || 0), 0)
+  // Calculate total ordered amount and aggregate ordered food items
+  const activeOrders = tableOrders.filter(
+    (ord: any) => ord.status !== 'cancelled' && !ord.order_number?.startsWith('BILL') && !ord.order_number?.startsWith('SRV')
+  )
+  const totalAmount = activeOrders.reduce((sum: number, ord: any) => sum + Number(ord.total || 0), 0)
 
-  const reasons = [
-    { id: 'pay_cash', label: '💵 เรียกเก็บเงิน / เช็คบิล', isPay: true },
-    { id: 'soup', label: '🍲 เติมน้ำซุป / เปลี่ยนถ่าน', isPay: false },
-    { id: 'napkin', label: '🧻 ขอทิชชู่ / ตะเกียบ / จานชาม', isPay: false },
-    { id: 'ice', label: '🧊 ขอเติมน้ำแข็ง / เครื่องดื่ม', isPay: false },
-    { id: 'condiment', label: '🧂 ขอพริก กระเทียม มะนาว น้ำจิ้ม', isPay: false },
-    { id: 'general', label: '🙋‍♂️ เรียกพนักงานทั่วไป / สอบถาม', isPay: false }
-  ]
+  const aggregatedItems: { name: string; quantity: number; total: number; unit_price: number }[] = []
+  activeOrders.forEach((ord: any) => {
+    (ord.items || []).forEach((item: any) => {
+      const existing = aggregatedItems.find((i) => i.name === item.name)
+      if (existing) {
+        existing.quantity += (item.quantity || 1)
+        existing.total += ((item.unit_price || 0) * (item.quantity || 1))
+      } else {
+        aggregatedItems.push({
+          name: item.name,
+          quantity: item.quantity || 1,
+          unit_price: item.unit_price || 0,
+          total: (item.unit_price || 0) * (item.quantity || 1)
+        })
+      }
+    })
+  })
 
   const callStaffMutation = useMutation({
     mutationFn: async () => {
       if (!storeId || !tableId) throw new Error('ไม่พบข้อมูลโต๊ะ')
-      const isPayment = selectedReason.includes('เก็บเงิน') || selectedReason.includes('เช็คบิล')
+      const isPayment = selectedType === 'bill'
+      const actionName = isPayment ? 'เรียกเก็บเงิน / เช็คบิล' : 'เรียกพนักงาน'
       const orderPayload: any = {
         store_id: storeId,
         table_id: tableId,
         order_number: (isPayment ? 'BILL' : 'SRV') + Math.floor(1000 + Math.random() * 9000),
         order_type: 'dine_in',
         status: 'pending',
-        subtotal: isPayment ? totalAmount : 0,
-        total: isPayment ? totalAmount : 0,
-        customer_name: `โต๊ะ ${tableName} (${isPayment ? 'เรียกเก็บเงิน' : 'เรียกพนักงาน'})`,
-        notes: `[เรียกพนักงาน] ${selectedReason}${totalAmount > 0 && isPayment ? ` (ยอดรวม ฿${totalAmount.toLocaleString()})` : ''}${customNote ? ` : ${customNote}` : ''}`
+        subtotal: 0,
+        total: 0,
+        customer_name: `โต๊ะ ${tableName} (${actionName})`,
+        notes: `[${actionName}]${totalAmount > 0 && isPayment ? ` (ยอดรวม ฿${totalAmount.toLocaleString()})` : ''}${customNote ? ` : ${customNote}` : ''}`
       }
       const { error } = await supabase.from('store_orders').insert(orderPayload)
-      if (error && !error.message?.includes('notes')) throw error
+      if (error) {
+        if (error.message?.includes('notes')) {
+          delete orderPayload.notes
+          const retry = await supabase.from('store_orders').insert(orderPayload)
+          if (retry.error) throw retry.error
+        } else {
+          throw error
+        }
+      }
     },
     onSuccess: () => {
-      onSuccess(selectedReason + (customNote ? ` (${customNote})` : ''))
+      const actionName = selectedType === 'bill' ? '💵 เรียกเก็บเงิน / เช็คบิล' : '🙋‍♂️ เรียกพนักงาน'
+      onSuccess(actionName + (customNote ? ` (${customNote})` : ''))
       onClose()
       setCustomNote('')
+    },
+    onError: (err: any) => {
+      console.error('Call staff error:', err)
+      alert(`ไม่สามารถส่งคำขอได้: ${err.message || 'กรุณาลองใหม่อีกครั้ง'}`)
     }
   })
 
@@ -485,13 +518,14 @@ function CallStaffModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
       <div className="relative w-full max-w-md bg-white border border-line rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto max-h-[92vh] overflow-y-auto animate-scale-up">
+        {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-line pb-3">
           <div className="flex items-center gap-2.5">
             <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-600">
               <Bell size={20} className="animate-bounce" />
             </span>
             <div>
-              <h2 className="text-base sm:text-lg font-black text-ink">เรียกพนักงาน</h2>
+              <h2 className="text-base sm:text-lg font-black text-ink">บริการประจำโต๊ะ</h2>
               <p className="text-[11px] text-smoke font-medium">โต๊ะ {tableName} • บริการส่งตรงถึงโต๊ะคุณ</p>
             </div>
           </div>
@@ -503,50 +537,110 @@ function CallStaffModal({
           </button>
         </div>
 
-        <div className="space-y-2.5">
-          <label className="text-xs font-bold text-ink block">เลือกเรื่องที่ต้องการให้พนักงานบริการ:</label>
-          <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-            {reasons.map((r) => (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => setSelectedReason(r.label)}
-                className={`w-full p-2.5 sm:p-3 rounded-xl border text-left text-xs font-bold transition flex items-center justify-between cursor-pointer ${
-                  selectedReason === r.label
-                    ? r.isPay
-                      ? 'bg-emerald-50 border-emerald-400 text-emerald-800 shadow-sm'
-                      : 'bg-amber-50 border-amber-400 text-amber-800 shadow-sm'
-                    : 'bg-soft/60 border-line text-ink hover:bg-soft'
-                }`}
-              >
-                <span>{r.label}</span>
-                {selectedReason === r.label && (
-                  <Check size={16} className={r.isPay ? 'text-emerald-600' : 'text-amber-600'} />
-                )}
-              </button>
-            ))}
+        {/* 2 Primary Choices */}
+        <div className="space-y-3">
+          <label className="text-xs font-bold text-ink block">เลือกบริการที่ต้องการ:</label>
+          <div className="grid grid-cols-1 gap-2.5">
+            {/* Option 1: เรียกพนักงาน */}
+            <button
+              type="button"
+              onClick={() => setSelectedType('service')}
+              className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition flex items-center justify-between cursor-pointer ${
+                selectedType === 'service'
+                  ? 'bg-amber-50/80 border-amber-500 shadow-sm'
+                  : 'bg-white border-zinc-200 hover:border-zinc-300 text-zinc-700'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🙋‍♂️</span>
+                <div>
+                  <h3 className="font-extrabold text-sm text-zinc-950">เรียกพนักงาน</h3>
+                  <p className="text-[11px] text-zinc-500 font-medium mt-0.5">บริการทั่วไป, เติมน้ำซุป, ขออุปกรณ์ หรือสอบถาม</p>
+                </div>
+              </div>
+              <div className={`size-5 rounded-full border-2 grid place-items-center shrink-0 ${
+                selectedType === 'service' ? 'border-amber-500 bg-amber-500 text-white' : 'border-zinc-300'
+              }`}>
+                {selectedType === 'service' && <Check size={13} strokeWidth={3} />}
+              </div>
+            </button>
+
+            {/* Option 2: เรียกเก็บเงิน / เช็คบิล */}
+            <button
+              type="button"
+              onClick={() => setSelectedType('bill')}
+              className={`p-3.5 sm:p-4 rounded-2xl border-2 text-left transition flex items-center justify-between cursor-pointer ${
+                selectedType === 'bill'
+                  ? 'bg-emerald-50/80 border-emerald-500 shadow-sm'
+                  : 'bg-white border-zinc-200 hover:border-zinc-300 text-zinc-700'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">💵</span>
+                <div>
+                  <h3 className="font-extrabold text-sm text-zinc-950">เรียกเก็บเงิน / เช็คบิล</h3>
+                  <p className="text-[11px] text-zinc-500 font-medium mt-0.5">ชำระเงินโอน QR PromptPay, เงินสด หรือบัตรเครดิต</p>
+                </div>
+              </div>
+              <div className={`size-5 rounded-full border-2 grid place-items-center shrink-0 ${
+                selectedType === 'bill' ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-zinc-300'
+              }`}>
+                {selectedType === 'bill' && <Check size={13} strokeWidth={3} />}
+              </div>
+            </button>
           </div>
 
-          {/* Running total preview for billing requests */}
-          {(selectedReason.includes('เก็บเงิน') || selectedReason.includes('เช็คบิล')) && (
-            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs flex justify-between items-center animate-fade-in">
-              <span className="font-bold text-ink">ยอดรวมที่สั่งทั้งหมดปัจจุบัน:</span>
-              <span className="text-sm font-black text-emerald-700">฿{totalAmount.toLocaleString()}</span>
+          {/* Ordered Food Items Breakdown when requesting Bill */}
+          {selectedType === 'bill' && (
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-xs space-y-2.5 animate-fade-in shadow-xs">
+              <div className="flex items-center justify-between border-b border-emerald-200/70 pb-2">
+                <span className="font-extrabold text-emerald-950 flex items-center gap-1.5">
+                  <Receipt size={14} className="text-emerald-700" /> รายการอาหารที่สั่งไปแล้ว
+                </span>
+                <span className="font-bold text-[11px] text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                  {aggregatedItems.reduce((sum, it) => sum + it.quantity, 0)} ชิ้น
+                </span>
+              </div>
+
+              {aggregatedItems.length > 0 ? (
+                <div className="max-h-36 overflow-y-auto space-y-1.5 divide-y divide-emerald-200/40 pr-1">
+                  {aggregatedItems.map((it, idx) => (
+                    <div key={idx} className="pt-1.5 first:pt-0 flex items-center justify-between font-medium text-emerald-950">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="truncate">{it.name}</span>
+                        <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[11px] font-black shrink-0">
+                          x{it.quantity}
+                        </span>
+                      </div>
+                      <span className="font-extrabold shrink-0">฿{it.total.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-emerald-700 text-center py-1 font-medium text-[11px]">ยังไม่มีรายการสั่งอาหาร</p>
+              )}
+
+              <div className="border-t border-emerald-300 pt-2 flex justify-between items-center">
+                <span className="font-black text-emerald-950">ยอดรวมสุทธิทั้งสิ้น</span>
+                <span className="text-base sm:text-lg font-black text-emerald-700">฿{totalAmount.toLocaleString()}</span>
+              </div>
             </div>
           )}
 
+          {/* Optional Note */}
           <div className="space-y-1 pt-1">
             <label className="text-xs font-bold text-ink block">ระบุข้อความเพิ่มเติม (ถ้ามี):</label>
             <textarea
               rows={2}
               value={customNote}
               onChange={(e) => setCustomNote(e.target.value)}
-              placeholder="เช่น ขอพริกกับกระเทียมเพิ่ม, เตรียมเงินทอน 1,000 บาท..."
+              placeholder={selectedType === 'bill' ? 'เช่น เตรียมเงินทอน 1,000 บาท, จ่ายผ่าน QR Code...' : 'เช่น ขอเติมน้ำซุป, ขอพริกกระเทียมเพิ่ม...'}
               className="w-full border border-line outline-none rounded-xl p-2.5 bg-soft text-ink text-xs focus:border-amber-500 transition"
             />
           </div>
         </div>
 
+        {/* Action Buttons */}
         <div className="flex items-center gap-2.5 pt-1">
           <button
             type="button"
@@ -559,10 +653,18 @@ function CallStaffModal({
             type="button"
             onClick={() => callStaffMutation.mutate()}
             disabled={callStaffMutation.isPending}
-            className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+            className={`flex-1 py-2.5 rounded-xl font-bold text-xs shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer text-white ${
+              selectedType === 'bill'
+                ? 'bg-emerald-600 hover:bg-emerald-700'
+                : 'bg-amber-500 hover:bg-amber-600'
+            }`}
           >
             <Send size={13} />
-            {callStaffMutation.isPending ? 'กำลังส่งคำขอ...' : 'ส่งคำขอเรียกพนักงาน'}
+            {callStaffMutation.isPending
+              ? 'กำลังส่งคำขอ...'
+              : selectedType === 'bill'
+              ? 'ส่งคำขอเรียกเก็บเงิน'
+              : 'ส่งคำขอเรียกพนักงาน'}
           </button>
         </div>
       </div>
@@ -679,6 +781,217 @@ function OrderSummaryModal({
             ปิดหน้าต่าง
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ProductDetailModal({
+  item,
+  categories = [],
+  isOpen,
+  onClose,
+  cartQty,
+  onAddToCart,
+  onChangeQty
+}: {
+  item: any | null
+  categories?: any[]
+  isOpen: boolean
+  onClose: () => void
+  cartQty: number
+  onAddToCart: (item: any) => void
+  onChangeQty: (id: string, delta: number) => void
+}) {
+  if (!isOpen || !item) return null
+
+  const categoryName = item.category?.name || categories.find(c => c.id === item.category_id)?.name
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div 
+        className="relative w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl border border-zinc-200/80 animate-scale-up max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-20 size-8 sm:size-9 rounded-full bg-black/50 hover:bg-black/75 text-white grid place-items-center backdrop-blur-md transition cursor-pointer"
+        >
+          <X size={18} />
+        </button>
+
+        {/* Large Food Image */}
+        <div className="relative aspect-video sm:aspect-4/3 w-full bg-zinc-100 shrink-0 overflow-hidden">
+          {item.image_url ? (
+            <img
+              src={item.image_url}
+              alt={item.name}
+              className="size-full object-cover"
+            />
+          ) : (
+            <div className="grid size-full place-items-center bg-orange-50 text-5xl">
+              🍲
+            </div>
+          )}
+        </div>
+
+        {/* Content Area */}
+        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {categoryName && (
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-200/60">
+                  📁 {categoryName}
+                </span>
+              )}
+              {item.badge && (
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200/60">
+                  {item.badge}
+                </span>
+              )}
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-zinc-950">
+              {item.name}
+            </h2>
+            <div className="text-xl font-black text-orange-500">
+              ฿{Number(item.price || 0).toLocaleString()}
+            </div>
+          </div>
+
+          {/* Real Description */}
+          {item.description ? (
+            <div className="space-y-1 border-t border-zinc-100 pt-3">
+              <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                รายละเอียดเมนู
+              </h4>
+              <p className="text-sm text-zinc-600 leading-relaxed whitespace-pre-line">
+                {item.description}
+              </p>
+            </div>
+          ) : (
+            <div className="border-t border-zinc-100 pt-3">
+              <p className="text-xs text-zinc-400 italic">
+                (ไม่มีคำอธิบายเพิ่มเติมสำหรับเมนูนี้)
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Bar: Action / Stepper */}
+        <div className="p-4 sm:p-5 border-t border-zinc-100 bg-zinc-50/70 flex items-center justify-between gap-3 shrink-0">
+          <div>
+            <span className="text-[11px] text-zinc-400 font-bold block">ราคารวม</span>
+            <span className="text-lg font-black text-zinc-950">
+              ฿{Number((item.price || 0) * (cartQty > 0 ? cartQty : 1)).toLocaleString()}
+            </span>
+          </div>
+
+          {cartQty > 0 ? (
+            <div className="flex items-center gap-3 bg-emerald-600 text-white rounded-2xl px-4 py-2 shadow-md">
+              <button
+                onClick={() => onChangeQty(item.id, -1)}
+                className="size-7 rounded-full bg-white/20 hover:bg-white/30 grid place-items-center font-black text-sm active:scale-90 cursor-pointer"
+              >
+                -
+              </button>
+              <span className="text-base font-black px-1 min-w-[20px] text-center">{cartQty}</span>
+              <button
+                onClick={() => onChangeQty(item.id, 1)}
+                className="size-7 rounded-full bg-white/20 hover:bg-white/30 grid place-items-center font-black text-sm active:scale-90 cursor-pointer"
+              >
+                +
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                onAddToCart(item)
+              }}
+              className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-sm font-black shadow-md transition cursor-pointer"
+            >
+              <Plus size={18} strokeWidth={2.8} /> เพิ่มลงตะกร้า
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OrderProcessStepper({ status, orderType = 'dine_in' }: { status: string; orderType?: string }) {
+  const isDelivery = orderType === 'delivery'
+  const steps = [
+    { step: 1, label: 'รับออเดอร์', icon: '📝' },
+    { step: 2, label: 'กำลังปรุง', icon: '🍳' },
+    { step: 3, label: isDelivery ? 'กำลังจัดส่ง' : 'พร้อมเสิร์ฟ', icon: isDelivery ? '🛵' : '🍽️' },
+    { step: 4, label: isDelivery ? 'จัดส่งสำเร็จ' : 'เสิร์ฟเรียบร้อย', icon: '✨' }
+  ]
+
+  let currentStep = 1
+  if (['pending', 'accepted'].includes(status)) currentStep = 1
+  else if (status === 'preparing') currentStep = 2
+  else if (status === 'ready') currentStep = 3
+  else if (status === 'completed') currentStep = 4
+
+  if (status === 'cancelled') {
+    return (
+      <div className="flex items-center justify-center gap-2 rounded-2xl bg-red-50 p-3.5 text-xs font-bold text-red-600 border border-red-200">
+        <AlertCircle size={16} /> ออเดอร์นี้ถูกยกเลิกแล้ว (Cancelled)
+      </div>
+    )
+  }
+
+  const progressPercent = currentStep === 1 ? 0 : currentStep === 2 ? 33.33 : currentStep === 3 ? 66.66 : 100
+
+  return (
+    <div className="py-3 px-1 sm:px-4">
+      <div className="relative flex items-center justify-between">
+        {/* Background Connecting Line */}
+        <div className="absolute left-5 right-5 top-4 h-1 bg-zinc-200 -translate-y-1/2 z-0 rounded-full" />
+        
+        {/* Active Progress Line */}
+        <div
+          className="absolute left-5 top-4 h-1 bg-emerald-500 -translate-y-1/2 z-0 rounded-full transition-all duration-500"
+          style={{ width: `calc((100% - 2.5rem) * ${progressPercent / 100})` }}
+        />
+
+        {/* 4 Connected Circular Steps */}
+        {steps.map((s) => {
+          const isDone = currentStep > s.step
+          const isCurrent = currentStep === s.step
+
+          return (
+            <div key={s.step} className="relative z-10 flex flex-col items-center gap-2">
+              <div
+                className={`grid size-8 sm:size-9 place-items-center rounded-full text-xs font-black transition-all shadow-sm ${
+                  isCurrent
+                    ? 'bg-emerald-500 text-white ring-4 ring-emerald-100 animate-breathing'
+                    : isDone
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-white border-2 border-zinc-300 text-zinc-400'
+                }`}
+              >
+                {isDone ? (
+                  <Check size={14} strokeWidth={3} className="text-white" />
+                ) : (
+                  <span>{s.icon}</span>
+                )}
+              </div>
+              <span
+                className={`text-[10px] sm:text-[11px] font-bold text-center select-none ${
+                  isCurrent
+                    ? 'text-emerald-700 font-extrabold'
+                    : isDone
+                    ? 'text-zinc-800'
+                    : 'text-zinc-400'
+                }`}
+              >
+                {s.label}
+              </span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -880,6 +1193,7 @@ function StorefrontApp() {
 
   const [activeCat, setActiveCat] = useState<string>('all')
   const [search, setSearch] = useState('')
+  const [detailItem, setDetailItem] = useState<any | null>(null)
 
   const addToCart = (item: any) => {
     const existing = cart.find(x => x.item.id === item.id)
@@ -920,9 +1234,16 @@ function StorefrontApp() {
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 flex flex-col font-sans">
       
-      <div className={`fixed top-4 right-4 z-50 bg-black text-white px-4 py-2 rounded-lg shadow-xl text-xs font-bold transition ${toast.show ? 'translate-x-0' : 'translate-x-full'}`}>{toast.message}</div>
+      {/* Floating Toast Notification */}
+      <div
+        className={`fixed top-4 right-4 z-50 bg-zinc-900 text-white px-4 py-2.5 rounded-2xl shadow-2xl text-xs font-bold transition-all duration-300 pointer-events-none ${
+          toast.show ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 -translate-y-4 scale-90 pointer-events-none'
+        }`}
+      >
+        {toast.message}
+      </div>
 
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-zinc-200 shadow-sm px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+      <header className="fixed top-0 left-0 right-0 z-40 h-14 sm:h-16 bg-white/95 backdrop-blur-md border-b border-zinc-200 shadow-sm px-3 sm:px-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 cursor-pointer min-w-0" onClick={() => setView('home')}>
           {settings?.logo_url ? (
             <img src={settings.logo_url} className="size-8 sm:size-9 rounded-full object-cover border border-zinc-200 shrink-0" />
@@ -935,7 +1256,15 @@ function StorefrontApp() {
         </div>
 
         <nav className="hidden md:flex items-center gap-6">
-          {['home', 'order', 'track', 'promotions', 'contact'].map((v) => (
+          {[
+            ['home', 'หน้าแรก'],
+            ['order', 'สั่งอาหาร'],
+            ['track', 'ประวัติ'],
+            ...(!tableId ? [
+              ['promotions', 'โปรโมชั่น'],
+              ['contact', 'ติดต่อเรา']
+            ] : [])
+          ].map(([v, label]) => (
             <button
               key={v}
               onClick={() => {
@@ -947,7 +1276,7 @@ function StorefrontApp() {
               }}
               className={`text-sm font-semibold transition hover:text-orange-500 ${view === v ? 'text-orange-500 font-bold' : 'text-zinc-500'}`}
             >
-              {v.charAt(0).toUpperCase() + v.slice(1)}
+              {label}
             </button>
           ))}
         </nav>
@@ -955,7 +1284,7 @@ function StorefrontApp() {
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {tableId ? (
             <>
-              <div className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-orange-50 border border-orange-200 text-orange-600 font-bold text-[11px] sm:text-xs flex items-center gap-1">
+              <div className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-orange-50 border border-orange-200 text-orange-600 font-bold text-[11px] sm:text-xs flex items-center gap-1">
                 <MapPin size={12} className="shrink-0" /> โต๊ะ {tableName}
               </div>
               <button
@@ -963,19 +1292,11 @@ function StorefrontApp() {
                   setCallStaffDefaultReason('💵 เรียกเก็บเงิน / เช็คบิล')
                   setIsCallStaffOpen(true)
                 }}
-                className="flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold text-[11px] sm:text-xs transition active:scale-95 shadow-sm cursor-pointer"
-                title="เรียกพนักงาน / เรียกเก็บเงิน"
+                className="animate-breathing flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md transition active:scale-95 cursor-pointer"
+                title="เรียกพนักงาน"
               >
-                <Bell size={12} className="text-amber-600 animate-bounce" />
-                <span className="hidden xs:inline">เรียกพนักงาน</span>
-              </button>
-              <button
-                onClick={() => setIsBillOpen(true)}
-                className="flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold text-[11px] sm:text-xs transition active:scale-95 shadow-sm cursor-pointer"
-                title="ดูยอดรวมที่สั่งไปแล้ว"
-              >
-                <Receipt size={12} className="text-emerald-600" />
-                <span className="hidden xs:inline">ดูยอดรวม</span>
+                <Bell size={13} />
+                <span>เรียกพนักงาน</span>
               </button>
             </>
           ) : customer ? (
@@ -1004,7 +1325,7 @@ function StorefrontApp() {
 
       {/* Active Service Call Notification Alert Bar */}
       {activeServiceRequest && tableId && (
-        <div className="bg-amber-100/90 border-b border-amber-300 px-3 sm:px-4 py-2 flex items-center justify-between text-xs text-amber-900 font-bold animate-fade-in shadow-inner">
+        <div className="fixed top-14 sm:top-16 left-0 right-0 z-30 bg-amber-100/95 backdrop-blur-md border-b border-amber-300 px-3 sm:px-4 py-2 flex items-center justify-between text-xs text-amber-900 font-bold animate-fade-in shadow-inner">
           <div className="flex items-center gap-2 min-w-0">
             <span className="size-2.5 rounded-full bg-amber-500 animate-ping shrink-0" />
             <span className="truncate">
@@ -1024,28 +1345,16 @@ function StorefrontApp() {
         </div>
       )}
 
-      {['home', 'order', 'promotions', 'contact'].includes(view) && (
-        <button
-          onClick={() => requireAuthAndNavigate('cart')}
-          className="fixed bottom-16 sm:bottom-20 md:bottom-6 right-4 sm:right-6 z-40 bg-orange-600 hover:bg-orange-700 text-white p-3.5 sm:p-4 rounded-full shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition"
-          aria-label="ตะกร้าสินค้า"
-        >
-          <ShoppingCart size={20} className="sm:size-[22px]" />
-          {getCartCount() > 0 && (
-            <span className="absolute -top-1 -right-1 bg-white text-orange-600 font-black text-[10px] size-5 rounded-full flex items-center justify-center shadow-md">
-              {getCartCount()}
-            </span>
-          )}
-        </button>
-      )}
-
+      {/* Fixed Bottom Mobile Navigation on ALL pages */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-line px-1 sm:px-2 py-1.5 flex items-center justify-around z-30 shadow-lg pb-safe">
         {[
           ['home', Compass, 'หน้าแรก'],
           ['order', Utensils, 'สั่งอาหาร'],
-          ['track', Clock, 'ติดตามสถานะ'],
-          ['promotions', Tag, 'โปรโมชั่น'],
-          ['contact', MessageSquare, 'ติดต่อเรา'],
+          ['track', Clock, 'ประวัติ'],
+          ...(!tableId ? [
+            ['promotions', Tag, 'โปรโมชั่น'],
+            ['contact', MessageSquare, 'ติดต่อเรา'],
+          ] : [])
         ].map(([v, Icon, label]: any) => (
           <button
             key={v}
@@ -1065,7 +1374,7 @@ function StorefrontApp() {
       </div>
 
       {/* ── Main View Switcher ── */}
-      <main className="flex-1 pb-24 md:pb-8">
+      <main className={`flex-1 pb-24 md:pb-8 ${activeServiceRequest && tableId ? 'pt-24 sm:pt-28' : 'pt-15 sm:pt-18'}`}>
 
         {/* ── VIEW: Login / Customer Auth ── */}
         {view === 'login' && (
@@ -1132,7 +1441,7 @@ function StorefrontApp() {
         {/* ── VIEW: Home (Landing Page) ── */}
         {view === 'home' && (
           <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-8 sm:space-y-12 bg-paper">
-            <section className="relative rounded-2xl sm:rounded-3xl overflow-hidden bg-coal text-paper p-5 xs:p-6 sm:p-10 lg:p-16 flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-8 border border-white/10 shadow-2xl">
+            <section className="relative rounded-2xl sm:rounded-3xl overflow-hidden bg-coal text-paper p-4 xs:p-5 sm:p-8 lg:p-14 flex flex-row items-center justify-between gap-3 sm:gap-8 border border-white/10 shadow-2xl">
               <HeroAnimatedBackground bannerUrl={settings?.banner_url} />
               
               {/* Floating ambient badge top-right */}
@@ -1145,37 +1454,50 @@ function StorefrontApp() {
                 <span className="text-ember">🔥</span> การันตีความสด อร่อยทุกคำ
               </div>
 
-              <div className="relative z-10 space-y-4 sm:space-y-6 max-w-xl text-center md:text-left flex flex-col items-center md:items-start w-full">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-ember/10 border border-ember/30 text-[11px] sm:text-xs font-bold text-ember">
-                  <span className="size-2 rounded-full bg-ember animate-ping" />
+              <div className="relative z-10 space-y-2 xs:space-y-3 sm:space-y-4 max-w-xl text-left flex flex-col items-start flex-1 min-w-0 pr-1 sm:pr-0">
+                <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-ember/10 border border-ember/30 text-[10px] sm:text-xs font-bold text-ember">
+                  <span className="size-1.5 sm:size-2 rounded-full bg-ember animate-ping" />
                   เปิดให้บริการทุกวัน 11:00 – 23:00 น.
                 </span>
-                <h1 className="text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-black font-sans leading-tight">
+                <h1 className="text-base xs:text-xl sm:text-3xl lg:text-5xl font-black font-sans leading-tight">
                   {shop?.name || 'หมูกระทะพรีเมียม'} <br />
                   <span className="text-ember">สดทุกคำ ร้อนทุกเตา</span>
                 </h1>
-                <p className="text-xs sm:text-sm text-smoke leading-relaxed max-w-md">
+                <p className="hidden md:block text-xs sm:text-sm text-smoke leading-relaxed max-w-md line-clamp-2">
                   {settings?.description || 'คัดสรรวัตถุดิบคุณภาพพรีเมียมจากแหล่งที่ดีที่สุด ส่งตรงถึงบ้านด้วยไรเดอร์มืออาชีพ หรือสำรองโต๊ะนั่งอร่อยฟินหน้าร้าน'}
                 </p>
-                <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2.5 sm:gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2 sm:gap-3 pt-0.5 sm:pt-1">
                   <button
                     onClick={() => requireAuthAndNavigate('order')}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 sm:py-3.5 rounded-xl font-bold bg-ember hover:bg-deep text-white shadow-lg transition active:scale-95 text-xs sm:text-sm cursor-pointer"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1 px-3 sm:px-6 py-2 sm:py-3.5 rounded-xl font-bold bg-ember hover:bg-deep text-white shadow-lg transition active:scale-95 text-xs sm:text-sm cursor-pointer shrink-0"
                   >
-                    เริ่มสั่งอาหาร <ChevronRight size={16} />
+                    เริ่มสั่งอาหาร <ChevronRight size={14} />
                   </button>
-                  <button
-                    onClick={() => setView('promotions')}
-                    className="w-full sm:w-auto flex items-center justify-center px-6 py-3 sm:py-3.5 rounded-xl font-bold border border-white/10 hover:border-white/30 text-white bg-white/5 text-xs sm:text-sm transition cursor-pointer"
-                  >
-                    ดูโปรโมชั่นพิเศษ
-                  </button>
+                  {tableId ? (
+                    <button
+                      onClick={() => {
+                        setCallStaffDefaultReason('💵 เรียกเก็บเงิน / เช็คบิล')
+                        setIsCallStaffOpen(true)
+                      }}
+                      className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 sm:px-6 py-2 sm:py-3.5 rounded-xl font-bold bg-amber-500 hover:bg-amber-600 text-white text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer shrink-0"
+                    >
+                      <Bell size={14} /> เรียกพนักงาน / เช็คบิล
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setView('promotions')}
+                      className="w-full sm:w-auto flex items-center justify-center px-3 sm:px-6 py-2 sm:py-3.5 rounded-xl font-bold border border-white/10 hover:border-white/30 text-white bg-white/5 text-xs sm:text-sm transition cursor-pointer shrink-0"
+                    >
+                      ดูโปรโมชั่นพิเศษ
+                    </button>
+                  )}
                 </div>
               </div>
 
               <HeroProductShowcase
                 items={menuQuery.data?.items}
                 onAddToCart={addToCart}
+                onSelectItem={setDetailItem}
               />
             </section>
 
@@ -1188,9 +1510,13 @@ function StorefrontApp() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                 {[
                   ['🍖', 'สั่งอาหารฟินๆ', 'เลือกเมนูลงเตา', () => requireAuthAndNavigate('order')],
-                  ['🛒', 'ตะกร้าของฉัน', 'ตรวจสอบราคารวม', () => requireAuthAndNavigate('cart')],
-                  ['📍', 'ติดตามสถานะ', 'ดูขั้นตอนการทำ', () => setView('track')],
-                  ['🎁', 'คูปองโปรโมชั่น', 'โค้ดส่วนลดพิเศษ', () => setView('promotions')]
+                  ['🛒', 'ตะกร้าของฉัน', 'ตรวจสอบรายการอาหาร', () => { if (cart.length === 0) setView('order'); else requireAuthAndNavigate('cart'); }],
+                  ['📍', 'ประวัติออเดอร์', 'ดูสถานะการทำ', () => setView('track')],
+                  ...(tableId ? [
+                    ['🔔', 'เรียกพนักงาน', 'บริการ / เรียกเช็คบิล', () => { setCallStaffDefaultReason('🙋‍♂️ เรียกพนักงาน'); setIsCallStaffOpen(true); }]
+                  ] : [
+                    ['🎁', 'คูปองโปรโมชั่น', 'โค้ดส่วนลดพิเศษ', () => setView('promotions')]
+                  ])
                 ].map(([emoji, title, desc, action], i) => (
                   <div key={i} onClick={action as any} className="bg-white rounded-2xl border border-line p-3.5 sm:p-5 cursor-pointer hover:-translate-y-1 hover:shadow-md transition duration-300">
                     <span className="text-2xl sm:text-3xl">{emoji}</span>
@@ -1207,147 +1533,349 @@ function StorefrontApp() {
                 <Utensils className="text-ember" size={18} />
                 เมนูแนะนำประจำวันนี้
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                {menuQuery.data?.items.slice(0, 3).map((item) => (
-                  <div key={item.id} className="bg-white border border-line rounded-2xl overflow-hidden flex flex-col justify-between group shadow-sm">
-                    <div className="h-40 sm:h-44 bg-soft flex items-center justify-center overflow-hidden">
-                      <div className="relative h-full w-full group-hover:scale-105 duration-300">
-                        <ProductImageCarousel item={item} />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {menuQuery.data?.items.slice(0, 4).map((item) => {
+                  const qty = cart.find(x => x.item.id === item.id)?.quantity || 0
+                  return (
+                    <div
+                      key={item.id}
+                      className="group flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-zinc-200/80 bg-white overflow-hidden shadow-xs transition hover:shadow-md duration-300"
+                    >
+                      {/* Food Image */}
+                      <div
+                        onClick={() => setDetailItem(item)}
+                        className="relative aspect-square w-full overflow-hidden bg-zinc-100 cursor-pointer"
+                      >
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.name}
+                            className="size-full object-cover transition duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="grid size-full place-items-center bg-orange-50 text-3xl">
+                            🍲
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Divider Line between Image and Text */}
+                      <div className="border-t border-zinc-100" />
+
+                      {/* Food Info & Price with Plus Button on Right */}
+                      <div className="p-2.5 sm:p-3 flex flex-col justify-between flex-1 gap-2">
+                        <div onClick={() => setDetailItem(item)} className="cursor-pointer">
+                          <h3 className="text-xs sm:text-sm font-extrabold text-zinc-900 truncate group-hover:text-orange-600 transition">
+                            {item.name}
+                          </h3>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-1 pt-0.5">
+                          <span className="text-xs sm:text-sm font-black text-zinc-950">
+                            ฿{item.price.toLocaleString()}
+                          </span>
+
+                          {qty > 0 ? (
+                            <div className="flex items-center rounded-full bg-emerald-600 px-1.5 py-0.5 text-white shadow-xs">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  changeQty(item.id, -1)
+                                }}
+                                className="grid size-5 place-items-center text-xs font-black hover:opacity-80 cursor-pointer"
+                              >
+                                -
+                              </button>
+                              <span className="px-1 text-xs font-black">{qty}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  changeQty(item.id, 1)
+                                }}
+                                className="grid size-5 place-items-center text-xs font-black hover:opacity-80 cursor-pointer"
+                              >
+                                +
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                addToCart(item)
+                              }}
+                              className="grid size-7 sm:size-8 place-items-center rounded-full bg-emerald-600 text-white shadow-xs transition duration-150 hover:bg-emerald-700 active:scale-90 cursor-pointer"
+                              title="เพิ่มลงตะกร้า"
+                            >
+                              <Plus size={15} strokeWidth={2.8} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="p-4 sm:p-5 space-y-3 flex-1 flex flex-col justify-between">
-                      <div>
-                        <h3 className="font-black text-sm sm:text-base text-ink">{item.name}</h3>
-                        <p className="text-xs text-smoke font-medium mt-1 line-clamp-2">{item.description || 'เมนูอร่อยที่ต้องลอง'}</p>
-                      </div>
-                      <div className="flex items-center justify-between pt-2 border-t border-line/45">
-                        <span className="font-black text-ember text-sm sm:text-base">฿{item.price.toLocaleString()}</span>
-                        <button
-                          onClick={() => addToCart(item)}
-                          className="h-8 px-3 sm:px-3.5 text-xs rounded-lg font-bold bg-coal text-white hover:bg-ink transition active:scale-95 cursor-pointer"
-                        >
-                          + เพิ่มลงตะกร้า
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </section>
           </div>
         )}
 
-        {/* ── VIEW: Order / Menu ── */}
+        {/* ── VIEW: Order / Menu (Grab / LINEMAN Clean Modern Style) ── */}
         {view === 'order' && (
-          <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 bg-paper space-y-5 sm:space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-black text-ink">
-                  {tableId ? `สั่งอาหาร โต๊ะ ${tableName}` : 'สั่งอาหารเดลิเวอรี'}
-                </h1>
-                <p className="text-xs font-semibold text-smoke mt-0.5 sm:mt-1">
-                  {tableId ? 'เลือกเมนูโปรด กดยืนยันส่งตรงถึงครัวได้เลย' : 'เลือกหมูกระทะและชุดเมนูสุดโปรดของคุณ'}
-                </p>
-              </div>
-              <div className="relative w-full sm:min-w-[240px]">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-smoke" />
+          <div className="max-w-4xl mx-auto px-3.5 sm:px-6 py-4 space-y-6 pb-36">
+            {/* Search & Category Filter Pills */}
+            <div className="space-y-3">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                 <input
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  placeholder="ค้นหาเมนูอาหาร..."
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-line bg-white text-xs outline-none focus:border-ember"
+                  placeholder="ค้นหาชื่อเมนูอาหาร เครื่องดื่ม..."
+                  className="h-11 w-full pl-10 pr-4 rounded-2xl border border-zinc-200 bg-white text-xs font-semibold outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-100 shadow-xs"
                 />
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Category Pills (Grab Style) */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                <button
+                  onClick={() => setActiveCat('all')}
+                  className={`px-4 py-2 rounded-full text-xs font-extrabold shrink-0 transition shadow-xs ${
+                    activeCat === 'all'
+                      ? 'bg-zinc-950 text-white'
+                      : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-100'
+                  }`}
+                >
+                  สำหรับคุณ
+                </button>
+                {categories.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => setActiveCat(c.id)}
+                    className={`px-4 py-2 rounded-full text-xs font-extrabold shrink-0 transition shadow-xs ${
+                      activeCat === c.id
+                        ? 'bg-zinc-950 text-white'
+                        : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-100'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Dine-In Table Quick Actions Banner */}
-            {tableId && (
-              <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-emerald-500/10 border border-orange-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-center gap-2.5">
-                  <span className="grid size-9 place-items-center rounded-xl bg-ember text-white font-black text-xs shadow-sm shrink-0">
-                    🪑
+            {/* ── SECTION 1: Featured / "สำหรับคุณ" (Top Picks Carousel / 2-Col Grid) ── */}
+            {activeCat === 'all' && !search && items.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-black text-zinc-950 flex items-center gap-1.5">
+                    <span>🔥 สำหรับคุณ</span>
+                  </h2>
+                  <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                    แนะนำ
                   </span>
-                  <div>
-                    <p className="text-xs font-black text-ink">บริการประจำโต๊ะ {tableName}</p>
-                    <p className="text-[11px] text-smoke font-medium">กดเรียกพนักงานเพื่อรับบริการ หรือสรุปยอดเช็คบิลได้ทันที</p>
-                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setCallStaffDefaultReason('💵 เรียกเก็บเงิน / เช็คบิล')
-                      setIsCallStaffOpen(true)
-                    }}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-sm transition active:scale-95 cursor-pointer"
-                  >
-                    <Bell size={13} /> เรียกพนักงาน / เก็บเงิน
-                  </button>
-                  <button
-                    onClick={() => setIsBillOpen(true)}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition active:scale-95 cursor-pointer"
-                  >
-                    <Receipt size={13} /> ดูยอดสั่งซื้อ (฿{(tableOrdersQuery.data || []).reduce((acc: number, o: any) => acc + Number(o.total || 0), 0).toLocaleString()})
-                  </button>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {items.slice(0, 2).map((item) => {
+                    const qty = cart.find(x => x.item.id === item.id)?.quantity || 0
+                    return (
+                      <div
+                        key={`featured-${item.id}`}
+                        className="group flex flex-col justify-between rounded-2xl sm:rounded-3xl border border-zinc-200/80 bg-white overflow-hidden shadow-xs transition hover:shadow-md duration-300"
+                      >
+                        <div
+                          onClick={() => setDetailItem(item)}
+                          className="relative aspect-square w-full overflow-hidden bg-zinc-100 cursor-pointer"
+                        >
+                          {item.image_url ? (
+                            <img
+                              src={item.image_url}
+                              alt={item.name}
+                              className="size-full object-cover transition duration-300 group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="grid size-full place-items-center bg-orange-50 text-3xl">
+                              🍲
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Divider Line between Image and Text */}
+                        <div className="border-t border-zinc-100" />
+
+                        <div className="p-2.5 sm:p-3 flex flex-col justify-between flex-1 gap-2">
+                          <div onClick={() => setDetailItem(item)} className="cursor-pointer">
+                            <h3 className="text-xs sm:text-sm font-extrabold text-zinc-900 truncate group-hover:text-orange-600 transition">
+                              {item.name}
+                            </h3>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-1 pt-0.5">
+                            <span className="text-xs sm:text-sm font-black text-zinc-950">
+                              ฿{Number(item.price || 0).toLocaleString()}
+                            </span>
+
+                            {qty > 0 ? (
+                              <div className="flex items-center rounded-full bg-emerald-600 px-1.5 py-0.5 text-white shadow-xs">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    changeQty(item.id, -1)
+                                  }}
+                                  className="grid size-5 place-items-center text-xs font-black hover:opacity-80 cursor-pointer"
+                                >
+                                  -
+                                </button>
+                                <span className="px-1 text-xs font-black">{qty}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    changeQty(item.id, 1)
+                                  }}
+                                  className="grid size-5 place-items-center text-xs font-black hover:opacity-80 cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  addToCart(item)
+                                }}
+                                className="grid size-7 sm:size-8 place-items-center rounded-full bg-emerald-600 text-white shadow-xs transition duration-150 hover:bg-emerald-700 active:scale-90 cursor-pointer"
+                                title="เพิ่มลงตะกร้า"
+                              >
+                                <Plus size={15} strokeWidth={2.8} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              </div>
+              </section>
             )}
 
-            {/* Category Tabs */}
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-              <button
-                onClick={() => setActiveCat('all')}
-                className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer ${activeCat === 'all' ? 'bg-ember text-white shadow-sm' : 'bg-white text-smoke border border-line hover:bg-soft'}`}
-              >
-                ทั้งหมด
-              </button>
-              {categories.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => setActiveCat(c.id)}
-                  className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer ${activeCat === c.id ? 'bg-ember text-white shadow-sm' : 'bg-white text-smoke border border-line hover:bg-soft'}`}
-                >
-                  {c.name}
-                </button>
-              ))}
-            </div>
+            {/* ── SECTION 2: Categorized Food Items (Horizontal Table / List Rows) ── */}
+            <div className="space-y-6">
+              {(activeCat === 'all'
+                ? categories.length > 0
+                  ? categories
+                  : [{ id: 'all', name: 'เมนูทั้งหมด' }]
+                : categories.filter(c => c.id === activeCat)
+              ).map((category) => {
+                const categoryItems = activeCat === 'all' && categories.length > 0
+                  ? items.filter(x => x.category_id === category.id)
+                  : items
 
-            {/* Menu Items Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-5">
-              {items.map((item) => {
-                const qty = cart.find(x => x.item.id === item.id)?.quantity || 0
+                if (categoryItems.length === 0) return null
+
                 return (
-                  <div key={item.id} className="bg-white border border-line rounded-2xl p-3 sm:p-4 flex gap-3 sm:gap-4 items-center shadow-sm">
-                    <div className="size-16 sm:size-20 rounded-xl bg-soft flex items-center justify-center overflow-hidden shrink-0 border border-line">
-                      <div className="size-full">
-                        <ProductImageCarousel item={item} />
-                      </div>
-                    </div>
-                    <div className="space-y-1 sm:space-y-1.5 flex-1 min-w-0">
-                      <h3 className="font-bold text-xs sm:text-sm text-ink truncate">{item.name}</h3>
-                      <p className="text-[10px] sm:text-[11px] text-smoke font-medium line-clamp-1">{item.description || 'สด ใหม่ ทุกล็อต'}</p>
-                      <div className="flex items-center justify-between pt-1">
-                        <span className="font-bold text-xs sm:text-sm text-ember">฿{item.price}</span>
-                        {qty > 0 ? (
-                          <div className="flex items-center bg-soft border border-line rounded-lg overflow-hidden h-7">
-                            <button onClick={() => changeQty(item.id, -1)} className="px-2 hover:bg-line/20 h-full font-bold text-xs text-ink cursor-pointer">-</button>
-                            <span className="px-2 font-bold text-xs text-ink">{qty}</span>
-                            <button onClick={() => changeQty(item.id, 1)} className="px-2 hover:bg-line/20 h-full font-bold text-xs text-ink cursor-pointer">+</button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => addToCart(item)}
-                            className="h-7 px-2.5 sm:px-3 text-[10px] sm:text-[11px] rounded-lg font-bold bg-coal text-white hover:bg-ink transition active:scale-95 cursor-pointer"
+                  <section key={category.id} className="space-y-3">
+                    <h2 className="text-lg font-black text-zinc-950 border-b border-zinc-100 pb-2">
+                      {category.name}
+                    </h2>
+
+                    <div className="space-y-3">
+                      {categoryItems.map((item) => {
+                        const qty = cart.find(x => x.item.id === item.id)?.quantity || 0
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-3.5 rounded-3xl border border-zinc-100 bg-white p-3.5 sm:p-4 shadow-sm transition hover:shadow-md group"
                           >
-                            + เพิ่ม
-                          </button>
-                        )}
-                      </div>
+                            {/* Food Image */}
+                            <div
+                              onClick={() => setDetailItem(item)}
+                              className="relative size-20 sm:size-24 shrink-0 overflow-hidden rounded-2xl bg-zinc-100 border border-zinc-100 shadow-sm cursor-pointer"
+                            >
+                              {item.image_url ? (
+                                <img
+                                  src={item.image_url}
+                                  alt={item.name}
+                                  className="size-full object-cover transition duration-300 group-hover:scale-105"
+                                />
+                              ) : (
+                                <div className="grid size-full place-items-center bg-orange-50 text-2xl">
+                                  🍲
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Food Details */}
+                            <div
+                              onClick={() => setDetailItem(item)}
+                              className="flex-1 min-w-0 space-y-1 cursor-pointer"
+                            >
+                              <h3 className="text-sm sm:text-base font-extrabold text-zinc-900 truncate group-hover:text-orange-600 transition">
+                                {item.name}
+                              </h3>
+                              {item.description && (
+                                <p className="text-xs text-zinc-500 font-medium line-clamp-2">
+                                  {item.description}
+                                </p>
+                              )}
+                              <p className="text-sm sm:text-base font-black text-zinc-950 pt-0.5">
+                                ฿{Number(item.price || 0).toLocaleString()}
+                              </p>
+                            </div>
+
+                            {/* Right Action Button (Green Plus / Stepper) */}
+                            <div className="shrink-0">
+                              {qty > 0 ? (
+                                <div className="flex items-center rounded-full bg-emerald-600 px-2 py-1 text-white shadow-md">
+                                  <button
+                                    onClick={() => changeQty(item.id, -1)}
+                                    className="grid size-6 place-items-center text-xs font-black hover:opacity-80 active:scale-90 cursor-pointer"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="px-2 text-xs font-black">{qty}</span>
+                                  <button
+                                    onClick={() => changeQty(item.id, 1)}
+                                    className="grid size-6 place-items-center text-xs font-black hover:opacity-80 active:scale-90 cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => addToCart(item)}
+                                  className="grid size-10 place-items-center rounded-full bg-emerald-600 text-white shadow-md transition duration-150 hover:bg-emerald-700 active:scale-90 cursor-pointer"
+                                  title="เพิ่มรายการ"
+                                >
+                                  <Plus size={20} strokeWidth={3} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                  </div>
+                  </section>
                 )
               })}
             </div>
-            {items.length === 0 && <div className="py-16 text-center text-sm text-smoke font-medium">ไม่พบรายการอาหารในหมวดหมู่นี้</div>}
+
+            {items.length === 0 && (
+              <div className="py-16 text-center">
+                <div className="mx-auto grid size-16 place-items-center rounded-full bg-zinc-100 text-2xl">
+                  🍽️
+                </div>
+                <p className="mt-3 text-sm font-bold text-zinc-600">ไม่พบรายการอาหารในหมวดนี้</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -1357,71 +1885,83 @@ function StorefrontApp() {
             <h1 className="text-2xl sm:text-3xl font-black text-ink">ตะกร้าของคุณ</h1>
             <p className="text-xs font-semibold text-smoke mt-1">ตรวจสอบรายการอาหารก่อนสั่งซื้อ</p>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-6 lg:gap-8 mt-6 sm:mt-8 items-start">
-              <section className="space-y-4">
-                {cart.length > 0 ? (
-                  <div className="bg-white border border-line rounded-2xl p-4 sm:p-5 shadow-sm divide-y divide-line/45">
+            {cart.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-6 lg:gap-8 mt-6 sm:mt-8 items-start">
+                <section className="space-y-4">
+                  <div className="bg-white border border-line rounded-3xl p-4 sm:p-5 shadow-sm divide-y divide-zinc-100 space-y-3">
                     {cart.map((c) => (
-                      <div key={c.item.id} className="py-3.5 first:pt-0 last:pb-0 flex flex-col xs:flex-row xs:items-center justify-between gap-3 sm:gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="size-12 sm:size-14 rounded-lg bg-soft flex items-center justify-center overflow-hidden border border-line shrink-0">
+                      <div key={c.item.id} className="pt-3 first:pt-0 flex items-center justify-between gap-3">
+                        {/* Food Image + Info */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="size-14 sm:size-16 rounded-2xl bg-soft flex items-center justify-center overflow-hidden border border-zinc-200 shrink-0 shadow-xs">
                             <div className="size-full">
                               <ProductImageCarousel item={c.item} />
                             </div>
                           </div>
-                          <div className="min-w-0">
-                            <h3 className="font-bold text-xs sm:text-sm text-ink truncate">{c.item.name}</h3>
-                            <p className="text-[10px] sm:text-[11px] text-smoke font-medium">฿{c.item.price.toLocaleString()} / ชิ้น</p>
+                          <div className="min-w-0 space-y-0.5">
+                            <h3 className="font-extrabold text-sm sm:text-base text-zinc-900 truncate">{c.item.name}</h3>
+                            <p className="text-xs font-semibold text-zinc-400">฿{c.item.price.toLocaleString()} / ชิ้น</p>
+                            <p className="text-sm font-black text-orange-500 sm:hidden">
+                              ฿{(c.item.price * c.quantity).toLocaleString()}
+                            </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between xs:justify-end gap-3 sm:gap-4">
-                          <div className="flex items-center bg-soft border border-line rounded-lg overflow-hidden h-8 sm:h-9">
-                            <button onClick={() => changeQty(c.item.id, -1)} className="px-2.5 sm:px-3 hover:bg-line/20 h-full font-extrabold text-ink transition cursor-pointer">−</button>
-                            <span className="px-2.5 sm:px-3 font-bold text-xs text-ink">{c.quantity}</span>
-                            <button onClick={() => changeQty(c.item.id, 1)} className="px-2.5 sm:px-3 hover:bg-line/20 h-full font-extrabold text-ink transition cursor-pointer">+</button>
+                        {/* Stepper + Total Price (Desktop) + Trash Action */}
+                        <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+                          <span className="hidden sm:inline-block font-black text-base text-zinc-950 min-w-16 text-right">
+                            ฿{(c.item.price * c.quantity).toLocaleString()}
+                          </span>
+
+                          <div className="flex items-center bg-zinc-100 rounded-full h-8 px-1 border border-zinc-200">
+                            <button
+                              onClick={() => changeQty(c.item.id, -1)}
+                              className="size-6 grid place-items-center rounded-full text-zinc-700 hover:bg-white active:scale-90 font-black text-xs transition"
+                            >
+                              −
+                            </button>
+                            <span className="w-7 text-center font-extrabold text-xs text-zinc-900">{c.quantity}</span>
+                            <button
+                              onClick={() => changeQty(c.item.id, 1)}
+                              className="size-6 grid place-items-center rounded-full text-zinc-700 hover:bg-white active:scale-90 font-black text-xs transition"
+                            >
+                              +
+                            </button>
                           </div>
-                          <span className="font-black text-xs sm:text-sm text-ink w-14 sm:w-16 text-right">฿{(c.item.price * c.quantity).toLocaleString()}</span>
-                          <button onClick={() => changeQty(c.item.id, -c.quantity)} className="text-smoke hover:text-deep transition p-1 cursor-pointer">
-                            <Trash2 size={15} />
+
+                          <button
+                            onClick={() => changeQty(c.item.id, -c.quantity)}
+                            className="size-8 grid place-items-center rounded-full text-zinc-400 hover:text-red-500 hover:bg-red-50 transition active:scale-90 cursor-pointer"
+                            title="ลบรายการ"
+                          >
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="bg-white border border-line rounded-2xl p-8 sm:p-12 text-center shadow-sm space-y-4">
-                    <span className="text-4xl sm:text-5xl block select-none">🛒</span>
-                    <h2 className="font-black text-base sm:text-lg text-ink">ยังไม่มีอาหารในตะกร้าของคุณ</h2>
-                    <p className="text-xs text-smoke font-medium">เลือกหมูกระทะคุโรบูตะ ซีฟู้ด หรือเมนูอื่นๆ ลงตะกร้าเลย!</p>
-                    <button onClick={() => setView('order')} className="px-6 py-2.5 rounded-xl bg-ember hover:bg-deep text-white font-bold text-xs transition cursor-pointer">
-                      ดูเมนูอาหาร
-                    </button>
-                  </div>
-                )}
-              </section>
+                </section>
 
-              <aside className="space-y-6">
-                <div className="bg-white border border-line rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
-                  <h2 className="text-sm sm:text-base font-black text-ink border-b border-line pb-3">สรุปออเดอร์</h2>
-                  <div className="space-y-2 text-xs font-semibold text-smoke">
-                    <div className="flex justify-between">
-                      <span>ราคาค่าอาหาร</span>
-                      <span className="text-ink">฿{getCartTotal().toLocaleString()}</span>
-                    </div>
-                    {!tableId && (
+                <aside className="space-y-6">
+                  <div className="bg-white border border-line rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
+                    <h2 className="text-sm sm:text-base font-black text-ink border-b border-line pb-3">สรุปออเดอร์</h2>
+                    <div className="space-y-2 text-xs font-semibold text-smoke">
                       <div className="flex justify-between">
-                        <span>ราคาค่าจัดส่ง</span>
-                        <span className="text-emerald-600 font-bold">ฟรี (โปรโมชั่น)</span>
+                        <span>ราคาค่าอาหาร</span>
+                        <span className="text-ink">฿{getCartTotal().toLocaleString()}</span>
                       </div>
-                    )}
-                  </div>
-                  <div className="border-t border-line/60 pt-3 flex justify-between items-center">
-                    <span className="font-black text-ink text-xs sm:text-sm">ยอดรวมจ่ายทั้งหมด</span>
-                    <span className="font-black text-base sm:text-lg text-deep">฿{getCartTotal().toLocaleString()}</span>
-                  </div>
+                      {!tableId && (
+                        <div className="flex justify-between">
+                          <span>ราคาค่าจัดส่ง</span>
+                          <span className="text-emerald-600 font-bold">ฟรี (โปรโมชั่น)</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="border-t border-line/60 pt-3 flex justify-between items-center">
+                      <span className="font-black text-ink text-xs sm:text-sm">ยอดรวมจ่ายทั้งหมด</span>
+                      <span className="font-black text-base sm:text-lg text-deep">฿{getCartTotal().toLocaleString()}</span>
+                    </div>
 
-                  {cart.length > 0 ? (
                     <button
                       onClick={() => {
                         if (tableId) {
@@ -1438,14 +1978,22 @@ function StorefrontApp() {
                         : <>ไปหน้ากรอกที่อยู่และชำระเงิน <ChevronRight size={15} /></>
                       }
                     </button>
-                  ) : (
-                    <button disabled className="w-full h-11 sm:h-12 rounded-xl bg-zinc-200 text-zinc-400 font-bold text-xs sm:text-sm cursor-not-allowed">
-                      ตะกร้าว่าง
-                    </button>
-                  )}
-                </div>
-              </aside>
-            </div>
+                  </div>
+                </aside>
+              </div>
+            ) : (
+              <div className="mt-6 max-w-md mx-auto bg-white border border-line rounded-3xl p-8 sm:p-12 text-center shadow-md space-y-4">
+                <span className="text-5xl block select-none">🛒</span>
+                <h2 className="font-black text-base sm:text-lg text-ink">ยังไม่มีอาหารในตะกร้าของคุณ</h2>
+                <p className="text-xs text-smoke font-medium">กดเลือกเมนูอาหารจานโปรดลงตะกร้าก่อนทำการสั่งซื้อ</p>
+                <button
+                  onClick={() => setView('order')}
+                  className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer"
+                >
+                  ไปเลือกดูเมนูอาหาร
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1577,112 +2125,96 @@ function StorefrontApp() {
           </div>
         )}
 
-        {/* ── VIEW: Track Order Status ── */}
+        {/* ── VIEW: Order History / Track Status ── */}
         {view === 'track' && (
           <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-5 sm:space-y-6 bg-paper">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-ink">{tableId ? `ประวัติการสั่งอาหาร โต๊ะ ${tableName}` : 'ติดตามสถานะออเดอร์'}</h1>
+              <h1 className="text-2xl sm:text-3xl font-black text-ink">
+                {tableId ? `ประวัติการสั่งอาหาร โต๊ะ ${tableName}` : 'ประวัติคำสั่งซื้อ'}
+              </h1>
               <p className="text-xs font-semibold text-smoke mt-1">
-                {tableId ? 'รายการออเดอร์ทั้งหมดของโต๊ะนี้ (อัปเดตเรียลไทม์จากห้องครัว)' : 'อัปเดตแบบเรียลไทม์ตรงถึงบ้านของคุณ'}
+                {tableId ? 'รายการออเดอร์ทั้งหมดของโต๊ะนี้ (อัปเดตเรียลไทม์จากห้องครัว)' : 'ติดตามสถานะคำสั่งซื้อแบบเรียลไทม์'}
               </p>
             </div>
 
             {/* DINE-IN ORDERS HISTORY FOR THIS TABLE */}
-            {tableId ? (
-              tableOrdersQuery.data && tableOrdersQuery.data.length > 0 ? (
+            {tableId ? (() => {
+              const validFoodOrders = (tableOrdersQuery.data || []).filter((ord: any) => {
+                const isServiceOrBill =
+                  ord.order_number?.startsWith('BILL') ||
+                  ord.order_number?.startsWith('SRV') ||
+                  ord.order_type === 'service_request' ||
+                  ord.notes?.startsWith('[เรียกพนักงาน]') ||
+                  ord.customer_name?.includes('เรียกเก็บเงิน') ||
+                  ord.customer_name?.includes('เรียกพนักงาน') ||
+                  (!ord.items || ord.items.length === 0)
+                return !isServiceOrBill
+              })
+
+              const activeFoodOrders = validFoodOrders.filter((o: any) => o.status !== 'cancelled')
+              const totalTableAmount = activeFoodOrders.reduce((acc: number, o: any) => acc + Number(o.total || 0), 0)
+
+              return validFoodOrders.length > 0 ? (
                 <div className="space-y-4 sm:space-y-6">
-                  {tableOrdersQuery.data.map((ord: any) => {
-                    const isDone = ord.status === 'completed' || ord.status === 'ready'
-                    const isPrep = ord.status === 'preparing' || ord.status === 'accepted'
+                  {validFoodOrders.map((ord: any) => {
                     return (
-                      <div key={ord.id} className="bg-white border border-line rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-md space-y-4 sm:space-y-6">
-                        <div className="flex flex-col sm:flex-row justify-between border-b border-line pb-3 sm:pb-4 gap-2">
-                          <div>
-                            <h2 className="text-base sm:text-lg font-black text-ink">#{ord.order_number || ord.id.slice(0, 8)}</h2>
-                            <p className="text-xs text-smoke font-medium">
-                              สั่งเมื่อ: <strong className="text-ink">{new Date(ord.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.</strong>
-                            </p>
+                      <div key={ord.id} className="bg-white border border-line rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-md space-y-4">
+                        {/* Inline Single-Row Order Header */}
+                        <div className="flex items-center justify-between border-b border-zinc-100 pb-3 gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h2 className="text-sm sm:text-base font-black text-zinc-950 shrink-0">
+                              #{ord.order_number || ord.id.slice(0, 7)}
+                            </h2>
+                            <span className="text-zinc-300 font-bold">·</span>
+                            <span className="text-xs font-semibold text-zinc-500 truncate">
+                              สั่งเมื่อ {new Date(ord.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
+                            </span>
                           </div>
-                          <span className="px-3 py-1 rounded-lg bg-ember/10 border border-ember/30 text-xs font-bold text-ember self-start sm:self-center">
-                            🔥 {ord.status === 'pending' ? 'รอรับออเดอร์' : ord.status === 'preparing' ? 'กำลังปรุงอาหาร' : ord.status === 'ready' ? 'พร้อมเสิร์ฟ' : ord.status === 'completed' ? 'เสิร์ฟเรียบร้อย' : ord.status}
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
+                            ord.status === 'completed'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : ord.status === 'cancelled'
+                              ? 'bg-red-50 text-red-700 border border-red-200'
+                              : 'bg-orange-50 text-orange-600 border border-orange-200'
+                          }`}>
+                            {ord.status === 'pending' ? '🔥 รอรับออเดอร์' : ord.status === 'accepted' ? '📋 รับออเดอร์แล้ว' : ord.status === 'preparing' ? '🍳 กำลังปรุงอาหาร' : ord.status === 'ready' ? '🍽️ พร้อมเสิร์ฟ' : ord.status === 'completed' ? '✨ เสิร์ฟเรียบร้อย' : ord.status === 'cancelled' ? '❌ ยกเลิกแล้ว' : ord.status}
                           </span>
                         </div>
 
-                        {/* Dine-In Progress Steps */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                          <div className={`flex flex-col items-center text-center space-y-1 p-2.5 sm:p-3 rounded-xl border text-[11px] sm:text-xs font-bold ${ord.status ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-soft/40 border-line text-smoke'}`}>
-                            <span className="size-6 sm:size-7 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">✓</span>
-                            <span>รับออเดอร์แล้ว</span>
-                          </div>
-                          <div className={`flex flex-col items-center text-center space-y-1 p-2.5 sm:p-3 rounded-xl border text-[11px] sm:text-xs font-bold ${isPrep || isDone ? 'bg-ember/10 border-ember/30 text-ember' : 'bg-soft/40 border-line text-smoke opacity-50'}`}>
-                            <span className="size-6 sm:size-7 rounded-full bg-ember text-white flex items-center justify-center font-bold text-xs shadow-sm animate-pulse">🔥</span>
-                            <span>กำลังปรุงอาหาร</span>
-                          </div>
-                          <div className={`flex flex-col items-center text-center space-y-1 p-2.5 sm:p-3 rounded-xl border text-[11px] sm:text-xs font-bold ${isDone ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-soft/40 border-line text-smoke opacity-50'}`}>
-                            <span className="size-6 sm:size-7 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">🍽️</span>
-                            <span>พร้อมเสิร์ฟ</span>
-                          </div>
-                          <div className={`flex flex-col items-center text-center space-y-1 p-2.5 sm:p-3 rounded-xl border text-[11px] sm:text-xs font-bold ${ord.status === 'completed' ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : 'bg-soft/40 border-line text-smoke opacity-50'}`}>
-                            <span className="size-6 sm:size-7 rounded-full bg-zinc-700 text-white flex items-center justify-center font-bold text-xs shadow-sm">🎉</span>
-                            <span>เสิร์ฟเรียบร้อย</span>
-                          </div>
-                        </div>
+                        {/* 4 Circular Connected Process Steps */}
+                        <OrderProcessStepper status={ord.status} orderType={ord.order_type} />
 
-                        {/* Order Items List */}
-                        <div className="space-y-2 pt-2">
-                          <b className="text-xs text-ink block">รายการอาหารรอบนี้:</b>
-                          <div className="space-y-1.5 divide-y divide-line/30">
+                        {/* Order Items List (Enlarged and Clear) */}
+                        <div className="space-y-2.5 pt-3 border-t border-zinc-100">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-extrabold text-zinc-600">รายการอาหารรอบนี้:</span>
+                            <span className="text-[11px] font-bold text-zinc-400">
+                              {(ord.items || []).reduce((acc: number, it: any) => acc + (it.quantity || 1), 0)} รายการ
+                            </span>
+                          </div>
+                          <div className="space-y-2 divide-y divide-zinc-100">
                             {ord.items && ord.items.map((it: any) => (
-                              <div key={it.id} className="flex justify-between text-xs pt-1.5 font-medium text-ink">
-                                <span className="truncate max-w-[200px]">🥩 {it.name} <small className="text-smoke">x{it.quantity}</small></span>
-                                <b>฿{(it.unit_price * it.quantity).toLocaleString()}</b>
+                              <div key={it.id} className="flex items-center justify-between pt-2 text-sm sm:text-base font-bold text-zinc-900">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-zinc-800 truncate">{it.name}</span>
+                                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 text-xs font-black shrink-0">
+                                    x{it.quantity}
+                                  </span>
+                                </div>
+                                <span className="font-black text-zinc-950 shrink-0">
+                                  ฿{(it.unit_price * it.quantity).toLocaleString()}
+                                </span>
                               </div>
                             ))}
                           </div>
-                          <div className="border-t border-line/60 pt-3 flex justify-between items-center text-xs sm:text-sm">
-                            <span className="font-bold text-ink">ยอดรวมรอบนี้</span>
-                            <span className="font-black text-ember">฿{ord.total?.toLocaleString()}</span>
+                          <div className="border-t border-zinc-200 pt-3 flex justify-between items-center">
+                            <span className="text-sm sm:text-base font-extrabold text-zinc-800">ยอดรวมรอบนี้</span>
+                            <span className="text-lg sm:text-xl font-black text-orange-500">฿{Number(ord.total || 0).toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
                     )
                   })}
-
-                  {/* Dine-In Session Bill Summary & Actions Card */}
-                  <div className="bg-gradient-to-br from-white to-orange-50/40 border-2 border-orange-200/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-md space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line pb-3">
-                      <div>
-                        <h3 className="font-black text-sm sm:text-base text-ink flex items-center gap-1.5">
-                          <Receipt size={17} className="text-ember" /> สรุปยอดรวมทั้งหมดของโต๊ะ {tableName}
-                        </h3>
-                        <p className="text-[11px] text-smoke font-medium">รวมรายการสั่งอาหารทุกรอบในมื้อนี้</p>
-                      </div>
-                      <div className="text-left sm:text-right">
-                        <span className="text-xs text-smoke font-bold block sm:inline mr-2">ยอดสุทธิรวม:</span>
-                        <span className="text-xl sm:text-2xl font-black text-ember">
-                          ฿{(tableOrdersQuery.data || []).reduce((acc: number, o: any) => acc + Number(o.total || 0), 0).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <button
-                        onClick={() => {
-                          setCallStaffDefaultReason('💵 เรียกเก็บเงิน / เช็คบิล')
-                          setIsCallStaffOpen(true)
-                        }}
-                        className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <Bell size={16} /> เรียกพนักงาน / เก็บเงิน
-                      </button>
-                      <button
-                        onClick={() => setIsBillOpen(true)}
-                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <Receipt size={16} /> ดูรายการและยอดรวมที่สั่ง
-                      </button>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <div className="bg-white border border-line rounded-2xl sm:rounded-3xl p-8 sm:p-12 text-center shadow-sm space-y-4">
@@ -1694,45 +2226,26 @@ function StorefrontApp() {
                   </button>
                 </div>
               )
-            ) : (
+            })() : (
               /* DELIVERY ORDER TRACKING */
               lastOrder ? (
-                <div className="bg-white border border-line rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-md space-y-6 sm:space-y-8">
-                  <div className="flex flex-col sm:flex-row justify-between border-b border-line pb-3 sm:pb-4 gap-2">
-                    <div>
-                      <h2 className="text-base sm:text-lg font-black text-ink">{lastOrder.id}</h2>
-                      <p className="text-xs text-smoke font-medium">
-                        ประเภทออเดอร์: <strong className="text-ink">จัดส่งถึงบ้าน (เดลิเวอรี)</strong>
-                      </p>
+                <div className="bg-white border border-line rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-md space-y-5 sm:space-y-6">
+                  {/* Inline Single-Row Order Header */}
+                  <div className="flex items-center justify-between border-b border-zinc-100 pb-3 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h2 className="text-sm sm:text-base font-black text-zinc-950 shrink-0">{lastOrder.id}</h2>
+                      <span className="text-zinc-300 font-bold">·</span>
+                      <span className="text-xs font-semibold text-zinc-500 truncate">
+                        เดลิเวอรี · สั่งเมื่อ {lastOrder.time}
+                      </span>
                     </div>
-                    <span className="px-3.5 py-1.5 rounded-lg bg-ember/10 border border-ember/30 text-xs font-bold text-ember self-start sm:self-center">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-600 border border-orange-200 shrink-0">
                       🔥 {lastOrder.status}
                     </span>
                   </div>
 
-                  {/* Delivery Progress Steps */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
-                    <div className="flex flex-col items-center text-center space-y-1.5 p-2.5 sm:p-3 rounded-xl bg-soft/40 border border-line">
-                      <span className="size-7 sm:size-8 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-sm">✓</span>
-                      <b className="text-xs text-ink">รับออเดอร์แล้ว</b>
-                      <small className="text-[10px] text-smoke font-medium">{lastOrder.time}</small>
-                    </div>
-                    <div className="flex flex-col items-center text-center space-y-1.5 p-2.5 sm:p-3 rounded-xl bg-ember/5 border-2 border-ember">
-                      <span className="size-7 sm:size-8 rounded-full bg-ember text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-sm animate-pulse">🔥</span>
-                      <b className="text-xs text-ember">กำลังปรุงอาหาร</b>
-                      <small className="text-[10px] text-ember font-medium">เตากำลังร้อน</small>
-                    </div>
-                    <div className="flex flex-col items-center text-center space-y-1.5 p-2.5 sm:p-3 rounded-xl bg-soft/40 border border-line opacity-50">
-                      <span className="size-7 sm:size-8 rounded-full bg-zinc-200 text-smoke flex items-center justify-center font-bold text-xs sm:text-sm">🛵</span>
-                      <b className="text-xs text-ink">ไรเดอร์จัดส่ง</b>
-                      <small className="text-[10px] text-smoke font-medium">รออัปเดต</small>
-                    </div>
-                    <div className="flex flex-col items-center text-center space-y-1.5 p-2.5 sm:p-3 rounded-xl bg-soft/40 border border-line opacity-50">
-                      <span className="size-7 sm:size-8 rounded-full bg-zinc-200 text-smoke flex items-center justify-center font-bold text-xs sm:text-sm">🎉</span>
-                      <b className="text-xs text-ink">จัดส่งเรียบร้อย</b>
-                      <small className="text-[10px] text-smoke font-medium">รอรับสินค้า</small>
-                    </div>
-                  </div>
+                  {/* 4 Circular Connected Process Steps (Delivery) */}
+                  <OrderProcessStepper status={lastOrder.status} orderType="delivery" />
 
                   <div className="p-3.5 sm:p-4 rounded-xl bg-ember/5 border border-ember/20 text-xs text-ink font-semibold flex items-center gap-2">
                     <Info size={16} className="text-ember shrink-0" />
@@ -1870,6 +2383,29 @@ function StorefrontApp() {
 
       </main>
 
+      {/* ── GLOBAL FLOATING CIRCULAR CART ICON BUTTON (Visible on Home & Menu) ── */}
+      {['home', 'order', 'promotions', 'contact'].includes(view) && cart.length > 0 && (
+        <div className="fixed bottom-20 sm:bottom-22 md:bottom-8 right-4 sm:right-6 z-40 animate-scale-up">
+          <button
+            onClick={() => requireAuthAndNavigate('cart')}
+            className="relative grid size-13 sm:size-15 place-items-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-white shadow-2xl shadow-orange-500/50 transition hover:scale-105 active:scale-95 cursor-pointer"
+            title="ดูตะกร้าสินค้า"
+          >
+            <ShoppingCart size={22} strokeWidth={2.5} />
+            
+            {/* Badge with count (No white border) */}
+            <span className="absolute -top-1 -right-1 grid size-5 sm:size-6 place-items-center rounded-full bg-red-600 text-white text-[10px] sm:text-[11px] font-black shadow-md">
+              {getCartCount()}
+            </span>
+
+            {/* Price pill indicator (No white border) */}
+            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-zinc-900 text-white px-2.5 py-0.5 text-[10px] sm:text-xs font-black whitespace-nowrap shadow-lg">
+              ฿{getCartTotal().toLocaleString()}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* ── MODALS: Call Staff & Order Summary ── */}
       <CallStaffModal
         isOpen={isCallStaffOpen}
@@ -1877,7 +2413,7 @@ function StorefrontApp() {
         tableName={tableName}
         storeId={storeId}
         tableId={tableId}
-        tableOrders={tableOrdersQuery.data || []}
+        tableOrders={(tableOrdersQuery.data || []).filter((o: any) => o.status !== 'cancelled' && !o.order_number?.startsWith('BILL') && !o.order_number?.startsWith('SRV') && o.items && o.items.length > 0)}
         shop={shop}
         settings={settings}
         defaultReason={callStaffDefaultReason}
@@ -1894,11 +2430,22 @@ function StorefrontApp() {
         isOpen={isBillOpen}
         onClose={() => setIsBillOpen(false)}
         tableName={tableName}
-        tableOrders={tableOrdersQuery.data || []}
+        tableOrders={(tableOrdersQuery.data || []).filter((o: any) => o.status !== 'cancelled' && !o.order_number?.startsWith('BILL') && !o.order_number?.startsWith('SRV') && o.items && o.items.length > 0)}
         onCallStaff={(reason) => {
           if (reason) setCallStaffDefaultReason(reason)
           setIsCallStaffOpen(true)
         }}
+      />
+
+      {/* Product Detail Modal */}
+      <ProductDetailModal
+        item={detailItem}
+        categories={categories}
+        isOpen={Boolean(detailItem)}
+        onClose={() => setDetailItem(null)}
+        cartQty={detailItem ? (cart.find(x => x.item.id === detailItem.id)?.quantity || 0) : 0}
+        onAddToCart={addToCart}
+        onChangeQty={changeQty}
       />
 
     </div>

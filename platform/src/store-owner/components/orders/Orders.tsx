@@ -225,11 +225,8 @@ export default function Orders() {
                 <tr className="border-b border-zinc-100 bg-zinc-50/70 text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:border-zinc-800 dark:bg-zinc-800/50">
                   <th className="px-5 py-3.5">Order</th>
                   <th className="px-5 py-3.5">Customer</th>
-                  <th className="px-5 py-3.5">Channel</th>
                   <th className="px-5 py-3.5">Table</th>
-                  <th className="px-5 py-3.5">Total</th>
                   <th className="px-5 py-3.5">Status</th>
-                  <th className="px-5 py-3.5">Created</th>
                   <th className="px-5 py-3.5 text-right">Action</th>
                 </tr>
               </thead>
@@ -276,24 +273,16 @@ export default function Orders() {
                       </td>
 
                       <td className="px-5 py-4">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${ch.bg}`}>
-                          <span>{ch.icon}</span>
-                          <span>{ch.label}</span>
-                        </span>
-                      </td>
-
-                      <td className="px-5 py-4 font-bold text-zinc-700 dark:text-zinc-300">
                         {o.store_tables?.table_number ? (
-                          <span className="rounded-lg bg-zinc-100 px-2.5 py-1 text-xs font-extrabold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
-                            โต๊ะ {o.store_tables.table_number}
+                          <span className="inline-flex items-center gap-1.5 rounded-xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/50 px-2.5 py-1 text-xs font-black text-orange-600 dark:text-orange-400">
+                            <MapPin size={12} /> โต๊ะ {o.store_tables.table_number}
                           </span>
                         ) : (
-                          '—'
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${ch.bg}`}>
+                            <span>{ch.icon}</span>
+                            <span>{ch.label}</span>
+                          </span>
                         )}
-                      </td>
-
-                      <td className="px-5 py-4 font-black text-zinc-900 dark:text-white">
-                        ฿{Number(o.total || 0).toLocaleString()}
                       </td>
 
                       <td className="px-5 py-4">
@@ -311,22 +300,13 @@ export default function Orders() {
                         </select>
                       </td>
 
-                      <td className="px-5 py-4 text-xs font-medium text-zinc-400">
-                        {new Date(o.created_at).toLocaleString('th-TH', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </td>
-
                       <td className="px-5 py-4 text-right">
                         <button
                           onClick={() => setSelectedOrder(o)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                          className="inline-grid size-8 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-600 shadow-xs transition hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 active:scale-95 cursor-pointer"
+                          title="ดูรายละเอียดออเดอร์"
                         >
-                          <Eye size={14} /> ดูรายละเอียด
+                          <Eye size={15} />
                         </button>
                       </td>
                     </tr>
