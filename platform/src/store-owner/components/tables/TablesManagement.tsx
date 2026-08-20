@@ -3,11 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, Search, Trash2, QrCode, Power, PowerOff, RefreshCw, Download,
   X, Copy, Check, LayoutGrid, List, Receipt, Utensils, Sparkles,
-  Clock, ArrowRight, CheckCircle2, AlertCircle
+  Clock, ArrowRight, CheckCircle2, AlertCircle, Bluetooth
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
+import { printTableQRViaBluetooth } from '../pos/bluetoothPrinter'
 
 // ─── Table Detail & Actions Modal (เมนูจัดการโต๊ะทั้งหมด) ─────────────────────
 interface TableActionModalProps {
@@ -23,6 +24,8 @@ interface TableActionModalProps {
   isClosing: boolean
   isRegenerating: boolean
   storeSlug: string
+  storeName: string
+  storePhone?: string
 }
 
 function TableActionModal({
@@ -37,9 +40,13 @@ function TableActionModal({
   isOpening,
   isClosing,
   isRegenerating,
-  storeSlug
+  storeSlug,
+  storeName,
+  storePhone,
 }: TableActionModalProps) {
   const [copied, setCopied] = useState(false)
+  const [btPrinting, setBtPrinting] = useState(false)
+  const [btStatus, setBtStatus] = useState('')
 
   if (!table) return null
 
@@ -166,20 +173,54 @@ function TableActionModal({
               </button>
             </div>
 
-            <div className="flex w-full gap-2 pt-1">
+            <div className="flex flex-col w-full gap-2 pt-1">
               <button
-                onClick={handleDownload}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition shadow-sm cursor-pointer dark:bg-zinc-700 dark:hover:bg-zinc-600"
+                disabled={btPrinting}
+                onClick={async () => {
+                  if (!qrUrl) return
+                  setBtPrinting(true)
+                  setBtStatus('กำลังค้นหาเครื่องพิมพ์...')
+                  try {
+                    await printTableQRViaBluetooth({
+                      storeName: storeName || 'ร้านค้า',
+                      storePhone: storePhone || '',
+                      tableNumber: table.table_number,
+                      qrUrl: qrUrl,
+                    }, (msg) => setBtStatus(msg))
+                    setBtStatus('✅ พิมพ์ QR โต๊ะสำเร็จ!')
+                  } catch (err: any) {
+                    setBtStatus(`❌ ${err.message}`)
+                  } finally {
+                    setBtPrinting(false)
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black transition shadow-md cursor-pointer disabled:opacity-50 active:scale-98"
               >
-                <Download size={14} /> โหลดรูป QR
+                <Bluetooth size={16} />
+                {btPrinting ? 'กำลังพิมพ์ QR...' : `🖨️ พิมพ์ QR โต๊ะ ${table.table_number} (Bluetooth)`}
               </button>
-              <button
-                onClick={() => onRegenerateQR(table.id)}
-                disabled={isRegenerating}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-orange-300 text-orange-600 hover:bg-orange-50 text-xs font-bold transition disabled:opacity-50 cursor-pointer dark:border-orange-500/30 dark:text-orange-400 dark:hover:bg-orange-500/10"
-              >
-                <RefreshCw size={14} className={isRegenerating ? 'animate-spin' : ''} /> รีเซ็ต QR ใหม่
-              </button>
+
+              {btStatus && (
+                <p className="text-center text-xs font-bold py-1.5 px-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200">
+                  {btStatus}
+                </p>
+              )}
+
+              <div className="flex w-full gap-2">
+                <button
+                  onClick={handleDownload}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition shadow-sm cursor-pointer dark:bg-zinc-700 dark:hover:bg-zinc-600"
+                >
+                  <Download size={14} /> โหลดรูป QR
+                </button>
+                <button
+                  onClick={() => onRegenerateQR(table.id)}
+                  disabled={isRegenerating}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-orange-300 text-orange-600 hover:bg-orange-50 text-xs font-bold transition disabled:opacity-50 cursor-pointer dark:border-orange-500/30 dark:text-orange-400 dark:hover:bg-orange-500/10"
+                >
+                  <RefreshCw size={14} className={isRegenerating ? 'animate-spin' : ''} /> รีเซ็ต QR ใหม่
+                </button>
+              </div>
             </div>
           </div>
         ) : (
@@ -307,6 +348,7 @@ export default function TablesManagement() {
         .select('id, table_id, status, total, created_at, store_order_items(id, name, quantity, unit_price)')
         .eq('store_id', store.id)
         .neq('status', 'cancelled')
+        .neq('status', 'completed')
       if (error) return []
       return data || []
     },
@@ -318,6 +360,7 @@ export default function TablesManagement() {
     if (!sessionOpenedAt) return []
     return (activeOrdersQuery.data || []).filter((o: any) => {
       if (o.table_id !== tableId) return false
+      if (o.status === 'completed' || o.status === 'cancelled') return false
       if (sessionOpenedAt && new Date(o.created_at).getTime() < new Date(sessionOpenedAt).getTime()) return false
       if (o.order_number?.startsWith('INV') || o.order_number?.startsWith('SRV') || o.order_number?.startsWith('BILL')) return false
       return true
@@ -743,6 +786,8 @@ export default function TablesManagement() {
         isClosing={closeTable.isPending}
         isRegenerating={regenerateQR.isPending}
         storeSlug={storeSlug}
+        storeName={store.name}
+        storePhone={store.phone}
       />
     </div>
   )

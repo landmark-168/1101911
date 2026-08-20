@@ -1,23 +1,35 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Minus, Plus, Printer, Check, Receipt, CheckCircle } from 'lucide-react'
+import { Minus, Plus, Printer, Check, Receipt, CheckCircle, Bluetooth } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
+import { printReceiptViaBluetooth, printQROnlyViaBluetooth } from './bluetoothPrinter'
 
 // Helper: Standard Thai PromptPay Payload Generator (EMVCo QR)
 function generatePromptPayPayload(target: string, amount?: number): string {
-  const sanitized = target.replace(/[^0-9]/g, '')
+  const sanitized = (target || '').replace(/[^0-9]/g, '')
   let formattedTarget = ''
-  if (sanitized.length === 10) {
+  let subTag = '0113' // Default to 01 for mobile phone
+
+  if (sanitized.length === 10 && sanitized.startsWith('0')) {
+    // 10-digit Thai Mobile (e.g. 0910203541 -> 0066910203541)
     formattedTarget = '0066' + sanitized.slice(1)
+    subTag = '0113'
+  } else if (sanitized.length === 9) {
+    formattedTarget = '0066' + sanitized
+    subTag = '0113'
   } else if (sanitized.length === 13) {
+    // 13-digit National Citizen ID
     formattedTarget = sanitized
+    subTag = '0213'
   } else {
-    formattedTarget = (sanitized || '0812345678').padStart(13, '0')
+    const fallback = sanitized.padEnd(10, '0')
+    formattedTarget = '0066' + (fallback.startsWith('0') ? fallback.slice(1) : fallback.slice(0, 9))
+    subTag = '0113'
   }
 
-  const tag29_sub = `0016A000000677010111${formattedTarget.length === 13 ? '0213' : '0113'}${formattedTarget}`
+  const tag29_sub = `0016A000000677010111${subTag}${formattedTarget}`
   const tag29 = `29${tag29_sub.length.toString().padStart(2, '0')}${tag29_sub}`
   const tag58 = '5802TH'
   const tag53 = '5303764'
@@ -54,6 +66,8 @@ export default function POS() {
   const [cart, setCart] = useState<{ id: string; name: string; price: number; qty: number; fromCustomer?: boolean }[]>([])
   const [isBillModalOpen, setIsBillModalOpen] = useState(false)
   const [completedBill, setCompletedBill] = useState<any | null>(null)
+  const [btPrinting, setBtPrinting] = useState(false)
+  const [btStatus, setBtStatus] = useState('')
 
   // Fetch Menu
   const menu = useQuery({
@@ -118,6 +132,7 @@ export default function POS() {
         .eq('store_id', store.id)
         .eq('table_id', tableId)
         .neq('status', 'cancelled')
+        .neq('status', 'completed')
         .gte('created_at', sessionOpenedAt)
         .order('created_at', { ascending: true })
 
@@ -190,6 +205,7 @@ export default function POS() {
         billNumber: number,
         tableName: selectedTableObj?.table_number || (type === 'dine_in' ? 'Dine-in' : type === 'takeaway' ? 'Takeaway' : 'Delivery'),
         storeName: store.name,
+        storeLogo: settings.data?.logo_url || store.logo_url || '',
         storePhone: promptPayPhone,
         storeAddress: settings.data?.address || store.address || '',
         items: [...cart],
@@ -423,7 +439,17 @@ export default function POS() {
             {/* Printable Receipt */}
             <div className="p-6 overflow-y-auto space-y-4 text-zinc-900 dark:text-white">
               <div id="printable-slip" className="p-4 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-800/40 text-center space-y-3 font-mono text-xs">
-                <div className="space-y-0.5 border-b border-dashed border-zinc-300 pb-3 dark:border-zinc-700">
+                {/* Store Logo & Header */}
+                <div className="space-y-1 border-b border-dashed border-zinc-300 pb-3 dark:border-zinc-700">
+                  {completedBill.storeLogo && (
+                    <div className="flex justify-center pb-1">
+                      <img
+                        src={completedBill.storeLogo}
+                        alt="Store Logo"
+                        className="size-14 rounded-2xl object-cover border border-zinc-200 shadow-2xs mx-auto"
+                      />
+                    </div>
+                  )}
                   <h2 className="text-base font-black uppercase font-sans text-zinc-900 dark:text-white">
                     {completedBill.storeName}
                   </h2>
@@ -477,13 +503,20 @@ export default function POS() {
 
                 {/* PromptPay QR on Bill */}
                 <div className="pt-3 border-t border-dashed border-zinc-300 dark:border-zinc-700 flex flex-col items-center gap-1.5">
-                  <div className="bg-white p-2.5 rounded-xl shadow-xs border border-zinc-200">
-                    <QRCodeSVG value={completedBill.promptPayPayload} size={130} level="M" />
+                  <div className="bg-white p-2.5 rounded-xl shadow-xs border border-zinc-200 inline-block">
+                    <QRCodeSVG
+                      value={completedBill.promptPayPayload || '00020101021129370016A000000677010111011300668123456785802TH53037646304'}
+                      size={120}
+                      level="M"
+                      bgColor="#ffffff"
+                      fgColor="#000000"
+                      includeMargin={false}
+                    />
                   </div>
-                  <p className="text-[10px] font-bold text-zinc-600 dark:text-zinc-300">
+                  <p className="text-[10px] font-bold text-zinc-800 dark:text-zinc-200">
                     สแกนชำระผ่าน PromptPay QR
                   </p>
-                  <p className="text-[9px] text-zinc-400">
+                  <p className="text-[9px] text-zinc-500">
                     PromptPay: {completedBill.storePhone}
                   </p>
                 </div>
@@ -495,16 +528,92 @@ export default function POS() {
             </div>
 
             {/* Modal Actions */}
-            <div className="p-4 border-t border-zinc-100 bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-800 flex flex-col sm:flex-row gap-2">
-              <button
-                onClick={() => window.print()}
-                className="flex-1 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer dark:bg-zinc-700 dark:hover:bg-zinc-600"
-              >
-                <Printer size={15} /> พิมพ์ใบเสร็จ (Print Bill)
-              </button>
+            <div className="p-4 border-t border-zinc-100 bg-zinc-50 dark:bg-zinc-800 dark:border-zinc-800 flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex-1 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer dark:bg-zinc-700 dark:hover:bg-zinc-600"
+                >
+                  <Printer size={15} /> พิมพ์ (Browser)
+                </button>
+                <button
+                  id="bt-print-btn"
+                  disabled={btPrinting}
+                  onClick={async () => {
+                    if (!completedBill) return
+                    setBtPrinting(true)
+                    setBtStatus('กำลังค้นหา...')
+                    try {
+                      await printReceiptViaBluetooth({
+                        billNumber: completedBill.billNumber,
+                        storeName: completedBill.storeName,
+                        storePhone: completedBill.storePhone,
+                        storeAddress: completedBill.storeAddress,
+                        tableName: completedBill.tableName,
+                        items: completedBill.items,
+                        subtotal: completedBill.subtotal,
+                        serviceCharge: completedBill.serviceCharge,
+                        serviceChargePercent: completedBill.serviceChargePercent,
+                        tax: completedBill.tax,
+                        taxPercent: completedBill.taxPercent,
+                        total: completedBill.total,
+                        createdAt: completedBill.createdAt,
+                        promptPayPayload: generatePromptPayPayload(completedBill.storePhone || store.phone || '', completedBill.total),
+                      }, (msg) => setBtStatus(msg))
+                      setBtStatus('✅ พิมพ์สำเร็จ!')
+                    } catch (err: any) {
+                      setBtStatus(`❌ ${err.message}`)
+                    } finally {
+                      setBtPrinting(false)
+                    }
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer disabled:opacity-50"
+                >
+                  <Bluetooth size={15} />
+                  {btPrinting ? 'กำลังพิมพ์…' : '🖨️ Bluetooth'}
+                </button>
+                <button
+                  title="พิมพ์เฉพาะ QR Code พร้อมเพย์"
+                  disabled={btPrinting}
+                  onClick={async () => {
+                    if (!completedBill) return
+                    setBtPrinting(true)
+                    setBtStatus('กำลังพิมพ์ QR Code...')
+                    try {
+                      await printQROnlyViaBluetooth({
+                        billNumber: completedBill.billNumber,
+                        storeName: completedBill.storeName,
+                        storePhone: completedBill.storePhone,
+                        storeAddress: completedBill.storeAddress,
+                        tableName: completedBill.tableName,
+                        items: completedBill.items,
+                        subtotal: completedBill.subtotal,
+                        serviceCharge: completedBill.serviceCharge,
+                        serviceChargePercent: completedBill.serviceChargePercent,
+                        tax: completedBill.tax,
+                        taxPercent: completedBill.taxPercent,
+                        total: completedBill.total,
+                        createdAt: completedBill.createdAt,
+                        promptPayPayload: generatePromptPayPayload(completedBill.storePhone || store.phone || '', completedBill.total),
+                      }, (msg) => setBtStatus(msg))
+                      setBtStatus('✅ พิมพ์ QR สำเร็จ!')
+                    } catch (err: any) {
+                      setBtStatus(`❌ ${err.message}`)
+                    } finally {
+                      setBtPrinting(false)
+                    }
+                  }}
+                  className="px-3.5 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer disabled:opacity-50 active:scale-98"
+                >
+                  📱 พิมพ์เฉพาะ QR
+                </button>
+              </div>
+              {btStatus && (
+                <p className="text-center text-xs font-medium py-1 rounded-lg bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200">{btStatus}</p>
+              )}
               <button
                 onClick={handleFinishAndCloseTable}
-                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
               >
                 <Check size={15} /> ปิดโต๊ะ / รับเงินเรียบร้อย
               </button>

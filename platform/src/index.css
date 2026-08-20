@@ -138,24 +138,57 @@ button { cursor: pointer; }
 
 /* Print Styles for POS Thermal Receipt Slip */
 @media print {
-  body * {
-    visibility: hidden;
+  @page {
+    size: 80mm auto;
+    margin: 0;
   }
-  #printable-slip, #printable-slip * {
-    visibility: visible;
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  #printable-slip,
+  #printable-slip * {
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   #printable-slip {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    top: 0;
-    width: 80mm;
-    margin: 0;
-    padding: 8px;
+    position: fixed !important;
+    left: 50% !important;
+    top: 0 !important;
+    transform: translateX(-50%) !important;
+    width: 78mm !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 10px 12px !important;
     border: none !important;
     background: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
+    display: block !important;
+    font-family: monospace, -apple-system, sans-serif !important;
+  }
+  #printable-slip img {
+    visibility: visible !important;
+    display: block !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    max-width: 50px !important;
+    max-height: 50px !important;
+  }
+  #printable-slip svg {
+    visibility: visible !important;
+    display: block !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
   }
 }
+
 
