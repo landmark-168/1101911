@@ -1,25 +1,75 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, Search, Trash2, QrCode, Power, PowerOff, RefreshCw, Download,
   X, Copy, Check, LayoutGrid, List, Receipt, Utensils, Sparkles,
-  Clock, ArrowRight, CheckCircle2, AlertCircle, Bluetooth
+  Clock, ArrowRight, CheckCircle2, AlertCircle, Bluetooth, Bell,
+  Volume2, VolumeX, CircleDollarSign
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
 import { printTableQRViaBluetooth } from '../pos/bluetoothPrinter'
 
-// ─── Table Detail & Actions Modal (เมนูจัดการโต๊ะทั้งหมด) ─────────────────────
+// Web Audio API Bill Request Chime (Bell Ring)
+function playBillChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+    if (!AudioContextClass) return
+    const ctx = new AudioContextClass()
+
+    const tones = [
+      { freq: 659.25, time: 0, dur: 0.35 },    // E5
+      { freq: 830.61, time: 0.15, dur: 0.4 },  // G#5
+      { freq: 1046.50, time: 0.35, dur: 0.6 }  // C6
+    ]
+
+    tones.forEach(t => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(t.freq, ctx.currentTime + t.time)
+      gain.gain.setValueAtTime(0.25, ctx.currentTime + t.time)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t.time + t.dur)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(ctx.currentTime + t.time)
+      osc.stop(ctx.currentTime + t.time + t.dur)
+    })
+  } catch {
+    // Autoplay policy fallback
+  }
+}
+
+function isBillCallOrder(o: any) {
+  if (!o || o.status === 'completed' || o.status === 'cancelled') return false
+  const num = String(o.order_number || '').toUpperCase()
+  const name = String(o.customer_name || '').toLowerCase()
+  const notes = String(o.notes || '').toLowerCase()
+  return num.startsWith('BILL') || name.includes('เรียกเก็บเงิน') || name.includes('เช็คบิล') || notes.includes('เรียกเก็บเงิน') || notes.includes('เช็คบิล')
+}
+
+function isStaffCallOrder(o: any) {
+  if (!o || o.status === 'completed' || o.status === 'cancelled') return false
+  const num = String(o.order_number || '').toUpperCase()
+  const name = String(o.customer_name || '').toLowerCase()
+  const notes = String(o.notes || '').toLowerCase()
+  return num.startsWith('SRV') || name.includes('เรียกพนักงาน') || notes.includes('เรียกพนักงาน')
+}
+
+// ─── Table Detail & Actions Modal ─────────────────────────────────────────────
 interface TableActionModalProps {
   table: any | null
   activeItemsCount: number
   activeOrders: any[]
+  billCallOrder: any | null
+  staffCallOrder: any | null
   onClose: () => void
   onOpenTable: (id: string) => void
   onCloseTable: (id: string) => void
   onRegenerateQR: (id: string) => void
   onRemove: (id: string) => void
+  onDismissCall: (orderId: string) => void
   isOpening: boolean
   isClosing: boolean
   isRegenerating: boolean
@@ -32,11 +82,14 @@ function TableActionModal({
   table,
   activeItemsCount,
   activeOrders,
+  billCallOrder,
+  staffCallOrder,
   onClose,
   onOpenTable,
   onCloseTable,
   onRegenerateQR,
   onRemove,
+  onDismissCall,
   isOpening,
   isClosing,
   isRegenerating,
@@ -94,7 +147,7 @@ function TableActionModal({
   }
 
   const handleCloseOrCheckout = () => {
-    if (activeItemsCount > 0) {
+    if (activeItemsCount > 0 || billCallOrder) {
       window.location.href = `/store/${storeSlug}/pos?table_id=${table.id}`
     } else {
       onCloseTable(table.id)
@@ -111,11 +164,83 @@ function TableActionModal({
         className="relative w-full max-w-md rounded-3xl bg-white p-6 sm:p-7 shadow-2xl dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 space-y-5 animate-scale-up max-h-[92vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
+        {/* Urgent Call Alert Banner inside modal */}
+        {billCallOrder && (
+          <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 dark:border-amber-500/60 dark:bg-amber-950/40 animate-pulse">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-amber-500 text-white font-black">
+                  <Bell size={16} className="animate-bell-wiggle" />
+                </span>
+                <div>
+                  <h4 className="text-sm font-black text-amber-900 dark:text-amber-200">
+                    🔔 ลูกค้ากดเรียกเก็บเงิน / เช็คบิล!
+                  </h4>
+                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mt-0.5">
+                    {billCallOrder.notes || 'ลูกค้ารอชำระเงินที่โต๊ะ'}
+                  </p>
+                  <span className="text-[10px] text-amber-600 dark:text-amber-500 font-bold block mt-1">
+                    เมื่อ {new Date(billCallOrder.created_at).toLocaleTimeString('th-TH')} น.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onDismissCall(billCallOrder.id)}
+                className="shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-extrabold bg-amber-200 text-amber-900 hover:bg-amber-300 dark:bg-amber-800 dark:text-amber-100 transition"
+              >
+                รับทราบ
+              </button>
+            </div>
+
+            <div className="mt-3 pt-2.5 border-t border-amber-200/80 dark:border-amber-800 flex gap-2">
+              <button
+                onClick={() => {
+                  window.location.href = `/store/${storeSlug}/pos?table_id=${table.id}`
+                }}
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black shadow-md transition cursor-pointer"
+              >
+                <CircleDollarSign size={14} /> คิดเงินโต๊ะนี้ที่ POS ทันที
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Staff Call Alert Banner inside modal */}
+        {!billCallOrder && staffCallOrder && (
+          <div className="rounded-2xl border-2 border-blue-400 bg-blue-50 p-4 dark:border-blue-500/60 dark:bg-blue-950/40">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-blue-500 text-white font-black">
+                  🙋‍♂️
+                </span>
+                <div>
+                  <h4 className="text-sm font-black text-blue-900 dark:text-blue-200">
+                    ลูกค้ากดเรียกพนักงาน
+                  </h4>
+                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mt-0.5">
+                    {staffCallOrder.notes || 'ลูกค้าต้องการความช่วยเหลือ'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onDismissCall(staffCallOrder.id)}
+                className="shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-extrabold bg-blue-200 text-blue-900 hover:bg-blue-300 dark:bg-blue-800 dark:text-blue-100 transition"
+              >
+                รับทราบ
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-start justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
           <div className="flex items-center gap-3.5">
             <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-xl font-black shadow-inner ${
-              occupied
+              billCallOrder
+                ? 'bg-amber-500 text-white shadow-amber-500/40 animate-pulse'
+                : occupied
                 ? 'bg-orange-500 text-white shadow-orange-500/30'
                 : 'bg-emerald-500 text-white shadow-emerald-500/30'
             }`}>
@@ -125,11 +250,13 @@ function TableActionModal({
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-black text-zinc-950 dark:text-white">โต๊ะ {table.table_number}</h2>
                 <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${
-                  occupied
+                  billCallOrder
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/80 dark:text-amber-300'
+                    : occupied
                     ? 'bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300 border border-red-200 dark:border-red-800'
                     : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                 }`}>
-                  {occupied ? '🔴 มีลูกค้า' : '🟢 ว่าง'}
+                  {billCallOrder ? '🔔 เรียกเก็บเงิน' : occupied ? '🔴 มีลูกค้า' : '🟢 ว่าง'}
                 </span>
               </div>
               <p className="text-xs text-zinc-400 font-medium mt-0.5">
@@ -247,53 +374,68 @@ function TableActionModal({
           </div>
         )}
 
-        {/* Action Menu (เมนูการจัดการ) */}
+        {/* Action Menu */}
         <div className="space-y-2.5 pt-1">
           {occupied ? (
             <>
-              {/* POS Checkout */}
               <button
                 onClick={handleCloseOrCheckout}
                 disabled={isClosing}
-                className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white font-black text-sm shadow-lg transition cursor-pointer active:scale-98 ${
-                  activeItemsCount > 0
-                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-orange-500/25'
-                    : 'bg-zinc-800 hover:bg-zinc-900'
+                className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-black transition shadow-lg cursor-pointer active:scale-98 disabled:opacity-50 ${
+                  billCallOrder
+                    ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/25 animate-pulse'
+                    : activeItemsCount > 0
+                    ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/25'
+                    : 'bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-700 dark:hover:bg-zinc-600'
                 }`}
               >
-                {activeItemsCount > 0 ? (
+                {isClosing ? (
+                  <RefreshCw size={18} className="animate-spin" />
+                ) : activeItemsCount > 0 || billCallOrder ? (
                   <>
-                    <Receipt size={17} /> ไปหน้าเช็คบิล POS (฿{tableTotal.toLocaleString()})
+                    <Receipt size={18} />
+                    <span>ไปที่ระบบ POS (เช็คบิล โต๊ะ {table.table_number})</span>
+                    <ArrowRight size={16} />
                   </>
                 ) : (
                   <>
-                    <PowerOff size={16} /> ปิดโต๊ะนี้ (ไม่มีรายการอาหาร)
+                    <PowerOff size={18} />
+                    <span>ปิดโต๊ะ (เปลี่ยนสถานะเป็นว่าง)</span>
                   </>
                 )}
               </button>
+
+              {activeItemsCount > 0 && (
+                <button
+                  onClick={() => {
+                    if (confirm(`ยืนยันการเคลียร์และปิดโต๊ะ ${table.table_number} ทันทีโดยไม่ต้องคิดเงินที่ POS?`)) {
+                      onCloseTable(table.id)
+                      onClose()
+                    }
+                  }}
+                  className="w-full text-center text-xs font-bold text-zinc-400 hover:text-zinc-600 py-1.5 transition"
+                >
+                  บังคับปิดโต๊ะทันที (Force Close)
+                </button>
+              )}
             </>
           ) : (
-            /* Open Table */
             <button
-              onClick={() => {
-                onOpenTable(table.id)
-              }}
+              onClick={() => onOpenTable(table.id)}
               disabled={isOpening}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-98 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-black transition shadow-lg shadow-emerald-500/25 cursor-pointer active:scale-98 disabled:opacity-50"
             >
               {isOpening ? (
-                <>
-                  <RefreshCw size={17} className="animate-spin" /> กำลังเปิดโต๊ะ…
-                </>
+                <RefreshCw size={18} className="animate-spin" />
               ) : (
                 <>
-                  <Power size={17} /> เปิดโต๊ะเพื่อรับลูกค้า
+                  <Power size={18} />
+                  <span>เปิดโต๊ะ {table.table_number} (สร้าง QR Code)</span>
                 </>
               )}
             </button>
           )}
 
-          {/* Delete Table */}
           <button
             onClick={() => {
               onRemove(table.id)
@@ -318,7 +460,9 @@ export default function TablesManagement() {
   const [search, setSearch] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [selectedTable, setSelectedTable] = useState<any | null>(null)
+  const [soundEnabled, setSoundEnabled] = useState(true)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const lastBillCallCountRef = useRef<number>(0)
 
   const showMsg = (text: string, type: 'success' | 'error' = 'success') => {
     setMessage({ text, type })
@@ -339,42 +483,113 @@ export default function TablesManagement() {
     }
   })
 
-  // Fetch Active Orders to count items per table
+  // Fetch Active Orders to count items and check bill/service calls
   const activeOrdersQuery = useQuery({
     queryKey: ['active-table-orders-count', store.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('store_orders')
-        .select('id, table_id, status, total, created_at, store_order_items(id, name, quantity, unit_price)')
+        .select('id, table_id, order_number, customer_name, notes, status, total, created_at, store_order_items(id, name, quantity, unit_price)')
         .eq('store_id', store.id)
         .neq('status', 'cancelled')
         .neq('status', 'completed')
       if (error) return []
       return data || []
     },
-    refetchInterval: 4000
+    refetchInterval: 5000
   })
 
-  // Helper: Get active orders for table
-  const getTableActiveOrders = (tableId: string, sessionOpenedAt?: string) => {
-    if (!sessionOpenedAt) return []
+  // Supabase Realtime Subscription for instant updates
+  useEffect(() => {
+    if (!store?.id) return
+    const channel = supabase
+      .channel(`tables-realtime:${store.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_orders', filter: `store_id=eq.${store.id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ['active-table-orders-count', store.id] })
+          qc.invalidateQueries({ queryKey: key })
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_tables', filter: `store_id=eq.${store.id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: key })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [store.id, qc])
+
+  // Helper: Get active food orders for table (excluding service/bill call requests)
+  const getTableActiveOrders = (tableId: string) => {
     return (activeOrdersQuery.data || []).filter((o: any) => {
       if (o.table_id !== tableId) return false
       if (o.status === 'completed' || o.status === 'cancelled') return false
-      if (sessionOpenedAt && new Date(o.created_at).getTime() < new Date(sessionOpenedAt).getTime()) return false
-      if (o.order_number?.startsWith('INV') || o.order_number?.startsWith('SRV') || o.order_number?.startsWith('BILL')) return false
+      if (isBillCallOrder(o) || isStaffCallOrder(o)) return false
       return true
     })
   }
 
-  // Helper: Count active items for a table
-  const getTableActiveItemsCount = (tableId: string, sessionOpenedAt?: string) => {
-    const orders = getTableActiveOrders(tableId, sessionOpenedAt)
+  // Helper: Count active food items for a table
+  const getTableActiveItemsCount = (tableId: string) => {
+    const orders = getTableActiveOrders(tableId)
     return orders.reduce((sum: number, o: any) => {
       const itemsCount = (o.store_order_items || []).reduce((s: number, it: any) => s + (it.quantity || 1), 0)
       return sum + itemsCount
     }, 0)
   }
+
+  // Helper: Get active bill call request for table
+  const getTableBillCall = (tableId: string) => {
+    return (activeOrdersQuery.data || []).find((o: any) => {
+      if (o.table_id !== tableId) return false
+      return isBillCallOrder(o)
+    })
+  }
+
+  // Helper: Get active staff call request for table
+  const getTableStaffCall = (tableId: string) => {
+    return (activeOrdersQuery.data || []).find((o: any) => {
+      if (o.table_id !== tableId) return false
+      return isStaffCallOrder(o)
+    })
+  }
+
+  // Detect bill calls and play audio chime
+  const allActiveBillCalls = useMemo(() => {
+    return (activeOrdersQuery.data || []).filter((o: any) => isBillCallOrder(o))
+  }, [activeOrdersQuery.data])
+
+  useEffect(() => {
+    if (allActiveBillCalls.length > lastBillCallCountRef.current) {
+      if (soundEnabled) {
+        playBillChime()
+      }
+    }
+    lastBillCallCountRef.current = allActiveBillCalls.length
+  }, [allActiveBillCalls, soundEnabled])
+
+  // Dismiss Call Mutation
+  const dismissCall = useMutation({
+    mutationFn: async (orderId: string) => {
+      const { error } = await supabase
+        .from('store_orders')
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .eq('store_id', store.id)
+        .eq('id', orderId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      showMsg('รับทราบคำขอเรียบร้อยแล้ว')
+      qc.invalidateQueries({ queryKey: ['active-table-orders-count', store.id] })
+    }
+  })
 
   // Add Table
   const add = useMutation({
@@ -487,20 +702,28 @@ export default function TablesManagement() {
 
   const storeSlug = typeof window !== 'undefined' ? (window.location.pathname.split('/')[2] || store.slug || store.id) : (store.slug || store.id)
   const liveTable = selectedTable ? rows.find((x: any) => x.id === selectedTable.id) || selectedTable : null
-  const liveTableOrders = liveTable ? getTableActiveOrders(liveTable.id, liveTable.session_opened_at) : []
-  const liveItemsCount = liveTable ? getTableActiveItemsCount(liveTable.id, liveTable.session_opened_at) : 0
+  const liveTableOrders = liveTable ? getTableActiveOrders(liveTable.id) : []
+  const liveItemsCount = liveTable ? getTableActiveItemsCount(liveTable.id) : 0
+  const liveBillCall = liveTable ? getTableBillCall(liveTable.id) : null
+  const liveStaffCall = liveTable ? getTableStaffCall(liveTable.id) : null
 
   // Stats calculation
   const totalTables = rows.length
   const occupiedTables = rows.filter((x: any) => x.status === 'occupied').length
   const availableTables = totalTables - occupiedTables
 
+  // Tables that currently have active bill call
+  const callingTables = useMemo(() => {
+    return rows.filter((x: any) => !!getTableBillCall(x.id))
+  }, [rows, activeOrdersQuery.data])
+
   // Handle Quick Toggle (เปิด/ปิด โต๊ะ)
   const handleToggleTable = (e: React.MouseEvent, x: any) => {
     e.stopPropagation()
+    const billCall = getTableBillCall(x.id)
     if (x.status === 'occupied') {
-      const count = getTableActiveItemsCount(x.id, x.session_opened_at)
-      if (count > 0) {
+      const count = getTableActiveItemsCount(x.id)
+      if (count > 0 || billCall) {
         window.location.href = `/store/${storeSlug}/pos?table_id=${x.id}`
       } else {
         closeTable.mutate(x.id)
@@ -521,8 +744,58 @@ export default function TablesManagement() {
         </div>
       )}
 
+      {/* ── Active Bill Call Alert Banner (แจ้งเตือนเรียกเก็บเงินแบบชัดเจน) ── */}
+      {callingTables.length > 0 && (
+        <div className="rounded-3xl border-2 border-amber-400 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 p-4 sm:p-5 text-white shadow-xl shadow-amber-500/20 animate-pulse">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="grid size-11 place-items-center rounded-2xl bg-white/20 text-white backdrop-blur-md">
+                <Bell size={24} className="animate-bell-wiggle" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black tracking-tight flex items-center gap-2">
+                  <span>มีลูกค้ากดเรียกเก็บเงิน {callingTables.length} โต๊ะ!</span>
+                  <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-black text-amber-600">
+                    {callingTables.map((t: any) => `โต๊ะ ${t.table_number}`).join(', ')}
+                  </span>
+                </h3>
+                <p className="text-xs text-amber-100 font-semibold mt-0.5">
+                  กรุณาตรวจสอบและดำเนินการคิดเงินที่ระบบ POS หรือเข้ารับชำระเงินที่โต๊ะ
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {callingTables.length === 1 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = `/store/${storeSlug}/pos?table_id=${callingTables[0].id}`
+                  }}
+                  className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-amber-700 shadow-md transition hover:bg-amber-50 active:scale-95"
+                >
+                  <CircleDollarSign size={16} />
+                  <span>คิดเงินโต๊ะ {callingTables[0].table_number} ที่ POS</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = `/store/${storeSlug}/pos`
+                  }}
+                  className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-amber-700 shadow-md transition hover:bg-amber-50 active:scale-95"
+                >
+                  <CircleDollarSign size={16} />
+                  <span>เปิดระบบ POS</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header & Stats Banner */}
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <span className="text-xs font-black tracking-widest text-orange-500 uppercase">Live Store Workspace</span>
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-950 dark:text-white tracking-tight">
@@ -530,17 +803,39 @@ export default function TablesManagement() {
           </h1>
         </div>
 
-        {/* Add Table Button */}
-        <button
-          onClick={() => add.mutate()}
-          className="flex h-11 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-5 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:bg-orange-600 transition active:scale-95 cursor-pointer"
-        >
-          <Plus size={18} strokeWidth={3} /> เพิ่มโต๊ะใหม่
-        </button>
+        {/* Toolbar buttons */}
+        <div className="flex items-center gap-2">
+          {/* Sound Alert Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              const nextVal = !soundEnabled
+              setSoundEnabled(nextVal)
+              if (nextVal) playBillChime()
+            }}
+            className={`flex items-center gap-1.5 rounded-2xl px-3.5 py-2.5 text-xs font-bold transition border ${
+              soundEnabled
+                ? 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-700 dark:text-amber-300'
+                : 'bg-white border-zinc-200 text-zinc-400 dark:bg-zinc-900 dark:border-zinc-800'
+            }`}
+            title={soundEnabled ? 'ปิดเสียงแจ้งเตือนเรียกเก็บเงิน' : 'เปิดเสียงแจ้งเตือนเรียกเก็บเงิน'}
+          >
+            {soundEnabled ? <Volume2 size={16} className="text-amber-500 animate-pulse" /> : <VolumeX size={16} />}
+            <span>{soundEnabled ? 'เสียงเตือนเปิดอยู่' : 'ปิดเสียงเตือน'}</span>
+          </button>
+
+          {/* Add Table Button */}
+          <button
+            onClick={() => add.mutate()}
+            className="flex h-11 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-5 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:bg-orange-600 transition active:scale-95 cursor-pointer"
+          >
+            <Plus size={18} strokeWidth={3} /> เพิ่มโต๊ะใหม่
+          </button>
+        </div>
       </div>
 
       {/* Quick KPI Stat Chips */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="flex items-center gap-3 rounded-2xl border border-zinc-200/80 bg-white p-3.5 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900">
           <div className="grid size-10 place-items-center rounded-xl bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-white font-black text-base">
             {totalTables}
@@ -561,13 +856,34 @@ export default function TablesManagement() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 rounded-2xl border border-red-200/80 bg-red-50/50 p-3.5 shadow-2xs dark:border-red-900/40 dark:bg-red-950/20 col-span-2 sm:col-span-1">
+        <div className="flex items-center gap-3 rounded-2xl border border-red-200/80 bg-red-50/50 p-3.5 shadow-2xs dark:border-red-900/40 dark:bg-red-950/20">
           <div className="grid size-10 place-items-center rounded-xl bg-red-500 text-white font-black text-base shadow-sm">
             {occupiedTables}
           </div>
           <div>
             <p className="text-[11px] font-bold text-red-600 dark:text-red-400">กำลังรับประทาน</p>
             <p className="text-xs font-extrabold text-red-900 dark:text-red-200">{occupiedTables} โต๊ะมีลูกค้า</p>
+          </div>
+        </div>
+
+        {/* Bill call stats card */}
+        <div className={`flex items-center gap-3 rounded-2xl border p-3.5 shadow-2xs transition ${
+          callingTables.length > 0
+            ? 'border-amber-400 bg-amber-50 text-amber-900 dark:border-amber-500/60 dark:bg-amber-950/30 dark:text-amber-200 animate-pulse'
+            : 'border-zinc-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-900'
+        }`}>
+          <div className={`grid size-10 place-items-center rounded-xl font-black text-base ${
+            callingTables.length > 0 ? 'bg-amber-500 text-white shadow-sm' : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800'
+          }`}>
+            <Bell size={18} className={callingTables.length > 0 ? 'animate-bell-wiggle' : ''} />
+          </div>
+          <div>
+            <p className={`text-[11px] font-bold ${callingTables.length > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-zinc-400'}`}>
+              เรียกเก็บเงิน
+            </p>
+            <p className="text-xs font-extrabold">
+              {callingTables.length > 0 ? `${callingTables.length} โต๊ะรอดำเนินการ` : 'ไม่มีโต๊ะเรียก'}
+            </p>
           </div>
         </div>
       </div>
@@ -634,45 +950,70 @@ export default function TablesManagement() {
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                 {rows.map((x: any) => {
                   const occupied = x.status === 'occupied'
-                  const itemsCount = getTableActiveItemsCount(x.id, x.session_opened_at)
-                  const orders = getTableActiveOrders(x.id, x.session_opened_at)
+                  const itemsCount = getTableActiveItemsCount(x.id)
+                  const orders = getTableActiveOrders(x.id)
                   const totalAmt = orders.reduce((sum: number, o: any) => sum + Number(o.total || 0), 0)
+                  const billCall = getTableBillCall(x.id)
+                  const staffCall = getTableStaffCall(x.id)
 
                   return (
                     <div
                       key={x.id}
                       onClick={() => setSelectedTable(x)}
                       className={`group relative flex flex-col justify-between rounded-3xl border-2 p-5 sm:p-6 transition-all duration-300 cursor-pointer select-none hover:-translate-y-1 hover:shadow-xl active:scale-98 ${
-                        occupied
+                        billCall
+                          ? 'animate-table-bill border-amber-400 bg-gradient-to-b from-amber-100 via-amber-50/90 to-white ring-4 ring-amber-400/50 dark:from-amber-950/50 dark:to-zinc-900 dark:border-amber-400'
+                          : occupied
                           ? 'border-orange-200 bg-gradient-to-b from-orange-50/80 to-white hover:border-orange-400 dark:border-orange-900/60 dark:from-orange-950/30 dark:to-zinc-900'
                           : 'border-emerald-100 bg-gradient-to-b from-emerald-50/50 to-white hover:border-emerald-300 dark:border-emerald-950/60 dark:from-emerald-950/20 dark:to-zinc-900'
                       }`}
                     >
-                      {/* Top Row: Label & Status Dot */}
+                      {/* Top Row: Label & Status Dot / Bill Badge */}
                       <div className="flex items-center justify-between w-full">
                         <span className="text-[11px] font-black uppercase tracking-wider text-zinc-400">
                           TABLE
                         </span>
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-                          occupied
-                            ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
-                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
-                        }`}>
-                          <span className={`size-1.5 rounded-full ${occupied ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
-                          {occupied ? 'ไม่ว่าง' : 'ว่าง'}
-                        </span>
+                        
+                        {billCall ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white shadow-sm animate-pulse">
+                            <Bell size={11} className="animate-bell-wiggle" />
+                            <span>เรียกเก็บเงิน!</span>
+                          </span>
+                        ) : staffCall ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-500 text-white shadow-sm">
+                            <span>🙋‍♂️ เรียกพนักงาน</span>
+                          </span>
+                        ) : (
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                            occupied
+                              ? 'bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300'
+                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300'
+                          }`}>
+                            <span className={`size-1.5 rounded-full ${occupied ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
+                            {occupied ? 'ไม่ว่าง' : 'ว่าง'}
+                          </span>
+                        )}
                       </div>
 
                       {/* Middle: Big Table Number + Subtitle */}
                       <div className="my-5 flex flex-col items-center justify-center text-center">
                         <span className={`text-5xl sm:text-6xl font-black tracking-tight transition group-hover:scale-110 duration-300 ${
-                          occupied ? 'text-orange-600 dark:text-orange-400' : 'text-zinc-900 dark:text-white'
+                          billCall
+                            ? 'text-amber-600 dark:text-amber-400 animate-pulse'
+                            : occupied
+                            ? 'text-orange-600 dark:text-orange-400'
+                            : 'text-zinc-900 dark:text-white'
                         }`}>
                           {x.table_number}
                         </span>
 
                         <div className="mt-3 min-h-6 flex items-center justify-center">
-                          {occupied ? (
+                          {billCall ? (
+                            <span className="text-xs font-black text-amber-800 dark:text-amber-300 bg-amber-200/90 dark:bg-amber-900/60 px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                              <CircleDollarSign size={12} />
+                              <span>รอลูกค้าเช็คบิล</span>
+                            </span>
+                          ) : occupied ? (
                             itemsCount > 0 ? (
                               <span className="text-xs font-black text-orange-600 dark:text-orange-400 bg-orange-100/80 dark:bg-orange-950/60 px-3 py-1 rounded-full">
                                 {itemsCount} รายการ · ฿{totalAmt.toLocaleString()}
@@ -709,16 +1050,31 @@ export default function TablesManagement() {
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                 {rows.map((x: any) => {
                   const occupied = x.status === 'occupied'
-                  const itemsCount = getTableActiveItemsCount(x.id, x.session_opened_at)
-                  const orders = getTableActiveOrders(x.id, x.session_opened_at)
+                  const itemsCount = getTableActiveItemsCount(x.id)
+                  const orders = getTableActiveOrders(x.id)
                   const totalAmt = orders.reduce((sum: number, o: any) => sum + Number(o.total || 0), 0)
+                  const billCall = getTableBillCall(x.id)
+                  const staffCall = getTableStaffCall(x.id)
 
                   return (
-                    <tr key={x.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30 transition-colors">
+                    <tr
+                      key={x.id}
+                      className={`transition-colors ${
+                        billCall
+                          ? 'bg-amber-50/90 hover:bg-amber-100/80 dark:bg-amber-950/30'
+                          : 'hover:bg-zinc-50/60 dark:hover:bg-zinc-800/30'
+                      }`}
+                    >
                       <td className="px-3 sm:px-5 py-3">
                         <div className="flex flex-col">
-                          <span className="font-black text-sm text-zinc-900 dark:text-white">
-                            โต๊ะ {x.table_number}
+                          <span className="font-black text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                            <span>โต๊ะ {x.table_number}</span>
+                            {billCall && (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-1.5 py-0.5 text-[10px] font-black text-white animate-pulse">
+                                <Bell size={10} className="animate-bell-wiggle" />
+                                <span>เรียกเก็บเงิน</span>
+                              </span>
+                            )}
                           </span>
                           {occupied && itemsCount > 0 && (
                             <span className="text-[11px] font-extrabold text-orange-600 dark:text-orange-400">
@@ -728,7 +1084,12 @@ export default function TablesManagement() {
                         </div>
                       </td>
                       <td className="px-2 sm:px-4 py-3">
-                        {occupied ? (
+                        {billCall ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[11px] font-black text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 whitespace-nowrap animate-pulse">
+                            <span className="size-1.5 rounded-full bg-amber-500" />
+                            <span>🔔 เรียกลูกค้าเช็คบิล</span>
+                          </span>
+                        ) : occupied ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200 px-2 sm:px-2.5 py-0.5 text-[11px] font-bold text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-300 whitespace-nowrap">
                             <span className="size-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
                             <span>ไม่ว่าง</span>
@@ -745,14 +1106,16 @@ export default function TablesManagement() {
                           <button
                             onClick={(e) => handleToggleTable(e, x)}
                             className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-black text-white transition shadow-2xs cursor-pointer whitespace-nowrap ${
-                              occupied
+                              billCall
+                                ? 'bg-amber-500 hover:bg-amber-600 animate-pulse'
+                                : occupied
                                 ? itemsCount > 0
                                 ? 'bg-orange-500 hover:bg-orange-600'
                                 : 'bg-zinc-800 hover:bg-zinc-700'
                               : 'bg-emerald-600 hover:bg-emerald-700'
                             }`}
                           >
-                            {occupied ? (itemsCount > 0 ? 'เช็คบิล POS' : 'ปิดโต๊ะ') : 'เปิดโต๊ะ'}
+                            {billCall ? '💰 เช็คบิล POS' : occupied ? (itemsCount > 0 ? 'เช็คบิล POS' : 'ปิดโต๊ะ') : 'เปิดโต๊ะ'}
                           </button>
                           <button
                             onClick={() => setSelectedTable(x)}
@@ -777,11 +1140,14 @@ export default function TablesManagement() {
         table={liveTable}
         activeItemsCount={liveItemsCount}
         activeOrders={liveTableOrders}
+        billCallOrder={liveBillCall}
+        staffCallOrder={liveStaffCall}
         onClose={() => setSelectedTable(null)}
         onOpenTable={id => openTable.mutate(id)}
         onCloseTable={id => closeTable.mutate(id)}
         onRegenerateQR={id => regenerateQR.mutate(id)}
         onRemove={id => remove.mutate(id)}
+        onDismissCall={orderId => dismissCall.mutate(orderId)}
         isOpening={openTable.isPending}
         isClosing={closeTable.isPending}
         isRegenerating={regenerateQR.isPending}

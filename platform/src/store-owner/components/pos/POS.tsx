@@ -112,35 +112,55 @@ export default function POS() {
   })
 
   const selectedTableObj = tables.data?.find((t: any) => t.id === tableId)
-  const sessionOpenedAt = selectedTableObj?.session_opened_at
 
-  // Fetch Active Orders for Table (ONLY from current active session)
+  // Fetch Active Orders for Table
   const tableOrders = useQuery({
-    queryKey: ['pos-table-orders', store.id, tableId, sessionOpenedAt],
+    queryKey: ['pos-table-orders', store.id, tableId],
     enabled: Boolean(tableId && type === 'dine_in'),
     staleTime: 0,
     queryFn: async () => {
       if (!tableId) return []
-      // If table is not occupied or has no active session, do not pull old history!
-      if (selectedTableObj?.status !== 'occupied' || !sessionOpenedAt) {
-        return []
-      }
 
-      let q = supabase
+      const { data, error } = await supabase
         .from('store_orders')
         .select('*, store_order_items(*)')
         .eq('store_id', store.id)
         .eq('table_id', tableId)
         .neq('status', 'cancelled')
         .neq('status', 'completed')
-        .gte('created_at', sessionOpenedAt)
         .order('created_at', { ascending: true })
 
-      const { data, error } = await q
       if (error) throw error
       return data || []
     }
   })
+
+  // Supabase Realtime for table orders in POS
+  useEffect(() => {
+    if (!store?.id) return
+    const channel = supabase
+      .channel(`pos-orders-realtime:${store.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_orders', filter: `store_id=eq.${store.id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ['pos-table-orders'] })
+          qc.invalidateQueries({ queryKey: ['pos-tables', store.id] })
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_order_items', filter: `store_id=eq.${store.id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ['pos-table-orders'] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [store.id, qc])
 
   // Sync Table Orders into Cart
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   BarChart3, Bell, Boxes, ChefHat, ChevronDown, CircleDollarSign, ClipboardList, Gift,
   LayoutDashboard, Menu as MenuIcon, Moon, PanelLeftClose, Search, Settings, ShoppingBag,
@@ -14,6 +14,7 @@ import Reports from './components/reports/Reports'
 import StoreSettings from './components/settings/Settings'
 import { StoreProvider, useStore } from './StoreContext'
 import { fetchCurrentUserSummary } from '../lib/database'
+import { supabase } from '../lib/supabase'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,6 +75,7 @@ function SubscriptionExpiredWall() {
 
 function App() {
   const { store } = useStore()
+  const qc = useQueryClient()
   const themeColor = (store as any)?.theme_color || '#F97316'
   const getPathSegments = () => {
     if (typeof window === 'undefined') return { slug: 'demo', key: 'dashboard' }
@@ -117,6 +119,47 @@ function App() {
     window.addEventListener('popstate', p)
     return () => window.removeEventListener('popstate', p)
   }, [])
+
+  // Global Bill Calls Query
+  const { data: billCalls = [] } = useQuery({
+    queryKey: ['global-bill-calls', store?.id],
+    enabled: Boolean(store?.id),
+    queryFn: async () => {
+      if (!store?.id) return []
+      const { data } = await supabase
+        .from('store_orders')
+        .select('id, table_id, order_number, customer_name, notes, status, created_at, store_tables(table_number)')
+        .eq('store_id', store.id)
+        .neq('status', 'completed')
+        .neq('status', 'cancelled')
+      return (data || []).filter((o: any) => {
+        const num = String(o.order_number || '').toUpperCase()
+        const name = String(o.customer_name || '').toLowerCase()
+        const notes = String(o.notes || '').toLowerCase()
+        return num.startsWith('BILL') || name.includes('เรียกเก็บเงิน') || name.includes('เช็คบิล') || notes.includes('เรียกเก็บเงิน') || notes.includes('เช็คบิล')
+      })
+    },
+    refetchInterval: 6000
+  })
+
+  // Realtime listener for global bill calls
+  useEffect(() => {
+    if (!store?.id) return
+    const channel = supabase
+      .channel(`store-global-orders:${store.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'store_orders', filter: `store_id=eq.${store.id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ['global-bill-calls', store.id] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [store?.id, qc])
 
   let page: any = <Dashboard navigate={go} />
   if (active === 'orders') page = <Orders />
@@ -167,19 +210,30 @@ function App() {
         </div>
 
         <nav className="mt-3 flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
-          {nav.map(([id, label, Icon]) => (
-            <button
-              key={id}
-              onClick={() => go(id)}
-              style={active === id ? { backgroundColor: themeColor } : {}}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition cursor-pointer ${
-                active === id ? 'text-white shadow-lg shadow-zinc-950/30' : 'text-zinc-400 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              <Icon size={17} />
-              {label}
-            </button>
-          ))}
+          {nav.map(([id, label, Icon]) => {
+            const hasBillCall = id === 'tables' && billCalls.length > 0
+            return (
+              <button
+                key={id}
+                onClick={() => go(id)}
+                style={active === id ? { backgroundColor: themeColor } : {}}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold transition cursor-pointer ${
+                  active === id ? 'text-white shadow-lg shadow-zinc-950/30' : 'text-zinc-400 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon size={17} />
+                  <span>{label}</span>
+                </div>
+                {hasBillCall && (
+                  <span className="flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white shadow-sm animate-pulse">
+                    <Bell size={11} className="animate-bell-wiggle" />
+                    <span>{billCalls.length}</span>
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </nav>
       </aside>
 
@@ -191,6 +245,18 @@ function App() {
           <button onClick={() => setMobile(true)} className="grid size-10 place-items-center rounded-xl border dark:border-zinc-700 lg:hidden">
             <MenuIcon />
           </button>
+
+          {/* Top Header Bill Alert Button (if any tables are calling) */}
+          {billCalls.length > 0 && (
+            <button
+              onClick={() => go('tables')}
+              className="flex items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/30 px-3.5 py-1.5 text-xs font-black text-amber-600 dark:text-amber-400 shadow-sm transition hover:bg-amber-500/20 animate-pulse cursor-pointer"
+            >
+              <Bell size={14} className="text-amber-500 animate-bell-wiggle" />
+              <span>ลูกค้าเรียกเช็คบิล ({billCalls.length} โต๊ะ)</span>
+            </button>
+          )}
+
           <div className="ml-auto flex items-center gap-2">
             <button onClick={() => setDark(!dark)} className="grid size-10 place-items-center rounded-xl border bg-white text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 cursor-pointer">
               {dark ? <Sun size={17} /> : <Moon size={17} />}
