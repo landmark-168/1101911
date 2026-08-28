@@ -1,1 +1,2 @@
-export { default } from '../management/ManagementPage'
+export { default } from './EmployeesManagement'
+export * from './EmployeesManagement'
