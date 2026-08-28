@@ -150,9 +150,16 @@ function App() {
   })
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
+    if (dark) {
+      document.documentElement.classList.add('dark')
+      document.body.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      document.body.classList.remove('dark')
+    }
     localStorage.setItem('store-theme', dark ? 'dark' : 'light')
   }, [dark])
+
 
   useEffect(() => {
     fetchCurrentUserSummary().then((u: any) => {
@@ -425,9 +432,15 @@ function App() {
               <KeyRound size={17} className="text-orange-500" />
             </button>
 
-            <button onClick={() => setDark(!dark)} className="grid size-10 place-items-center rounded-xl border bg-white text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 cursor-pointer">
-              {dark ? <Sun size={17} /> : <Moon size={17} />}
+            <button
+              type="button"
+              onClick={() => setDark(prev => !prev)}
+              className="grid size-10 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white transition cursor-pointer shadow-2xs active:scale-95"
+              title={dark ? 'เปลี่ยนเป็นโหมดสว่าง (Light Mode)' : 'เปลี่ยนเป็นโหมดมืด (Dark Mode)'}
+            >
+              {dark ? <Sun size={18} className="text-amber-400 animate-fade-in" /> : <Moon size={18} className="text-zinc-600 animate-fade-in" />}
             </button>
+
             <button
               onClick={() => go('pos')}
               style={{ backgroundColor: themeColor }}
