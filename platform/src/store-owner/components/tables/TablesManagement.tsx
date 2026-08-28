@@ -703,10 +703,12 @@ export default function TablesManagement() {
 
   const storeSlug = typeof window !== 'undefined' ? (window.location.pathname.split('/')[2] || store.slug || store.id) : (store.slug || store.id)
   const realSlug = store.slug || store.id
+  const liveTable = selectedTable ? rows.find((x: any) => x.id === selectedTable.id) || selectedTable : null
   const liveTableOrders = liveTable ? getTableActiveOrders(liveTable.id, liveTable.session_opened_at) : []
   const liveItemsCount = liveTable ? getTableActiveItemsCount(liveTable.id, liveTable.session_opened_at) : 0
   const liveBillCall = liveTable ? getTableBillCall(liveTable.id) : null
   const liveStaffCall = liveTable ? getTableStaffCall(liveTable.id) : null
+
 
   // Online Storefront Link (ใช้ Slug หรือ ID จริงของร้านค้า)
   const storefrontLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${realSlug}`
