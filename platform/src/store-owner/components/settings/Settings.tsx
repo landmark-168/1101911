@@ -34,8 +34,7 @@ const CATEGORY_TABS = [
   { id: 'all', label: 'ทั้งหมด (All)', icon: Layers },
   { id: 'branding', label: 'ภาพลักษณ์และธีมสี', icon: Palette },
   { id: 'info', label: 'ข้อมูลร้านและเวลาทำการ', icon: Store },
-  { id: 'taxes', label: 'ภาษีและค่าธรรมเนียม', icon: Receipt },
-  { id: 'link', label: 'ลิงก์ร้านค้า', icon: ExternalLink }
+  { id: 'taxes', label: 'ภาษีและค่าธรรมเนียม', icon: Receipt }
 ]
 
 const emptySettings = {
@@ -215,16 +214,6 @@ export default function Settings() {
       showToast(e.message || 'เกิดข้อผิดพลาดในการบันทึก', 'error')
     }
   })
-
-  const storefrontLink = `${window.location.origin}/s/${form.store_slug || store.slug || store.id}`
-
-  const copyLink = () => {
-    navigator.clipboard.writeText(storefrontLink)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-    showToast('คัดลอกลิงก์ร้านค้าออนไลน์แล้ว')
-  }
-
   const activeThemeColor = form.theme_color || '#F97316'
 
   return (
@@ -287,46 +276,6 @@ export default function Settings() {
           )
         })}
       </div>
-
-      {/* ── CATEGORY 1: STOREFRONT LINK ── */}
-      {(activeTab === 'all' || activeTab === 'link') && (
-        <div className="rounded-3xl border border-zinc-200/80 bg-white p-5 sm:p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-3 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-black uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-              <Store size={15} style={{ color: activeThemeColor }} /> ลิงก์สำหรับเว็บร้านค้าออนไลน์ (Online Storefront URL)
-            </h3>
-            <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full dark:bg-emerald-950/40 dark:text-emerald-300">
-              ● สำหรับส่งให้ลูกค้าสั่งอาหาร
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-zinc-50/80 p-2.5 dark:border-zinc-700/80 dark:bg-zinc-800/60">
-            <input
-              readOnly
-              value={storefrontLink}
-              className="flex-1 bg-transparent px-2 font-mono text-xs font-bold text-zinc-700 dark:text-zinc-300 outline-none truncate"
-            />
-            <button
-              onClick={copyLink}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-bold shadow-2xs border border-zinc-200 transition cursor-pointer dark:bg-zinc-700 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-600"
-              title="คัดลอกลิงก์"
-            >
-              {copied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
-              <span>{copied ? 'คัดลอกแล้ว' : 'คัดลอก'}</span>
-            </button>
-            <a
-              href={storefrontLink}
-              target="_blank"
-              rel="noreferrer"
-              style={{ backgroundColor: activeThemeColor }}
-              className="grid size-8 place-items-center rounded-xl text-white shadow-xs transition hover:brightness-95 cursor-pointer"
-              title="เปิดหน้าร้าน"
-            >
-              <ExternalLink size={14} />
-            </a>
-          </div>
-        </div>
-      )}
 
       {/* ── CATEGORY 2: BRANDING, THEME, SLOGAN & LIVE PREVIEW (การ์ดเดียวกัน) ── */}
       {(activeTab === 'all' || activeTab === 'branding') && (

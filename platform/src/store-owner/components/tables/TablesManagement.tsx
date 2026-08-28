@@ -4,7 +4,8 @@ import {
   Plus, Search, Trash2, QrCode, Power, PowerOff, RefreshCw, Download,
   X, Copy, Check, LayoutGrid, List, Receipt, Utensils, Sparkles,
   Clock, ArrowRight, CheckCircle2, AlertCircle, Bluetooth, Bell,
-  Volume2, VolumeX, CircleDollarSign
+  Volume2, VolumeX, CircleDollarSign, ExternalLink, Globe
+
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase'
@@ -701,11 +702,21 @@ export default function TablesManagement() {
   }, [query.data, search])
 
   const storeSlug = typeof window !== 'undefined' ? (window.location.pathname.split('/')[2] || store.slug || store.id) : (store.slug || store.id)
-  const liveTable = selectedTable ? rows.find((x: any) => x.id === selectedTable.id) || selectedTable : null
-  const liveTableOrders = liveTable ? getTableActiveOrders(liveTable.id) : []
-  const liveItemsCount = liveTable ? getTableActiveItemsCount(liveTable.id) : 0
+  const realSlug = store.slug || store.id
+  const liveTableOrders = liveTable ? getTableActiveOrders(liveTable.id, liveTable.session_opened_at) : []
+  const liveItemsCount = liveTable ? getTableActiveItemsCount(liveTable.id, liveTable.session_opened_at) : 0
   const liveBillCall = liveTable ? getTableBillCall(liveTable.id) : null
   const liveStaffCall = liveTable ? getTableStaffCall(liveTable.id) : null
+
+  // Online Storefront Link (ใช้ Slug หรือ ID จริงของร้านค้า)
+  const storefrontLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${realSlug}`
+  const [copied, setCopied] = useState(false)
+  const copyLink = () => {
+    navigator.clipboard.writeText(storefrontLink)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
 
   // Stats calculation
   const totalTables = rows.length
@@ -801,10 +812,13 @@ export default function TablesManagement() {
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-950 dark:text-white tracking-tight">
             ผังโต๊ะ & จัดการโต๊ะ (Tables)
           </h1>
+          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 font-medium">
+            ภาพรวมผังโต๊ะ สถานะลูกค้า และจัดการ QR Code ประจำโต๊ะ
+          </p>
         </div>
 
-        {/* Toolbar buttons */}
-        <div className="flex items-center gap-2">
+        {/* Toolbar & Action Buttons */}
+        <div className="flex items-center gap-2.5 flex-wrap">
           {/* Sound Alert Toggle */}
           <button
             type="button"
@@ -833,6 +847,50 @@ export default function TablesManagement() {
           </button>
         </div>
       </div>
+
+      {/* Online Storefront URL Card (ลิงก์ร้านค้าออนไลน์) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl border border-orange-200/80 bg-gradient-to-r from-orange-50/70 via-amber-50/40 to-white dark:border-orange-950/50 dark:from-orange-950/20 dark:to-zinc-900 shadow-2xs">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="grid size-10 place-items-center rounded-xl bg-orange-500 text-white shadow-sm shrink-0">
+            <Globe size={18} />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-zinc-900 dark:text-white">
+                ลิงก์เว็บร้านค้าออนไลน์ (Online Storefront)
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 px-2 py-0.5 text-[10px] font-bold">
+                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> ออนไลน์
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate font-mono mt-0.5">
+              {storefrontLink}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={copyLink}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-800 text-xs font-bold shadow-2xs border border-zinc-200 transition cursor-pointer dark:bg-zinc-800 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-700 active:scale-95"
+            title="คัดลอกลิงก์ร้านค้าออนไลน์"
+          >
+            {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+            <span>{copied ? 'คัดลอกแล้ว!' : 'คัดลอกลิงก์'}</span>
+          </button>
+          <a
+            href={storefrontLink}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-sm shadow-orange-500/20 transition active:scale-95 cursor-pointer"
+            title="เปิดหน้าร้านออนไลน์ในแท็บใหม่"
+          >
+            <ExternalLink size={14} />
+            <span>เปิดดูหน้าร้าน</span>
+          </a>
+        </div>
+      </div>
+
 
       {/* Quick KPI Stat Chips */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
