@@ -1089,17 +1089,31 @@ function StorefrontApp() {
       const decodedParam = decodeURIComponent(param)
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decodedParam)
       
-      let q = supabase.from('shops').select('id, slug')
-      if (isUUID) {
-        q = q.eq('id', decodedParam)
-      } else {
-        q = q.or(`slug.eq.${decodedParam},slug.eq.${param}`)
+      const findStore = async () => {
+        if (decodedParam === 'my-store') {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) {
+            const { data: myShop } = await supabase.from('shops').select('id, slug').eq('owner_id', user.id).limit(1).maybeSingle()
+            if (myShop) return myShop
+          }
+        }
+
+        let q = supabase.from('shops').select('id, slug')
+        if (isUUID) {
+          q = q.eq('id', decodedParam)
+        } else {
+          q = q.or(`slug.eq.${decodedParam},slug.eq.${param}`)
+        }
+        const { data } = await q.maybeSingle()
+        return data
       }
-      
-      q.maybeSingle().then(({ data, error }) => {
-        if (error || !data) return setErrorMsg('ไม่พบร้านค้า หรือลิงก์ไม่ถูกต้อง')
+
+      findStore().then((data) => {
+        if (!data) return setErrorMsg('ไม่พบร้านค้า หรือลิงก์ไม่ถูกต้อง')
         setStoreId(data.id)
         setView('home')
+      }).catch(() => {
+        setErrorMsg('ไม่พบร้านค้า หรือลิงก์ไม่ถูกต้อง')
       })
     } else {
       setErrorMsg('ลิงก์ไม่ถูกต้อง')
