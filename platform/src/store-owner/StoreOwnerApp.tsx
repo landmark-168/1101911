@@ -3,8 +3,9 @@ import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tan
 import {
   BarChart3, Bell, Boxes, ChefHat, ChevronDown, CircleDollarSign, ClipboardList, Gift,
   LayoutDashboard, Menu as MenuIcon, Moon, PanelLeftClose, Search, Settings, ShoppingBag,
-  Store, Sun, Tags, Users, Utensils, X, AlertTriangle, CreditCard, KeyRound, Lock, Unlock, ShieldCheck, Shield, CheckCircle2
+  Store, Sun, Tags, Users, Utensils, X, AlertTriangle, AlertCircle, CreditCard, KeyRound, Lock, Unlock, ShieldCheck, Shield, CheckCircle2
 } from 'lucide-react'
+
 import Dashboard from './components/dashboard/Dashboard'
 import Orders from './components/orders/Orders'
 import POS from './components/pos/POS'
