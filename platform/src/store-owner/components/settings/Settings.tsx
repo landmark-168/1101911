@@ -5,10 +5,11 @@ import {
   Trash2, Sparkles, Store, Palette, Receipt, MapPin, Phone,
   FileText, Percent, DollarSign, RefreshCw, CheckCircle2,
   Clock, Eye, Smartphone, Monitor, ChevronRight, Bell, Flame,
-  Layers, SlidersHorizontal
+  Layers, SlidersHorizontal, Bike, Navigation, ShieldCheck, HelpCircle
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
+import DeliveryRouteMap from '../../../components/DeliveryRouteMap'
 
 const PRESET_COLORS = [
   { name: 'ส้มสด (Orange)', hex: '#F97316' },
@@ -34,6 +35,7 @@ const CATEGORY_TABS = [
   { id: 'all', label: 'ทั้งหมด (All)', icon: Layers },
   { id: 'branding', label: 'ภาพลักษณ์และธีมสี', icon: Palette },
   { id: 'info', label: 'ข้อมูลร้านและเวลาทำการ', icon: Store },
+  { id: 'delivery', label: 'ระบบจัดส่ง & พิกัดร้าน (Delivery)', icon: Bike },
   { id: 'taxes', label: 'ภาษีและค่าธรรมเนียม', icon: Receipt }
 ]
 
@@ -47,11 +49,21 @@ const emptySettings = {
   address: '',
   google_maps_url: '',
   line_oa: '',
-  delivery_fee: 0,
+  delivery_fee: 25,
   tax_percent: 7,
   service_charge_percent: 0,
   theme_color: '#F97316',
-  opening_hours_text: 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.'
+  opening_hours_text: 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.',
+  latitude: 13.7563,
+  longitude: 100.5018,
+  delivery_enabled: true,
+  delivery_radius_km: 10,
+  base_delivery_fee: 25,
+  delivery_fee_per_km: 10,
+  min_delivery_fee: 25,
+  max_delivery_fee: 150,
+  free_delivery_threshold: 500,
+  avg_prep_time_minutes: 20
 }
 
 export default function Settings() {
@@ -99,6 +111,8 @@ export default function Settings() {
         ? openingHoursRaw
         : (openingHoursRaw?.text || 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.')
 
+      const delConf = (settingsData as any)?.delivery_config || {}
+
       return {
         ...emptySettings,
         ...(settingsData || {}),
@@ -111,11 +125,21 @@ export default function Settings() {
         description: settingsData?.description || '',
         google_maps_url: settingsData?.google_maps_url || '',
         line_oa: settingsData?.line_oa || '',
-        delivery_fee: Number(settingsData?.delivery_fee ?? 0),
+        delivery_fee: Number(settingsData?.delivery_fee ?? delConf.base_delivery_fee ?? 25),
         tax_percent: Number(settingsData?.tax_percent ?? 7),
         service_charge_percent: Number(settingsData?.service_charge_percent ?? 0),
         theme_color: settingsData?.theme_color || '#F97316',
-        opening_hours_text: openingHoursText
+        opening_hours_text: openingHoursText,
+        latitude: Number(shopData?.latitude ?? delConf.latitude ?? 13.7563),
+        longitude: Number(shopData?.longitude ?? delConf.longitude ?? 100.5018),
+        delivery_enabled: delConf.delivery_enabled !== false,
+        delivery_radius_km: Number(delConf.delivery_radius_km ?? 10),
+        base_delivery_fee: Number(delConf.base_delivery_fee ?? settingsData?.delivery_fee ?? 25),
+        delivery_fee_per_km: Number(delConf.delivery_fee_per_km ?? 10),
+        min_delivery_fee: Number(delConf.min_delivery_fee ?? 25),
+        max_delivery_fee: Number(delConf.max_delivery_fee ?? 150),
+        free_delivery_threshold: Number(delConf.free_delivery_threshold ?? 500),
+        avg_prep_time_minutes: Number(delConf.avg_prep_time_minutes ?? 20)
       }
     }
   })
@@ -165,14 +189,28 @@ export default function Settings() {
   const save = useMutation({
     mutationFn: async () => {
       const now = new Date().toISOString()
+      const deliveryConfigObj = {
+        latitude: Number(form.latitude || 13.7563),
+        longitude: Number(form.longitude || 100.5018),
+        delivery_enabled: form.delivery_enabled !== false,
+        delivery_radius_km: Number(form.delivery_radius_km || 10),
+        base_delivery_fee: Number(form.base_delivery_fee || form.delivery_fee || 25),
+        delivery_fee_per_km: Number(form.delivery_fee_per_km || 10),
+        min_delivery_fee: Number(form.min_delivery_fee || 25),
+        max_delivery_fee: Number(form.max_delivery_fee || 150),
+        free_delivery_threshold: Number(form.free_delivery_threshold || 500),
+        avg_prep_time_minutes: Number(form.avg_prep_time_minutes || 20)
+      }
 
-      // 1. Update shops table safely (phone and address have not-null constraints in shops)
+      // 1. Update shops table safely with coordinates
       const shopPayload: any = {
         name: form.store_name?.trim() || store.name,
         slug: form.store_slug?.trim() || store.slug,
         logo_url: form.logo_url || null,
         phone: form.phone?.trim() || '0800000000',
         address: form.address?.trim() || '-',
+        latitude: Number(form.latitude || 13.7563),
+        longitude: Number(form.longitude || 100.5018),
         updated_at: now
       }
 
@@ -184,26 +222,41 @@ export default function Settings() {
       if (shopError) throw shopError
 
       // 2. Upsert store_settings table
-      const { error: settingsError } = await supabase
-        .from('store_settings')
-        .upsert({
-          store_id: store.id,
-          logo_url: form.logo_url || null,
-          banner_url: form.banner_url || null,
-          description: form.description?.trim() || null,
-          phone: form.phone?.trim() || null,
-          address: form.address?.trim() || null,
-          google_maps_url: form.google_maps_url?.trim() || null,
-          line_oa: form.line_oa?.trim() || null,
-          delivery_fee: Number(form.delivery_fee || 0),
-          tax_percent: Number(form.tax_percent || 0),
-          service_charge_percent: Number(form.service_charge_percent || 0),
-          theme_color: form.theme_color || '#F97316',
-          opening_hours: { text: form.opening_hours_text?.trim() || 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.' },
-          updated_at: now
-        }, { onConflict: 'store_id' })
+      const settingsPayload: any = {
+        store_id: store.id,
+        logo_url: form.logo_url || null,
+        banner_url: form.banner_url || null,
+        description: form.description?.trim() || null,
+        phone: form.phone?.trim() || null,
+        address: form.address?.trim() || null,
+        google_maps_url: form.google_maps_url?.trim() || null,
+        line_oa: form.line_oa?.trim() || null,
+        delivery_fee: Number(form.base_delivery_fee || form.delivery_fee || 25),
+        tax_percent: Number(form.tax_percent || 0),
+        service_charge_percent: Number(form.service_charge_percent || 0),
+        theme_color: form.theme_color || '#F97316',
+        opening_hours: {
+          text: form.opening_hours_text?.trim() || 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.',
+          delivery_config: deliveryConfigObj
+        },
+        delivery_config: deliveryConfigObj,
+        updated_at: now
+      }
 
-      if (settingsError) throw settingsError
+      let { error: settingsError } = await supabase
+        .from('store_settings')
+        .upsert(settingsPayload, { onConflict: 'store_id' })
+
+      // Fallback if delivery_config column isn't created yet in Postgres
+      if (settingsError && (settingsError.message?.includes('delivery_config') || settingsError.code === 'PGRST204')) {
+        delete settingsPayload.delivery_config
+        const retry = await supabase
+          .from('store_settings')
+          .upsert(settingsPayload, { onConflict: 'store_id' })
+        if (retry.error) throw retry.error
+      } else if (settingsError) {
+        throw settingsError
+      }
     },
     onSuccess: () => {
       showToast('บันทึกข้อมูลการตั้งค่าร้านสำเร็จ')
@@ -730,6 +783,261 @@ export default function Settings() {
                 placeholder="เช่น https://maps.google.com/..."
                 className="h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-4 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CATEGORY: DELIVERY & STORE LOCATION ── */}
+      {(activeTab === 'all' || activeTab === 'delivery') && (
+        <div className="rounded-3xl border border-zinc-200/80 bg-white p-5 sm:p-7 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-6 animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center gap-2">
+              <Bike size={20} style={{ color: activeThemeColor }} />
+              <div>
+                <h2 className="text-base font-black text-zinc-950 dark:text-white">
+                  ระบบจัดส่งเดลิเวอรี & พิกัดร้านค้า (Delivery & Location)
+                </h2>
+                <p className="text-xs text-zinc-400 font-medium">
+                  กำหนดพิกัดร้านค้า รัศมีให้บริการ อัตราค่าจัดส่งตามระยะทาง และเวลาถึงโดยประมาณ (ETA)
+                </p>
+              </div>
+            </div>
+
+            {/* Delivery Enable Toggle */}
+            <label className="flex items-center gap-2.5 cursor-pointer bg-zinc-50 dark:bg-zinc-800/60 px-4 py-2 rounded-2xl border border-zinc-200 dark:border-zinc-700">
+              <input
+                type="checkbox"
+                checked={form.delivery_enabled !== false}
+                onChange={e => setForm({ ...form, delivery_enabled: e.target.checked })}
+                className="size-4 accent-orange-500 rounded"
+              />
+              <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                {form.delivery_enabled !== false ? 'เปิดรับออเดอร์เดลิเวอรี' : 'ปิดรับออเดอร์เดลิเวอรี'}
+              </span>
+            </label>
+          </div>
+
+          {/* Map Location Picker */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                <MapPin size={15} style={{ color: activeThemeColor }} /> พิกัดร้านค้าบนแผนที่ (Store Coordinates)
+              </label>
+              <span className="text-[11px] text-zinc-400 font-medium">
+                * แตะบนแผนที่หรือลากหมุด 🏬 เพื่อเปลี่ยนตำแหน่งร้าน
+              </span>
+            </div>
+
+            <DeliveryRouteMap
+              mode="picker"
+              pickerTarget="store"
+              height="340px"
+              showSearch={true}
+              searchPlaceholder="🔍 พิมพ์ค้นหาที่ตั้งร้านค้า, ตลาด, อาคาร, ซอย, ถนน..."
+              radiusKm={form.delivery_radius_km || 10}
+              storeLocation={{
+                lat: Number(form.latitude || 13.7563),
+                lng: Number(form.longitude || 100.5018),
+                name: form.store_name || 'ร้านค้า'
+              }}
+              onChangeLocation={(lat, lng) => {
+                setForm(prev => ({
+                  ...prev,
+                  latitude: Number(lat.toFixed(6)),
+                  longitude: Number(lng.toFixed(6))
+                }))
+              }}
+              onSelectAddressText={(detectedAddress) => {
+                if (!form.address || form.address.length < 5) {
+                  setForm(prev => ({ ...prev, address: detectedAddress }))
+                }
+              }}
+            />
+
+            {/* Lat / Lng inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400">ละติจูด (Latitude)</label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={form.latitude ?? 13.7563}
+                  onChange={e => setForm({ ...form, latitude: Number(e.target.value) })}
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3 text-xs font-mono font-bold outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400">ลองจิจูด (Longitude)</label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  value={form.longitude ?? 100.5018}
+                  onChange={e => setForm({ ...form, longitude: Number(e.target.value) })}
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3 text-xs font-mono font-bold outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Delivery Configuration & Pricing Rules Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+            {/* Radius */}
+            <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700 sm:col-span-2 lg:col-span-1">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                  รัศมีจัดส่งสูงสุด (Radius)
+                </label>
+                <span className="text-xs font-black text-orange-600 dark:text-orange-400">
+                  {form.delivery_radius_km || 10} กม.
+                </span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="50"
+                step="1"
+                value={form.delivery_radius_km ?? 10}
+                onChange={e => setForm({ ...form, delivery_radius_km: Number(e.target.value) })}
+                className="w-full accent-orange-500 cursor-pointer"
+              />
+              <div className="flex flex-wrap gap-1 pt-1">
+                {[3, 5, 10, 15, 20, 30].map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setForm({ ...form, delivery_radius_km: r })}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                      form.delivery_radius_km === r
+                        ? 'bg-orange-500 text-white border-orange-500'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
+                    }`}
+                  >
+                    {r} กม.
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Base Delivery Fee */}
+            <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                  ค่าส่งเริ่มต้น (Base Fare)
+                </label>
+                <DollarSign size={14} style={{ color: activeThemeColor }} />
+              </div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-400">฿</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="5"
+                  value={form.base_delivery_fee ?? 25}
+                  onChange={e => setForm({ ...form, base_delivery_fee: Number(e.target.value), delivery_fee: Number(e.target.value) })}
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-8 pr-3 text-sm font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                />
+              </div>
+              <p className="text-[10px] text-zinc-400">ค่าจัดส่งสำหรับ 1 กิโลเมตรแรก</p>
+            </div>
+
+            {/* Fee Per KM */}
+            <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                  ค่าส่งต่อกิโลเมตร (Per KM)
+                </label>
+                <span className="text-[10px] font-bold text-zinc-400">฿ / กม.</span>
+              </div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-400">฿</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.delivery_fee_per_km ?? 10}
+                  onChange={e => setForm({ ...form, delivery_fee_per_km: Number(e.target.value) })}
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-8 pr-3 text-sm font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                />
+              </div>
+              <p className="text-[10px] text-zinc-400">คิดเพิ่มกิโลเมตรละ (หลังพ้น 1 กม. แรก)</p>
+            </div>
+
+            {/* Min / Max Capped Fee */}
+            <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
+              <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                ค่าส่งขั้นต่ำ / ขั้นสูง
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-[10px] text-zinc-400 font-bold block mb-1">ขั้นต่ำ (Min)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="5"
+                    value={form.min_delivery_fee ?? 25}
+                    onChange={e => setForm({ ...form, min_delivery_fee: Number(e.target.value) })}
+                    className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-2.5 text-xs font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] text-zinc-400 font-bold block mb-1">สูงสุด (Max)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={form.max_delivery_fee ?? 150}
+                    onChange={e => setForm({ ...form, max_delivery_fee: Number(e.target.value) })}
+                    className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-2.5 text-xs font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Free Delivery Threshold */}
+            <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                  ส่งฟรีเมื่อซื้อครบ (Free Delivery)
+                </label>
+                <Sparkles size={14} className="text-amber-500" />
+              </div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-400">฿</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="50"
+                  value={form.free_delivery_threshold ?? 500}
+                  onChange={e => setForm({ ...form, free_delivery_threshold: Number(e.target.value) })}
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-8 pr-3 text-sm font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                />
+              </div>
+              <p className="text-[10px] text-zinc-400">หากไม่ต้องการมีโปรส่งฟรี ให้ใส่ 0</p>
+            </div>
+
+            {/* Prep Time (ETA) */}
+            <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
+                  เวลาปรุงอาหารเฉลี่ย (Prep Time)
+                </label>
+                <Clock size={14} style={{ color: activeThemeColor }} />
+              </div>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="5"
+                  max="120"
+                  step="5"
+                  value={form.avg_prep_time_minutes ?? 20}
+                  onChange={e => setForm({ ...form, avg_prep_time_minutes: Number(e.target.value) })}
+                  className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 pr-12 text-sm font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">นาที</span>
+              </div>
+              <p className="text-[10px] text-zinc-400">ใช้คำนวณเวลารออาหารและเวลาเดินทางรวม (ETA)</p>
             </div>
           </div>
         </div>

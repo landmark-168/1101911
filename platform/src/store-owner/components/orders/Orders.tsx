@@ -2,18 +2,20 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   CheckCircle2, Clock, Eye, MapPin, Phone, RefreshCw, Search,
-  ShoppingBag, Utensils, X, AlertCircle, ChefHat, Bike, FileText
+  ShoppingBag, Utensils, X, AlertCircle, ChefHat, Bike, FileText, Navigation, ExternalLink
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
 import { PageHeader, Panel } from '../PageKit'
+import DeliveryRouteMap from '../../../components/DeliveryRouteMap'
 
-const statuses = ['pending', 'accepted', 'preparing', 'ready', 'completed', 'cancelled']
+const statuses = ['pending', 'accepted', 'preparing', 'delivering', 'ready', 'completed', 'cancelled']
 
 const statusConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
   pending: { label: 'รอดำเนินการ', bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-700 dark:text-amber-400', border: 'border-amber-200 dark:border-amber-800' },
   accepted: { label: 'รับออเดอร์แล้ว', bg: 'bg-sky-50 dark:bg-sky-500/10', text: 'text-sky-700 dark:text-sky-400', border: 'border-sky-200 dark:border-sky-800' },
   preparing: { label: 'กำลังปรุงอาหาร', bg: 'bg-indigo-50 dark:bg-indigo-500/10', text: 'text-indigo-700 dark:text-indigo-400', border: 'border-indigo-200 dark:border-indigo-800' },
+  delivering: { label: 'ไรเดอร์กำลังส่ง', bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-700 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-800' },
   ready: { label: 'พร้อมเสิร์ฟ/ส่ง', bg: 'bg-purple-50 dark:bg-purple-500/10', text: 'text-purple-700 dark:text-purple-400', border: 'border-purple-200 dark:border-purple-800' },
   completed: { label: 'สำเร็จแล้ว', bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-800' },
   cancelled: { label: 'ยกเลิกแล้ว', bg: 'bg-red-50 dark:bg-red-500/10', text: 'text-red-700 dark:text-red-400', border: 'border-red-200 dark:border-red-800' },
@@ -25,29 +27,51 @@ const channelConfig: Record<string, { label: string; icon: string; bg: string }>
   delivery: { label: 'เดลิเวอรี', icon: '🛵', bg: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' }
 }
 
-function parseCustomerInfo(rawName: string | null | undefined, orderType: string) {
+function parseCustomerInfo(rawName: string | null | undefined, orderType: string, notes?: string | null) {
+  let name = 'Customer'
+  let phone = ''
+  let location = ''
+  let lat = 13.7563
+  let lng = 100.5018
+  let distanceKm = ''
+  let hasGps = false
+
   if (!rawName || rawName === 'Walk-in') {
-    return { name: 'Walk-in Customer', phone: '', location: '' }
+    name = 'Walk-in Customer'
+  } else if (rawName.includes('|')) {
+    const parts = rawName.split('|').map(s => s.trim())
+    name = parts[0] || 'Customer'
+    phone = parts[1] || ''
+    location = parts.slice(2).join(' ') || ''
+  } else if (rawName === 'สั่งกลับบ้าน' || rawName.toLowerCase() === 'takeaway') {
+    name = 'สั่งกลับบ้าน (Takeaway)'
+  } else if (rawName.startsWith('โต๊ะ')) {
+    name = `ลูกค้า ${rawName}`
+  } else {
+    name = rawName
   }
 
-  if (rawName.includes('|')) {
-    const parts = rawName.split('|').map(s => s.trim())
-    return {
-      name: parts[0] || 'Customer',
-      phone: parts[1] || '',
-      location: parts.slice(2).join(' ') || ''
+  // Parse details from notes
+  if (notes) {
+    const gpsMatch = notes.match(/พิกัด GPS:\s*([\d.-]+),\s*([\d.-]+)/i) || notes.match(/GPS:\s*([\d.-]+),\s*([\d.-]+)/i)
+    if (gpsMatch) {
+      lat = parseFloat(gpsMatch[1])
+      lng = parseFloat(gpsMatch[2])
+      hasGps = true
+    }
+
+    const distMatch = notes.match(/ระยะทาง:\s*([\d.]+)\s*กม/i) || notes.match(/\(([\d.]+)\s*กม\.\)/i)
+    if (distMatch) {
+      distanceKm = distMatch[1]
+    }
+
+    const addrMatch = notes.match(/ที่อยู่:\s*([^\n]+)/i)
+    if (addrMatch && !location) {
+      location = addrMatch[1].trim()
     }
   }
 
-  if (rawName === 'สั่งกลับบ้าน' || rawName.toLowerCase() === 'takeaway') {
-    return { name: 'สั่งกลับบ้าน (Takeaway)', phone: '', location: '' }
-  }
-
-  if (rawName.startsWith('โต๊ะ')) {
-    return { name: `ลูกค้า ${rawName}`, phone: '', location: '' }
-  }
-
-  return { name: rawName, phone: '', location: '' }
+  return { name, phone, location, lat, lng, distanceKm, hasGps }
 }
 
 export default function Orders() {
@@ -71,6 +95,39 @@ export default function Orders() {
       return data || []
     }
   })
+
+  // Fetch store location (lat/lng) from shops table and store_settings
+  const storeLocationQuery = useQuery({
+    queryKey: ['store-coordinates', store.id],
+    queryFn: async () => {
+      // 1. Fetch from shops table (where Settings updates latitude/longitude)
+      const { data: shopData } = await supabase
+        .from('shops')
+        .select('latitude, longitude')
+        .eq('id', store.id)
+        .maybeSingle()
+
+      // 2. Fetch from store_settings (for delivery_config fallback)
+      const { data: settingsData } = await supabase
+        .from('store_settings')
+        .select('delivery_config')
+        .eq('store_id', store.id)
+        .maybeSingle()
+
+      const delConf = (settingsData as any)?.delivery_config || {}
+      const lat = shopData?.latitude ?? delConf?.latitude ?? 13.7563
+      const lng = shopData?.longitude ?? delConf?.longitude ?? 100.5018
+
+      return {
+        lat: Number(lat),
+        lng: Number(lng)
+      }
+    },
+    staleTime: 5 * 60 * 1000
+  })
+
+  const storeLat = Number(storeLocationQuery.data?.lat || 13.7563)
+  const storeLng = Number(storeLocationQuery.data?.lng || 100.5018)
 
   useEffect(() => {
     const c = supabase
@@ -232,7 +289,7 @@ export default function Orders() {
               </thead>
               <tbody className="divide-y divide-zinc-100 text-sm dark:divide-zinc-800">
                 {filteredOrders.map((o: any) => {
-                  const cust = parseCustomerInfo(o.customer_name, o.order_type)
+                  const cust = parseCustomerInfo(o.customer_name, o.order_type, o.notes)
                   const st = statusConfig[o.status] || { label: o.status, bg: 'bg-zinc-100', text: 'text-zinc-600', border: 'border-zinc-200' }
                   const ch = channelConfig[o.order_type] || { label: o.order_type, icon: '📦', bg: 'bg-zinc-100 text-zinc-600' }
 
@@ -250,6 +307,11 @@ export default function Orders() {
                             {o.store_order_items.length} รายการ
                           </span>
                         )}
+                        {cust.distanceKm && (
+                          <span className="ml-1.5 rounded-full bg-orange-100 dark:bg-orange-950/40 px-2 py-0.5 text-[10px] font-black text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800/50">
+                            🛵 {cust.distanceKm} กม.
+                          </span>
+                        )}
                       </td>
 
                       <td className="px-5 py-4">
@@ -264,7 +326,7 @@ export default function Orders() {
                               </span>
                             )}
                             {cust.location && (
-                              <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                              <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 max-w-[200px] truncate">
                                 <MapPin size={10} /> {cust.location}
                               </span>
                             )}
@@ -325,6 +387,11 @@ export default function Orders() {
           onClose={() => setSelectedOrder(null)}
           onUpdateStatus={(newStatus) => handleUpdateStatus(selectedOrder.id, newStatus)}
           isUpdating={update.isPending}
+          storeLocation={{
+            lat: storeLat,
+            lng: storeLng,
+            name: store?.name || 'ร้านค้า'
+          }}
         />
       )}
     </div>
@@ -335,14 +402,16 @@ function OrderDetailModal({
   order,
   onClose,
   onUpdateStatus,
-  isUpdating
+  isUpdating,
+  storeLocation
 }: {
   order: any
   onClose: () => void
   onUpdateStatus: (status: string) => void
   isUpdating: boolean
+  storeLocation?: { lat: number; lng: number; name?: string }
 }) {
-  const cust = parseCustomerInfo(order.customer_name, order.order_type)
+  const cust = parseCustomerInfo(order.customer_name, order.order_type, order.notes)
   const st = statusConfig[order.status] || { label: order.status, bg: 'bg-zinc-100', text: 'text-zinc-600', border: 'border-zinc-200' }
   const ch = channelConfig[order.order_type] || { label: order.order_type, icon: '📦', bg: 'bg-zinc-100 text-zinc-600' }
 
@@ -376,7 +445,7 @@ function OrderDetailModal({
         </div>
 
         {/* Modal Body */}
-        <div className="overflow-y-auto p-6 space-y-6">
+        <div className="overflow-y-auto p-6 space-y-5">
           {/* Info Card */}
           <div className="grid gap-4 rounded-2xl border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/50 sm:grid-cols-3">
             <div>
@@ -399,6 +468,48 @@ function OrderDetailModal({
             </div>
           </div>
 
+          {/* Delivery & Routing Map Section */}
+          {(order.order_type === 'delivery' || cust.hasGps || cust.location) && (
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-zinc-900 dark:text-white flex items-center gap-1.5">
+                  <Bike size={16} className="text-orange-500" /> แผนที่และข้อมูลการจัดส่งเดลิเวอรี
+                </span>
+                {cust.distanceKm && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400 text-xs font-black">
+                    ระยะทาง {cust.distanceKm} กม.
+                  </span>
+                )}
+              </div>
+
+              <DeliveryRouteMap
+                mode="route"
+                height="220px"
+                showSearch={false}
+                storeLocation={storeLocation}
+                customerLocation={{
+                  lat: cust.lat,
+                  lng: cust.lng,
+                  address: cust.location || cust.name || 'ที่อยู่จัดส่ง'
+                }}
+              />
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-xs">
+                <p className="text-zinc-600 dark:text-zinc-300 font-medium">
+                  ที่อยู่: <b>{cust.location || 'ตามพิกัดที่ปักหมุด'}</b>
+                </p>
+                <a
+                  href={`https://maps.google.com/?q=${cust.lat},${cust.lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-bold text-orange-600 hover:underline shrink-0"
+                >
+                  <Navigation size={13} /> นำทางด้วย Google Maps <ExternalLink size={11} />
+                </a>
+              </div>
+            </div>
+          )}
+
           {/* Customer Details */}
           <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-800/50">
             <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">ข้อมูลลูกค้า</p>
@@ -410,20 +521,15 @@ function OrderDetailModal({
                 <Phone size={13} className="text-zinc-400" /> {cust.phone}
               </p>
             )}
-            {cust.location && (
-              <p className="mt-1 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5 font-medium">
-                <MapPin size={13} className="text-amber-500" /> {cust.location}
-              </p>
-            )}
           </div>
 
           {/* Special Notes */}
           {order.notes && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-xs dark:border-amber-800/50 dark:bg-amber-500/10">
               <span className="font-bold text-amber-800 dark:text-amber-400 flex items-center gap-1.5 mb-1">
-                <FileText size={14} /> หมายเหตุเพิ่มเติมจากลูกค้า
+                <FileText size={14} /> ข้อมูลและหมายเหตุจากลูกค้า
               </span>
-              <p className="text-amber-900 dark:text-amber-300 font-medium">{order.notes}</p>
+              <p className="text-amber-900 dark:text-amber-300 font-medium whitespace-pre-line">{order.notes}</p>
             </div>
           )}
 
@@ -498,21 +604,22 @@ function OrderDetailModal({
           {/* Quick Change Status Buttons */}
           <div>
             <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2">
-              อัปเดตสถานะออเดอร์อย่างรวดเร็ว
+              อัปเดตสถานะออเดอร์ / จัดส่ง
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {[
                 { s: 'accepted', label: 'รับออเดอร์', icon: CheckCircle2, color: 'hover:border-sky-500 hover:text-sky-600' },
-                { s: 'preparing', label: 'เริ่มทำอาหาร', icon: ChefHat, color: 'hover:border-indigo-500 hover:text-indigo-600' },
-                { s: 'ready', label: 'พร้อมเสิร์ฟ/ส่ง', icon: Bike, color: 'hover:border-purple-500 hover:text-purple-600' },
-                { s: 'completed', label: 'เสร็จสิ้น/สำเร็จ', icon: CheckCircle2, color: 'hover:border-emerald-500 hover:text-emerald-600' },
-                { s: 'cancelled', label: 'ยกเลิกออเดอร์', icon: AlertCircle, color: 'hover:border-red-500 hover:text-red-600 sm:col-span-2' },
+                { s: 'preparing', label: 'กำลังปรุงอาหาร', icon: ChefHat, color: 'hover:border-indigo-500 hover:text-indigo-600' },
+                { s: 'delivering', label: 'ไรเดอร์ออกส่ง', icon: Bike, color: 'hover:border-blue-500 hover:text-blue-600' },
+                { s: 'ready', label: 'พร้อมเสิร์ฟ/ส่ง', icon: Utensils, color: 'hover:border-purple-500 hover:text-purple-600' },
+                { s: 'completed', label: 'จัดส่งสำเร็จ', icon: CheckCircle2, color: 'hover:border-emerald-500 hover:text-emerald-600' },
+                { s: 'cancelled', label: 'ยกเลิกออเดอร์', icon: AlertCircle, color: 'hover:border-red-500 hover:text-red-600' },
               ].map(btn => (
                 <button
                   key={btn.s}
                   disabled={isUpdating || order.status === btn.s}
                   onClick={() => onUpdateStatus(btn.s)}
-                  className={`flex items-center justify-center gap-1.5 rounded-xl border p-2.5 text-xs font-bold transition ${
+                  className={`flex items-center justify-center gap-1.5 rounded-xl border p-2.5 text-xs font-bold transition cursor-pointer ${
                     order.status === btn.s
                       ? 'border-orange-500 bg-orange-500 text-white shadow-md shadow-orange-500/20'
                       : `border-zinc-200 bg-white text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 ${btn.color}`
@@ -530,7 +637,7 @@ function OrderDetailModal({
         <div className="flex justify-end border-t border-zinc-100 p-4 dark:border-zinc-800">
           <button
             onClick={onClose}
-            className="h-11 rounded-xl bg-zinc-950 px-6 text-sm font-bold text-white shadow-md transition hover:bg-zinc-800 dark:bg-orange-500 dark:hover:bg-orange-600"
+            className="h-11 rounded-xl bg-zinc-950 px-6 text-sm font-bold text-white shadow-md transition hover:bg-zinc-800 dark:bg-orange-500 dark:hover:bg-orange-600 cursor-pointer"
           >
             ปิดหน้าต่าง
           </button>

@@ -6,8 +6,10 @@ import {
   Clock, Compass, ArrowLeft, Check, MapPin, Search, Store, Navigation,
   Trash2, ChevronRight, Phone, Info, AlertCircle, Copy, Plus, Minus,
   Bell, Receipt, QrCode, DollarSign, X, CheckCircle2, Send, Sparkles, RefreshCw,
-  ClipboardList
+  ClipboardList, Bike, ShieldAlert, Award
 } from 'lucide-react'
+import DeliveryRouteMap from '../components/DeliveryRouteMap'
+import { calculateDeliveryFee, formatEtaString, calculateDistanceKm } from '../lib/delivery'
 
 const qc = new QueryClient()
 
@@ -924,15 +926,15 @@ function OrderProcessStepper({ status, orderType = 'dine_in' }: { status: string
   const isDelivery = orderType === 'delivery'
   const steps = [
     { step: 1, label: 'รับออเดอร์', Icon: ClipboardList },
-    { step: 2, label: 'กำลังปรุง', Icon: Flame },
-    { step: 3, label: isDelivery ? 'กำลังจัดส่ง' : 'พร้อมเสิร์ฟ', Icon: Utensils },
+    { step: 2, label: 'กำลังปรุงอาหาร', Icon: Flame },
+    { step: 3, label: isDelivery ? 'ไรเดอร์กำลังส่ง' : 'พร้อมเสิร์ฟ', Icon: isDelivery ? Bike : Utensils },
     { step: 4, label: isDelivery ? 'จัดส่งสำเร็จ' : 'เสิร์ฟเรียบร้อย', Icon: Sparkles }
   ]
 
   let currentStep = 1
   if (['pending', 'accepted', 'waiting'].includes(status)) currentStep = 1
   else if (status === 'preparing') currentStep = 2
-  else if (status === 'ready') currentStep = 3
+  else if (['ready', 'delivering', 'on_the_way'].includes(status)) currentStep = 3
   else if (['completed', 'delivered', 'served'].includes(status)) currentStep = 4
 
   if (status === 'cancelled') {
@@ -1166,17 +1168,113 @@ function StorefrontApp() {
     refetchInterval: 4000
   })
 
+  const shop = storeQuery.data?.shop
+  const settings = storeQuery.data?.settings
+  const deliveryConfig = (settings as any)?.delivery_config || (settings as any)?.opening_hours?.delivery_config || {}
+  const storeLat = Number(shop?.latitude ?? deliveryConfig.latitude ?? 13.7563)
+  const storeLng = Number(shop?.longitude ?? deliveryConfig.longitude ?? 100.5018)
+
+  const cartSubtotal = cart.reduce((sum, c) => sum + c.item.price * c.quantity, 0)
+
+  const deliveryCalc = calculateDeliveryFee(
+    storeLat,
+    storeLng,
+    address.lat,
+    address.lng,
+    cartSubtotal,
+    {
+      latitude: storeLat,
+      longitude: storeLng,
+      delivery_radius_km: Number(deliveryConfig.delivery_radius_km || 10),
+      base_delivery_fee: Number(deliveryConfig.base_delivery_fee ?? settings?.delivery_fee ?? 25),
+      delivery_fee_per_km: Number(deliveryConfig.delivery_fee_per_km ?? 10),
+      min_delivery_fee: Number(deliveryConfig.min_delivery_fee ?? 25),
+      max_delivery_fee: Number(deliveryConfig.max_delivery_fee ?? 150),
+      free_delivery_threshold: Number(deliveryConfig.free_delivery_threshold ?? 500),
+      avg_prep_time_minutes: Number(deliveryConfig.avg_prep_time_minutes ?? 20),
+      delivery_enabled: deliveryConfig.delivery_enabled !== false
+    }
+  )
+
+  const taxPercent = Number(settings?.tax_percent ?? 0)
+  const serviceChargePercent = Number(settings?.service_charge_percent ?? 0)
+  const deliveryFee = tableId ? 0 : deliveryCalc.deliveryFee
+  const themeColor = settings?.theme_color || '#F97316'
+
+  const serviceChargeAmount = Math.round(cartSubtotal * (serviceChargePercent / 100) * 100) / 100
+  const taxAmount = Math.round((cartSubtotal + serviceChargeAmount) * (taxPercent / 100) * 100) / 100
+  const cartGrandTotal = cartSubtotal + serviceChargeAmount + taxAmount + deliveryFee
+
+  // Rider Progress animation for Live Tracking
+  const [riderProgress, setRiderProgress] = useState(0.15)
+  useEffect(() => {
+    if (view === 'track' && lastOrder) {
+      const st = lastOrder.status || 'pending'
+      if (['pending', 'accepted'].includes(st)) {
+        setRiderProgress(0.05)
+      } else if (st === 'preparing') {
+        setRiderProgress(0.15)
+      } else if (['ready', 'delivering', 'on_the_way'].includes(st)) {
+        setRiderProgress(0.4)
+        const interval = setInterval(() => {
+          setRiderProgress(prev => (prev >= 0.92 ? 0.35 : prev + 0.05))
+        }, 2000)
+        return () => clearInterval(interval)
+      } else if (['completed', 'delivered', 'served'].includes(st)) {
+        setRiderProgress(1.0)
+      }
+    }
+  }, [view, lastOrder?.status])
+
+  // Realtime subscription for customer's active order updates
+  useEffect(() => {
+    if (!lastOrder?.orderId) return
+    const channel = supabase
+      .channel(`customer-order:${lastOrder.orderId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'store_orders', filter: `id=eq.${lastOrder.orderId}` },
+        (payload: any) => {
+          const updated = payload.new
+          if (updated) {
+            setLastOrder((prev: any) => {
+              if (!prev) return prev
+              return {
+                ...prev,
+                status: updated.status
+              }
+            })
+            showToast(`อัปเดตสถานะออเดอร์: ${updated.status}`)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [lastOrder?.orderId])
+
   const checkout = useMutation({
     mutationFn: async () => {
       if (!storeId) throw new Error('ไม่พบข้อมูลร้านค้า')
       if (cart.length === 0) throw new Error('ไม่มีสินค้าในตะกร้า')
       if (!customer && !tableId) throw new Error('กรุณาล็อกอินก่อนทำการสั่งซื้อ')
 
-      const totalPrice = cartGrandTotal
+      if (!tableId && deliveryConfig.delivery_enabled === false) {
+        throw new Error('ขออภัย ขณะนี้ร้านค้าปิดรับออเดอร์จัดส่งเดลิเวอรีชั่วคราว')
+      }
+
+      if (!tableId && deliveryCalc.isOutOfRange) {
+        throw new Error(
+          `ตำแหน่งจัดส่งอยู่นอกพื้นที่ให้บริการ (${deliveryCalc.distanceKm} กม. / สูงสุด ${deliveryCalc.maxRadiusKm} กม.) กรุณาเลือกตำแหน่งใหม่อีกครั้ง`
+        )
+      }
+
       const mapUrl = `https://maps.google.com/?q=${address.lat},${address.lng}`
       const deliveryNotes = tableId
         ? `ทานที่ร้าน โต๊ะ ${tableName}`
-        : `เดลิเวอรีส่งถึง: ${address.name} (${address.phone})\nที่อยู่: ${address.address}\nจุดสังเกต: ${address.note}\nพิกัด GPS: ${address.lat.toFixed(6)}, ${address.lng.toFixed(6)}\nแผนที่นำทาง: ${mapUrl}`
+        : `[เดลิเวอรี] ส่งถึง: ${address.name || customer?.name || 'ลูกค้า'} (${address.phone || customer?.phone || '-'})\nที่อยู่: ${address.address}\nจุดสังเกต: ${address.note || '-'}\nระยะทาง: ${deliveryCalc.distanceKm} กม. | ค่าส่ง: ฿${deliveryFee}\nพิกัด GPS: ${address.lat.toFixed(6)}, ${address.lng.toFixed(6)}\nแผนที่นำทาง: ${mapUrl}`
 
       const orderPayload: any = {
         store_id: storeId,
@@ -1199,8 +1297,7 @@ function StorefrontApp() {
         if (orderErr.message?.includes('notes') || orderErr.code === 'PGRST204') {
           delete orderPayload.notes
           if (!tableId) {
-            // For delivery only: pack address info into customer_name as fallback
-            orderPayload.customer_name = `${address.name || customer?.name || 'เดลิเวอรี'} | ${address.phone} | ${address.address} (GPS: ${address.lat.toFixed(4)},${address.lng.toFixed(4)})`
+            orderPayload.customer_name = `${address.name || customer?.name || 'เดลิเวอรี'} | ${address.phone} | ${address.address} (${deliveryCalc.distanceKm} กม.)`
           }
           const retry = await supabase.from('store_orders').insert(orderPayload).select().single()
           if (retry.error) throw retry.error
@@ -1232,9 +1329,13 @@ function StorefrontApp() {
         id: `#ORD-${order.order_number || order.id.slice(0, 5)}`,
         orderId: order.id,
         total: cartGrandTotal,
-        status: 'กำลังปรุงอาหาร',
+        status: 'pending',
         items: [...cart],
         address: { ...address },
+        distanceKm: deliveryCalc.distanceKm,
+        deliveryFee: deliveryFee,
+        etaMinutes: deliveryCalc.etaMinutes,
+        storeLocation: { lat: storeLat, lng: storeLng, name: shop?.name || 'ร้านค้า' },
         time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
       }
       setLastOrder(newLastOrder)
@@ -1263,14 +1364,6 @@ function StorefrontApp() {
     setCart(cart.map(x => x.item.id === id ? { ...x, quantity: Math.max(0, x.quantity + delta) } : x).filter(x => x.quantity > 0))
   }
 
-  const shop = storeQuery.data?.shop
-  const settings = storeQuery.data?.settings
-
-  const taxPercent = Number(settings?.tax_percent ?? 0)
-  const serviceChargePercent = Number(settings?.service_charge_percent ?? 0)
-  const deliveryFee = tableId ? 0 : Number(settings?.delivery_fee ?? 0)
-  const themeColor = settings?.theme_color || '#F97316'
-
   useEffect(() => {
     if (themeColor) {
       document.documentElement.style.setProperty('--brand-color', themeColor)
@@ -1278,7 +1371,6 @@ function StorefrontApp() {
       document.documentElement.style.setProperty('--color-ember', themeColor)
       document.documentElement.style.setProperty('--color-deep', themeColor)
 
-      // Update mobile browser status bar color dynamically
       let metaTheme = document.querySelector('meta[name="theme-color"]')
       if (metaTheme) {
         metaTheme.setAttribute('content', themeColor)
@@ -1290,11 +1382,6 @@ function StorefrontApp() {
       }
     }
   }, [themeColor])
-
-  const cartSubtotal = cart.reduce((sum, c) => sum + c.item.price * c.quantity, 0)
-  const serviceChargeAmount = Math.round(cartSubtotal * (serviceChargePercent / 100) * 100) / 100
-  const taxAmount = Math.round((cartSubtotal + serviceChargeAmount) * (taxPercent / 100) * 100) / 100
-  const cartGrandTotal = cartSubtotal + serviceChargeAmount + taxAmount + deliveryFee
 
   const getCartTotal = () => cartGrandTotal
   const getCartCount = () => cart.reduce((sum, c) => sum + c.quantity, 0)
@@ -2184,8 +2271,57 @@ function StorefrontApp() {
         {/* ── VIEW: Checkout & Map Pin Location ── */}
         {view === 'checkout' && (
           <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 bg-paper">
-            <h1 className="text-2xl sm:text-3xl font-black text-ink">{tableId ? `ยืนยันสั่งอาหาร โต๊ะ ${tableName}` : 'ชำระเงินและปักหมุดจัดส่ง'}</h1>
-            <p className="text-xs font-semibold text-smoke mt-1">{tableId ? 'ตรวจสอบรายการอาหารเพื่อสั่งตรงไปยังห้องครัว' : 'ระบุพิกัดสถานที่จัดส่งเดลิเวอรีและเลือกช่องทางชำระเงิน'}</p>
+            <h1 className="text-2xl sm:text-3xl font-black text-ink">
+              {tableId ? `ยืนยันสั่งอาหาร โต๊ะ ${tableName}` : 'ชำระเงินและปักหมุดจัดส่ง'}
+            </h1>
+            <p className="text-xs font-semibold text-smoke mt-1">
+              {tableId ? 'ตรวจสอบรายการอาหารเพื่อสั่งตรงไปยังห้องครัว' : 'ระบุพิกัดสถานที่จัดส่งเดลิเวอรีและเลือกช่องทางชำระเงิน'}
+            </p>
+
+            {/* Out of Service Area Alert Banner */}
+            {!tableId && deliveryCalc.isOutOfRange && (
+              <div className="mt-4 p-4 rounded-2xl bg-red-50 border-2 border-red-200 text-red-700 flex items-start gap-3 animate-fade-in shadow-xs">
+                <ShieldAlert className="size-6 text-red-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <b className="text-sm font-black">ตำแหน่งของคุณอยู่นอกพื้นที่ให้บริการจัดส่ง</b>
+                  <p className="text-xs leading-relaxed text-red-600">
+                    ระยะทางจากร้านถึงตำแหน่งที่ปักหมุดคือ <b className="font-black text-red-800">{deliveryCalc.distanceKm} กม.</b> ซึ่งเกินรัศมีการจัดส่งสูงสุดของร้าน (<b className="font-black">{deliveryCalc.maxRadiusKm} กม.</b>) กรุณาเลื่อนหมุดพิกัดใหม่อีกครั้ง
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Free Delivery Promo Alert Banner */}
+            {!tableId && !deliveryCalc.isOutOfRange && (
+              <div className="mt-4 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-200/80 text-orange-950 flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid size-8 place-items-center rounded-xl bg-orange-500 text-white font-black text-xs">
+                    🎁
+                  </span>
+                  <div>
+                    {deliveryCalc.isFree ? (
+                      <p className="text-xs font-black text-emerald-700 flex items-center gap-1">
+                        <Award size={14} className="text-emerald-600" /> ยอดสั่งซื้อครบ ฿{deliveryConfig.free_delivery_threshold || 500} ได้รับสิทธิ์จัดส่งฟรี!
+                      </p>
+                    ) : (
+                      <p className="text-xs font-bold text-orange-900">
+                        สั่งอาหารเพิ่มอีก <b className="text-orange-600 font-black">฿{deliveryCalc.freeThresholdRemaining.toLocaleString()}</b> เพื่อรับสิทธิ์ <b className="text-emerald-700 font-black">ส่งฟรี!</b>
+                      </p>
+                    )}
+                    <p className="text-[10px] text-zinc-500">
+                      ระยะทาง {deliveryCalc.distanceKm} กม. • เวลาถึงโดยประมาณ {formatEtaString(deliveryCalc.etaMinutes)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <span className="text-[10px] font-bold text-zinc-400 block">ค่าจัดส่ง</span>
+                  <span className={`text-sm font-black ${deliveryCalc.isFree ? 'text-emerald-600' : 'text-orange-600'}`}>
+                    {deliveryCalc.isFree ? 'ฟรี (฿0)' : `฿${deliveryCalc.deliveryFee.toLocaleString()}`}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 lg:gap-8 mt-6 sm:mt-8 items-start">
               <section className="space-y-4 sm:space-y-6">
@@ -2204,37 +2340,60 @@ function StorefrontApp() {
                     </div>
                   </div>
                 ) : (
-                  /* Delivery Address & GPS Map Section */
+                  /* Delivery Address & Leaflet GPS Map Section */
                   <div className="bg-white border border-line rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
-                    <h2 className="text-sm sm:text-base font-black text-ink flex items-center gap-1.5">
-                      <MapPin size={17} className="text-ember" /> ข้อมูลผู้รับและที่อยู่จัดส่ง
-                    </h2>
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm sm:text-base font-black text-ink flex items-center gap-1.5">
+                        <MapPin size={17} className="text-ember" /> ข้อมูลผู้รับและที่อยู่จัดส่ง
+                      </h2>
+                      <span className="text-[11px] font-black px-2.5 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-200">
+                        {deliveryCalc.distanceKm} กม. • ~{deliveryCalc.etaMinutes} นาที
+                      </span>
+                    </div>
 
                     <div className="space-y-3">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                           type="text"
-                          placeholder="ชื่อผู้รับ"
+                          placeholder="ชื่อผู้รับ *"
                           value={address.name}
                           onChange={e => setAddress({ ...address, name: e.target.value })}
                           className="w-full border border-line outline-none rounded-xl p-3 bg-soft text-ink text-xs focus:border-ember"
                         />
                         <input
                           type="tel"
-                          placeholder="เบอร์โทรติดต่อ"
+                          placeholder="เบอร์โทรติดต่อ *"
                           value={address.phone}
                           onChange={e => setAddress({ ...address, phone: e.target.value })}
                           className="w-full border border-line outline-none rounded-xl p-3 bg-soft text-ink text-xs focus:border-ember"
                         />
                       </div>
 
-                      <textarea
-                        placeholder="ระบุบ้านเลขที่ ซอย ถนน แขวง/ตำบล (อย่างละเอียด)"
-                        rows={2}
-                        value={address.address}
-                        onChange={e => setAddress({ ...address, address: e.target.value })}
-                        className="w-full border border-line outline-none rounded-xl p-3 bg-soft text-ink text-xs focus:border-ember"
-                      />
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-zinc-500">ที่อยู่จัดส่งโดยละเอียด *</label>
+                          {/* Quick Location Tags */}
+                          <div className="flex items-center gap-1">
+                            {['🏠 บ้าน', '🏢 ที่ทำงาน', '🏬 คอนโด'].map((tag) => (
+                              <button
+                                key={tag}
+                                type="button"
+                                onClick={() => setAddress(prev => ({ ...prev, note: prev.note ? `${prev.note} (${tag})` : tag }))}
+                                className="px-2 py-0.5 rounded-lg bg-zinc-100 hover:bg-orange-100 text-zinc-700 hover:text-orange-700 text-[10px] font-bold transition cursor-pointer"
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <textarea
+                          placeholder="ระบุบ้านเลขที่ ซอย ถนน แขวง/ตำบล หรือเลือกจากช่องค้นหาในแผนที่ด้านล่าง *"
+                          rows={2}
+                          value={address.address}
+                          onChange={e => setAddress({ ...address, address: e.target.value })}
+                          className="w-full border border-line outline-none rounded-xl p-3 bg-soft text-ink text-xs focus:border-ember leading-relaxed"
+                        />
+                      </div>
 
                       <input
                         type="text"
@@ -2244,13 +2403,49 @@ function StorefrontApp() {
                         className="w-full border border-line outline-none rounded-xl p-3 bg-soft text-ink text-xs focus:border-ember"
                       />
 
-                      {/* Interactive Map Picker */}
-                      <div className="pt-1">
-                        <LeafletMapPicker
-                          lat={address.lat}
-                          lng={address.lng}
+                      {/* Interactive Delivery Map Picker with Integrated Search */}
+                      <div className="pt-2 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-zinc-700">
+                          <span className="flex items-center gap-1.5">
+                            <Navigation size={13} className="text-orange-500" /> ค้นหาและปักหมุดจัดส่งบนแผนที่
+                          </span>
+                          <span className="text-[10px] font-medium text-zinc-400">
+                            (พิมพ์ชื่อสถานที่ หรือแตะ/ลากหมุด 📍)
+                          </span>
+                        </div>
+
+                        <DeliveryRouteMap
+                          mode="picker"
+                          pickerTarget="customer"
+                          height="300px"
+                          showSearch={true}
+                          searchPlaceholder="🔍 พิมพ์ค้นหาที่อยู่จัดส่ง, คอนโด, ซอย, หรือสถานที่ใกล้เคียง..."
+                          storeLocation={{
+                            lat: storeLat,
+                            lng: storeLng,
+                            name: shop?.name || 'ร้านค้า'
+                          }}
+                          customerLocation={{
+                            lat: address.lat,
+                            lng: address.lng,
+                            address: address.address || address.name || 'ที่อยู่จัดส่ง'
+                          }}
+                          radiusKm={deliveryCalc.maxRadiusKm}
                           onChangeLocation={(lat, lng) => setAddress(prev => ({ ...prev, lat, lng }))}
+                          onSelectAddressText={(detectedAddress) => {
+                            setAddress(prev => ({ ...prev, address: detectedAddress }))
+                          }}
                         />
+
+                        {/* Location Specs Bar */}
+                        <div className="p-3 rounded-xl bg-zinc-50 border border-zinc-200 text-xs flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-zinc-600 font-medium">
+                            พิกัด: <b className="font-mono">{address.lat.toFixed(4)}, {address.lng.toFixed(4)}</b>
+                          </span>
+                          <span className="text-zinc-700 font-bold">
+                            ระยะทางจากร้าน: <b className="text-orange-600 font-black">{deliveryCalc.distanceKm} กม.</b> (ส่งได้ใน {deliveryCalc.maxRadiusKm} กม.)
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2290,6 +2485,7 @@ function StorefrontApp() {
                 )}
               </section>
 
+              {/* Order Summary Aside */}
               <aside className="space-y-6">
                 <div className="bg-white border border-line rounded-2xl p-4 sm:p-6 shadow-sm space-y-4 lg:sticky lg:top-20">
                   <h2 className="text-sm sm:text-base font-black text-ink border-b border-line pb-3">สรุปยอดคำสั่งซื้อ</h2>
@@ -2320,14 +2516,20 @@ function StorefrontApp() {
                       </div>
                     )}
                     {!tableId && (
-                      <div className="flex justify-between">
-                        <span>ค่าจัดส่ง</span>
-                        <span>{deliveryFee > 0 ? `฿${deliveryFee.toLocaleString()}` : 'ฟรี'}</span>
+                      <div className="flex justify-between items-center">
+                        <span>ค่าจัดส่ง ({deliveryCalc.distanceKm} กม.)</span>
+                        <span>
+                          {deliveryCalc.isFree ? (
+                            <span className="text-emerald-600 font-bold">ฟรี (โปรโมชั่น)</span>
+                          ) : (
+                            <b>฿{deliveryFee.toLocaleString()}</b>
+                          )}
+                        </span>
                       </div>
                     )}
-                    <div className="flex justify-between items-center text-sm font-black text-ink pt-1 border-t border-line/40">
+                    <div className="flex justify-between items-center text-sm font-black text-ink pt-2 border-t border-line/40">
                       <span>ยอดชำระสุทธิ</span>
-                      <span className="text-base text-deep" style={{ color: themeColor }}>
+                      <span className="text-base text-deep font-black" style={{ color: themeColor }}>
                         ฿{cartGrandTotal.toLocaleString()}
                       </span>
                     </div>
@@ -2335,11 +2537,19 @@ function StorefrontApp() {
 
                   <button
                     onClick={() => checkout.mutate()}
-                    disabled={checkout.isPending}
-                    style={{ backgroundColor: themeColor }}
-                    className="w-full h-11 sm:h-12 rounded-xl text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer hover:brightness-95"
+                    disabled={checkout.isPending || (!tableId && deliveryCalc.isOutOfRange)}
+                    style={{ backgroundColor: !tableId && deliveryCalc.isOutOfRange ? '#9ca3af' : themeColor }}
+                    className="w-full h-11 sm:h-12 rounded-xl text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer hover:brightness-95"
                   >
-                    {checkout.isPending ? 'กำลังส่งคำสั่งซื้อ...' : tableId ? `ยืนยันสั่งอาหาร โต๊ะ ${tableName}` : 'ยืนยันสั่งซื้อเดลิเวอรี'}
+                    {checkout.isPending ? (
+                      'กำลังส่งคำสั่งซื้อ...'
+                    ) : !tableId && deliveryCalc.isOutOfRange ? (
+                      '⚠️ อยู่นอกพื้นที่จัดส่ง'
+                    ) : tableId ? (
+                      `ยืนยันสั่งอาหาร โต๊ะ ${tableName}`
+                    ) : (
+                      'ยืนยันสั่งซื้อเดลิเวอรี'
+                    )}
                   </button>
                 </div>
               </aside>
@@ -2347,15 +2557,15 @@ function StorefrontApp() {
           </div>
         )}
 
-        {/* ── VIEW: Order History / Track Status ── */}
+        {/* ── VIEW: Order History / Live Delivery Track Status ── */}
         {view === 'track' && (
           <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-5 sm:space-y-6 bg-paper">
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-ink">
-                {tableId ? `ประวัติการสั่งอาหาร โต๊ะ ${tableName}` : 'ประวัติคำสั่งซื้อ'}
+                {tableId ? `ประวัติการสั่งอาหาร โต๊ะ ${tableName}` : 'ติดตามการจัดส่งเดลิเวอรี'}
               </h1>
               <p className="text-xs font-semibold text-smoke mt-1">
-                {tableId ? 'รายการออเดอร์ทั้งหมดของโต๊ะนี้ (อัปเดตเรียลไทม์จากห้องครัว)' : 'ติดตามสถานะคำสั่งซื้อแบบเรียลไทม์'}
+                {tableId ? 'รายการออเดอร์ทั้งหมดของโต๊ะนี้ (อัปเดตเรียลไทม์จากห้องครัว)' : 'ติดตามสถานะออเดอร์ พิกัดไรเดอร์ และเวลาถึงโดยประมาณ (ETA) แบบเรียลไทม์'}
               </p>
             </div>
 
@@ -2374,7 +2584,6 @@ function StorefrontApp() {
               })
 
               const activeFoodOrders = validFoodOrders.filter((o: any) => o.status !== 'cancelled')
-              const totalTableAmount = activeFoodOrders.reduce((acc: number, o: any) => acc + Number(o.total || 0), 0)
 
               return validFoodOrders.length > 0 ? (
                 <div className="space-y-4 sm:space-y-6">
@@ -2406,7 +2615,7 @@ function StorefrontApp() {
                         {/* 4 Circular Connected Process Steps */}
                         <OrderProcessStepper status={ord.status} orderType={ord.order_type} />
 
-                        {/* Order Items List (Enlarged and Clear) */}
+                        {/* Order Items List */}
                         <div className="space-y-2.5 pt-3 border-t border-zinc-100">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-extrabold text-zinc-600">รายการอาหารรอบนี้:</span>
@@ -2442,63 +2651,152 @@ function StorefrontApp() {
                 <div className="bg-white border border-line rounded-2xl sm:rounded-3xl p-8 sm:p-12 text-center shadow-sm space-y-4">
                   <span className="text-4xl sm:text-5xl block select-none">🪑</span>
                   <h2 className="font-black text-base sm:text-lg text-ink">ยังไม่มีรายการสั่งอาหารสำหรับโต๊ะ {tableName}</h2>
-                  <p className="text-xs text-smoke font-medium">กดเลือกหมูกระทะและเมนูเด็ดลงเตาได้เลย!</p>
+                  <p className="text-xs text-smoke font-medium">กดเลือกเมนูอร่อยลงเตาได้เลย!</p>
                   <button onClick={() => setView('order')} className="px-6 py-2.5 rounded-xl bg-ember hover:bg-deep text-white font-bold text-xs transition cursor-pointer">
                     ไปที่หน้าสั่งอาหาร
                   </button>
                 </div>
               )
             })() : (
-              /* DELIVERY ORDER TRACKING */
+              /* LIVE DELIVERY ORDER & RIDER TRACKING */
               lastOrder ? (
-                <div className="bg-white border border-line rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-md space-y-5 sm:space-y-6">
-                  {/* Inline Single-Row Order Header */}
+                <div className="bg-white border border-line rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-md space-y-5 sm:space-y-6 animate-fade-in">
+                  {/* Order Header */}
                   <div className="flex items-center justify-between border-b border-zinc-100 pb-3 gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <h2 className="text-sm sm:text-base font-black text-zinc-950 shrink-0">{lastOrder.id}</h2>
                       <span className="text-zinc-300 font-bold">·</span>
                       <span className="text-xs font-semibold text-zinc-500 truncate">
-                        เดลิเวอรี · สั่งเมื่อ {lastOrder.time}
+                        สั่งเมื่อ {lastOrder.time}
                       </span>
                     </div>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-orange-50 text-orange-600 border border-orange-200 shrink-0">
-                      🔥 {lastOrder.status}
+                    <span className={`px-3 py-1 rounded-full text-xs font-black shrink-0 ${
+                      lastOrder.status === 'completed'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : ['ready', 'delivering', 'on_the_way'].includes(lastOrder.status)
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse'
+                        : 'bg-orange-50 text-orange-600 border border-orange-200'
+                    }`}>
+                      {lastOrder.status === 'pending'
+                        ? '🔥 รอรับออเดอร์'
+                        : lastOrder.status === 'accepted'
+                        ? '📋 รับออเดอร์แล้ว'
+                        : lastOrder.status === 'preparing'
+                        ? '🍳 กำลังปรุงอาหาร'
+                        : ['ready', 'delivering', 'on_the_way'].includes(lastOrder.status)
+                        ? '🛵 ไรเดอร์กำลังจัดส่ง'
+                        : lastOrder.status === 'completed'
+                        ? '✨ จัดส่งสำเร็จ'
+                        : lastOrder.status}
                     </span>
                   </div>
 
                   {/* 4 Circular Connected Process Steps (Delivery) */}
                   <OrderProcessStepper status={lastOrder.status} orderType="delivery" />
 
-                  <div className="p-3.5 sm:p-4 rounded-xl bg-ember/5 border border-ember/20 text-xs text-ink font-semibold flex items-center gap-2">
-                    <Info size={16} className="text-ember shrink-0" />
-                    <span>อาหารของคุณกำลังปรุงสดใหม่ คาดว่าจะส่งออกจากครัวใน ~10 นาที</span>
+                  {/* ETA & Status Countdown Banner */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 via-indigo-50 to-orange-50 border border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3">
+                      <span className="grid size-11 place-items-center rounded-2xl bg-blue-500 text-white text-xl shadow-md animate-bounce">
+                        🛵
+                      </span>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-blue-600">Live Delivery ETA</span>
+                        <h3 className="text-base sm:text-lg font-black text-zinc-900">
+                          {lastOrder.status === 'completed'
+                            ? 'ส่งมอบอาหารถึงมือเรียบร้อยแล้ว'
+                            : ['ready', 'delivering', 'on_the_way'].includes(lastOrder.status)
+                            ? 'ไรเดอร์กำลังเดินทางมาส่งถึงคุณ'
+                            : 'กำลังเตรียมอาหารในครัว คาดว่าจะออกส่งในเร็วๆ นี้'}
+                        </h3>
+                        <p className="text-xs text-zinc-600 font-medium">
+                          เวลาถึงโดยประมาณ: <b className="text-orange-600 font-black">{formatEtaString(lastOrder.etaMinutes || 25)}</b>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      {shop?.phone && (
+                        <a
+                          href={`tel:${shop.phone}`}
+                          className="px-3.5 py-2 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-50 text-xs font-bold text-zinc-800 shadow-xs flex items-center gap-1.5 transition active:scale-95"
+                        >
+                          <Phone size={13} className="text-emerald-500" /> โทรหาร้านค้า
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Interactive Live Map Tracking */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-zinc-700">
+                      <span className="flex items-center gap-1.5">
+                        <Navigation size={14} className="text-orange-500" /> แผนที่เส้นทางการจัดส่งสด (Live Tracking Map)
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                        <span className="size-2 rounded-full bg-emerald-500 animate-ping" /> Realtime GPS
+                      </span>
+                    </div>
+
+                    <DeliveryRouteMap
+                      mode="live_track"
+                      height="320px"
+                      storeLocation={lastOrder.storeLocation || { lat: storeLat, lng: storeLng, name: shop?.name || 'ร้านค้า' }}
+                      customerLocation={{
+                        lat: lastOrder.address?.lat || address.lat,
+                        lng: lastOrder.address?.lng || address.lng,
+                        address: lastOrder.address?.address || 'ที่อยู่จัดส่ง'
+                      }}
+                      riderProgress={riderProgress}
+                      riderStatus={lastOrder.status}
+                    />
                   </div>
 
                   {/* Delivery Location Details */}
                   {lastOrder.address && (
-                    <div className="p-3.5 sm:p-4 rounded-xl bg-soft border border-line space-y-2 text-xs">
+                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/80 space-y-2 text-xs">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                        <span className="font-bold text-ink flex items-center gap-1">
-                          <MapPin size={14} className="text-ember" /> สถานที่จัดส่ง:
+                        <span className="font-bold text-zinc-900 flex items-center gap-1.5">
+                          <MapPin size={15} className="text-orange-500" /> สถานที่จัดส่งปลายทาง:
                         </span>
                         <a
                           href={`https://maps.google.com/?q=${lastOrder.address.lat},${lastOrder.address.lng}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-ember font-bold hover:underline flex items-center gap-1 text-[11px]"
+                          className="text-orange-600 font-bold hover:underline flex items-center gap-1 text-xs"
                         >
-                          <Navigation size={12} /> เปิดดูใน Google Maps
+                          <Navigation size={12} /> นำทางด้วย Google Maps
                         </a>
                       </div>
-                      <p className="text-smoke break-words">{lastOrder.address.name} ({lastOrder.address.phone}) - {lastOrder.address.address}</p>
+                      <p className="text-zinc-600 font-medium break-words leading-relaxed">
+                        <b>{lastOrder.address.name || customer?.name}</b> ({lastOrder.address.phone || customer?.phone}) — {lastOrder.address.address}
+                        {lastOrder.address.note && <span className="block text-zinc-400 text-[11px] mt-0.5">จุดสังเกต: {lastOrder.address.note}</span>}
+                      </p>
                     </div>
                   )}
+
+                  {/* Items Ordered List */}
+                  <div className="space-y-2 pt-2 border-t border-zinc-100">
+                    <span className="text-xs font-black text-zinc-800">รายการสินค้าที่สั่ง:</span>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {(lastOrder.items || []).map((it: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center text-xs py-1 border-b border-zinc-50 text-zinc-700 font-medium">
+                          <span>{it.item?.name || it.name} <small className="text-zinc-400 font-bold">x{it.quantity}</small></span>
+                          <b className="text-zinc-900">฿{((it.item?.price || it.unit_price || 0) * it.quantity).toLocaleString()}</b>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between items-center pt-2 text-sm font-black text-zinc-900 border-t border-zinc-200">
+                      <span>ยอดรวมทั้งสิ้น (รวมค่าจัดส่ง)</span>
+                      <span className="text-base text-orange-600 font-black">฿{Number(lastOrder.total || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="bg-white border border-line rounded-2xl sm:rounded-3xl p-8 sm:p-12 text-center shadow-sm space-y-4">
                   <span className="text-4xl sm:text-5xl block select-none">📦</span>
                   <h2 className="font-black text-base sm:text-lg text-ink">ยังไม่มีประวัติคำสั่งซื้อล่าสุด</h2>
-                  <p className="text-xs text-smoke font-medium">เริ่มกดสั่งหมูกระทะส่งตรงถึงบ้านคุณได้ทันที!</p>
+                  <p className="text-xs text-smoke font-medium">เริ่มกดสั่งอาหารส่งตรงถึงบ้านคุณได้ทันที!</p>
                   <button onClick={() => requireAuthAndNavigate('order')} className="px-6 py-2.5 rounded-xl bg-ember hover:bg-deep text-white font-bold text-xs transition cursor-pointer">
                     เริ่มสั่งอาหาร
                   </button>
