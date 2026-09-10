@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BarChart3, CircleDollarSign, Globe2, LayoutDashboard, LogOut, Mail, Package, Palette, Save, Settings, SlidersHorizontal, Store, Users, WalletCards, X, Zap, MessageCircle } from 'lucide-react'
+import { BarChart3, CircleDollarSign, Globe2, LayoutDashboard, LogOut, Mail, Package, Palette, Save, Settings, SlidersHorizontal, Store, Users, WalletCards, X, Zap } from 'lucide-react'
 import AdminHeader from './AdminHeader'
 import { fetchSettings, requireSuperAdmin, saveSettings, signOut } from './lib/database'
 import { applyBranding } from './lib/branding'
@@ -9,7 +9,6 @@ const emptySettings = {
   brand: { logo_url: '', primary_color: '#f65a1b', support_email: '' },
   payment: { currency: 'THB', stripe_enabled: false, stripe_publishable_key: '' },
   smtp: { enabled: false, host: '', port: '587', username: '', password: '', from_name: 'SmartPOS', from_email: '' },
-  line_oa: { enabled: false, basic_id: '', channel_access_token: '', channel_secret: '' },
   promptpay: { enabled: false, type: 'phone', account: '', account_name: '' },
   domain: { app_url: '', custom_domain: '', ssl_enabled: true },
 }
@@ -28,7 +27,6 @@ const tabs = [
   ['brand', 'แบรนด์และโลโก้', Palette],
   ['payment', 'ช่องทางชำระเงิน', WalletCards],
   ['smtp', 'ระบบอีเมล (SMTP)', Mail],
-  ['line_oa', 'การเชื่อมต่อ LINE OA', MessageCircle],
   ['promptpay', 'พร้อมเพย์ (PromptPay)', WalletCards],
   ['domain', 'โดเมนและเว็บไซต์', Globe2],
 ]
@@ -300,32 +298,6 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                {tab === 'line_oa' && (
-                  <div className="space-y-5">
-                    <Toggle label="เปิดใช้งานการแจ้งเตือน LINE OA" checked={data.line_oa.enabled} onChange={v => set('line_oa', 'enabled', v)} />
-                    <div className="grid gap-5 sm:grid-cols-2">
-                      <Field label="LINE Basic ID">
-                        <input className={inputClass} placeholder="@smartpos" value={data.line_oa.basic_id} onChange={e => set('line_oa', 'basic_id', e.target.value)} />
-                      </Field>
-                      <Field label="Channel Access Token">
-                        <input
-                          type="password"
-                          className={inputClass}
-                          value={data.line_oa.channel_access_token}
-                          onChange={e => set('line_oa', 'channel_access_token', e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Channel Secret">
-                        <input
-                          type="password"
-                          className={inputClass}
-                          value={data.line_oa.channel_secret}
-                          onChange={e => set('line_oa', 'channel_secret', e.target.value)}
-                        />
-                      </Field>
-                    </div>
-                  </div>
-                )}
 
                 {tab === 'promptpay' && (
                   <div className="space-y-5">

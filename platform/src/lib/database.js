@@ -197,7 +197,7 @@ export async function fetchPublicSettings() {
 
 export async function saveSettings(settings) {
   const {data:{user}}=await supabase.auth.getUser()
-  const payload={id:'global',general:settings.general,brand:settings.brand,payment:settings.payment,smtp:settings.smtp,line_oa:settings.line_oa,promptpay:settings.promptpay,domain:settings.domain,updated_by:user?.id,updated_at:new Date().toISOString()}
+  const payload={id:'global',general:settings.general,brand:settings.brand,payment:settings.payment,smtp:settings.smtp,promptpay:settings.promptpay,domain:settings.domain,updated_by:user?.id,updated_at:new Date().toISOString()}
   const {data,error}=await supabase.from('app_settings').upsert(payload).select().single();if(error)throw error
   localStorage.setItem('smartpos_public_settings',JSON.stringify({general:data.general,brand:data.brand}))
   return data

@@ -49,7 +49,6 @@ const emptySettings = {
   phone: '',
   address: '',
   google_maps_url: '',
-  line_oa: '',
   delivery_fee: 25,
   tax_percent: 7,
   service_charge_percent: 0,
@@ -127,7 +126,6 @@ export default function Settings() {
         address: settingsData?.address || shopData?.address || '',
         description: settingsData?.description || '',
         google_maps_url: settingsData?.google_maps_url || '',
-        line_oa: settingsData?.line_oa || '',
         delivery_fee: Number(settingsData?.delivery_fee ?? delConf.base_delivery_fee ?? 25),
         tax_percent: Number(settingsData?.tax_percent ?? 7),
         service_charge_percent: Number(settingsData?.service_charge_percent ?? 0),
@@ -233,7 +231,6 @@ export default function Settings() {
         phone: form.phone?.trim() || null,
         address: form.address?.trim() || null,
         google_maps_url: form.google_maps_url?.trim() || null,
-        line_oa: form.line_oa?.trim() || null,
         delivery_fee: Number(form.base_delivery_fee || form.delivery_fee || 25),
         tax_percent: Number(form.tax_percent || 0),
         service_charge_percent: Number(form.service_charge_percent || 0),
@@ -791,19 +788,6 @@ export default function Settings() {
               />
             </div>
 
-            {/* Line OA */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                LINE Official Account
-              </label>
-              <input
-                type="text"
-                value={form.line_oa || ''}
-                onChange={e => setForm({ ...form, line_oa: e.target.value })}
-                placeholder="เช่น @yourstore"
-                className="h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-4 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
-              />
-            </div>
 
             {/* Address */}
             <div className="sm:col-span-2 space-y-1.5">
