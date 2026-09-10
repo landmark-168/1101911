@@ -36,7 +36,6 @@ const nav = [
   ['categories', 'Categories', Tags],
   ['tables', 'Tables', Store],
   ['kitchen', 'Kitchen', ChefHat],
-  ['inventory', 'Inventory', Boxes],
   ['promotions', 'Promotions', Gift],
   ['customers', 'Customers', Users],
   ['employees', 'Employees & PIN', Users],
@@ -286,7 +285,7 @@ function App() {
   else if (active === 'kitchen') page = <Kitchen />
   else if (active === 'reports') page = <Reports />
   else if (active === 'settings') page = <StoreSettings />
-  else if (['menu', 'categories', 'tables', 'inventory', 'promotions', 'customers', 'employees'].includes(active)) {
+  else if (['menu', 'categories', 'tables', 'promotions', 'customers', 'employees'].includes(active)) {
     page = <ManagementPage kind={active} />
   }
 
@@ -401,7 +400,7 @@ function App() {
               >
                 <div className="flex items-center gap-3">
                   <Icon size={17} />
-                  <span>{({ dashboard: t('dashboard'), orders: t('orders'), pos: 'POS', menu: t('menu'), categories: t('categories'), tables: t('tables'), kitchen: t('kitchen'), inventory: t('inventory'), promotions: t('promotions'), customers: t('customers'), employees: t('employees'), reports: t('reports'), settings: t('settings') } as Record<string, string>)[id] || label}</span>
+                  <span>{({ dashboard: t('dashboard'), orders: t('orders'), pos: 'POS', menu: t('menu'), categories: t('categories'), tables: t('tables'), kitchen: t('kitchen'), promotions: t('promotions'), customers: t('customers'), employees: t('employees'), reports: t('reports'), settings: t('settings') } as Record<string, string>)[id] || label}</span>
                 </div>
                 {hasTableAlert && (
                   <span className="flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white shadow-sm animate-pulse">

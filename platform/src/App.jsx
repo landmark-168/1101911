@@ -27,7 +27,7 @@ const features = [
   { icon: CircleDollarSign, label: 'POS', title: 'ขายง่าย หน้าร้านลื่นไหล', description: 'รับออเดอร์ ชำระเงิน และจัดการโต๊ะในหน้าจอเดียว ใช้งานง่ายแม้ช่วงร้านแน่น', stat: 'เร็วขึ้น 2×', tone: 'orange' },
   { icon: QrCode, label: 'QR MENU', title: 'ลูกค้าสั่งเองจากโต๊ะ', description: 'สแกน QR ดูเมนู สั่งอาหาร และเรียกพนักงาน ลดงานซ้ำและลดออเดอร์ผิด', stat: 'ลดงาน 40%', tone: 'amber' },
   { icon: Truck, label: 'DELIVERY', title: 'ออเดอร์ออนไลน์ ไม่เสีย GP', description: 'มีเว็บสั่งอาหารเป็นของร้านเอง รับออเดอร์เดลิเวอรีและลูกค้ารับหน้าร้าน', stat: '0% GP', tone: 'zinc' },
-  { icon: BarChart3, label: 'DASHBOARD', title: 'รู้ยอดขายแบบเรียลไทม์', description: 'ดูเมนูขายดี สต็อก กำไร และภาพรวมทุกสาขาได้ทุกที่ทุกเวลา', stat: '24/7 Insights', tone: 'orange' },
+  { icon: BarChart3, label: 'DASHBOARD', title: 'รู้ยอดขายแบบเรียลไทม์', description: 'ดูเมนูขายดี ยอดขาย กำไร และภาพรวมทุกสาขาได้ทุกที่ทุกเวลา', stat: '24/7 Insights', tone: 'orange' },
 ]
 
 function Logo() {
@@ -44,9 +44,9 @@ function DashboardMockup() {
   const { language } = useLanguage()
   const english = language === 'en'
   const copy = english ? {
-    nav: ['Store overview', 'Sales', 'Menu', 'Inventory', 'Customers'], branch: 'Thonglor branch', open: 'Open now', date: 'Tuesday, 14 July', greeting: 'Hello, Palm 👋', cards: ['Today’s sales', 'Orders', 'New customers'], weekly: 'Weekly sales', latest: 'Last 7 days', channels: 'Sales channels', order: 'orders', counter: 'In store', online: 'Online', foodTitle: 'What should we eat today?', foods: ['ชุดอิ่มคุ้ม', 'หมูสามชั้น', 'ทะเลรวม', 'ผักสด'], cart: 'View cart', newOrder: 'New order received!', table: 'Table A08'
+    nav: ['Store overview', 'Sales', 'Menu', 'Tables', 'Customers'], branch: 'Thonglor branch', open: 'Open now', date: 'Tuesday, 14 July', greeting: 'Hello, Palm 👋', cards: ['Today’s sales', 'Orders', 'New customers'], weekly: 'Weekly sales', latest: 'Last 7 days', channels: 'Sales channels', order: 'orders', counter: 'In store', online: 'Online', foodTitle: 'What should we eat today?', foods: ['ชุดอิ่มคุ้ม', 'หมูสามชั้น', 'ทะเลรวม', 'ผักสด'], cart: 'View cart', newOrder: 'New order received!', table: 'Table A08'
   } : {
-    nav: ['ภาพรวมร้าน', 'รายการขาย', 'เมนูอาหาร', 'คลังสินค้า', 'ลูกค้า'], branch: 'สาขาทองหล่อ', open: 'เปิดให้บริการ', date: 'วันอังคารที่ 14 กรกฎาคม', greeting: 'สวัสดีคุณปาล์ม 👋', cards: ['ยอดขายวันนี้', 'ออเดอร์', 'ลูกค้าใหม่'], weekly: 'ยอดขายรายสัปดาห์', latest: '7 วันล่าสุด', channels: 'ช่องทางการขาย', order: 'ออเดอร์', counter: 'หน้าร้าน', online: 'ออนไลน์', foodTitle: 'วันนี้กินอะไรดี?', foods: ['ชุดอิ่มคุ้ม', 'หมูสามชั้น', 'ทะเลรวม', 'ผักสด'], cart: 'ดูตะกร้า', newOrder: 'รับออเดอร์ใหม่!', table: 'โต๊ะ A08'
+    nav: ['ภาพรวมร้าน', 'รายการขาย', 'เมนูอาหาร', 'จัดการโต๊ะ', 'ลูกค้า'], branch: 'สาขาทองหล่อ', open: 'เปิดให้บริการ', date: 'วันอังคารที่ 14 กรกฎาคม', greeting: 'สวัสดีคุณปาล์ม 👋', cards: ['ยอดขายวันนี้', 'ออเดอร์', 'ลูกค้าใหม่'], weekly: 'ยอดขายรายสัปดาห์', latest: '7 วันล่าสุด', channels: 'ช่องทางการขาย', order: 'ออเดอร์', counter: 'หน้าร้าน', online: 'ออนไลน์', foodTitle: 'วันนี้กินอะไรดี?', foods: ['ชุดอิ่มคุ้ม', 'หมูสามชั้น', 'ทะเลรวม', 'ผักสด'], cart: 'ดูตะกร้า', newOrder: 'รับออเดอร์ใหม่!', table: 'โต๊ะ A08'
   }
   return (
     <div className="relative mx-auto w-full max-w-[670px] pt-8 lg:pt-0" aria-label={english ? 'SmartPOS dashboard preview' : 'ตัวอย่างหน้าจอ SmartPOS Dashboard'}>
@@ -116,21 +116,21 @@ function LandingPage() {
   const english = language === 'en'
   const copy = english ? {
     allInOne: 'All-in-one restaurant management', hero: <>POS and<br/><span className="relative text-orange-500">online ordering<span className="absolute -bottom-1 left-0 h-2 w-full -rotate-1 rounded-full bg-orange-200/70 -z-10"/></span><br/>for every kind<br/>of restaurant</>,
-    heroDescription: 'In-store sales, QR ordering, delivery, inventory, sales reports, and LINE OA alerts — all in one system.',
+    heroDescription: 'In-store sales, QR ordering, delivery, sales reports, and kitchen display — all in one system.',
     trial: 'Try for free', demo: 'View barbecue restaurant demo', benefits: ['14-day free trial', 'No credit card required', 'Ready in 5 minutes'],
     tools: 'Everything a modern restaurant needs', businessTypes: ['Restaurant', 'Cafe', 'Delivery', 'Multi-branch'],
     featuresTitle: 'One system for your whole restaurant', featuresDescription: 'Reduce busywork, speed up service, and see your business more clearly.',
     growthTitle: <>Start small, grow<br/>with your restaurant</>, growthDescription: 'Whether you have one restaurant or many branches, SmartPOS makes every order easier.',
-    growthItems: ['Accurate inventory', 'LINE OA alerts', 'Real-time reports', 'QR menu ready'],
+    growthItems: ['Easy POS system', 'Kitchen KDS display', 'Real-time reports', 'QR menu ready'],
     ctaTop: 'Ready to make your restaurant smarter?', ctaTitle: 'Get started for free', ctaDescription: 'Try every feature free for 14 days. We help set up your store so you can start selling right away.', ctaButton: 'Create your store', footer: 'Every restaurant task, simple in one system'
   } : {
     allInOne: 'ระบบจัดการร้านอาหาร All-in-One', hero: <>ระบบ POS และ<br/><span className="relative text-orange-500">เว็บสั่งอาหาร<span className="absolute -bottom-1 left-0 h-2 w-full -rotate-1 rounded-full bg-orange-200/70 -z-10"/></span><br/>สำหรับร้านอาหาร<br/>ทุกประเภท</>,
-    heroDescription: 'ขายหน้าร้าน สั่งผ่าน QR Code เดลิเวอรี จัดการสต็อก รายงานยอดขาย และแจ้งเตือนผ่าน LINE OA — ครบในระบบเดียว',
+    heroDescription: 'ขายหน้าร้าน สั่งผ่าน QR Code เดลิเวอรี จอครัว KDS รายงานยอดขาย — ครบในระบบเดียว',
     trial: 'ทดลองใช้งานฟรี', demo: 'ดูตัวอย่างร้านหมูกระทะ', benefits: ['ฟรี 14 วัน', 'ไม่ต้องใช้บัตรเครดิต', 'พร้อมใช้ใน 5 นาที'],
     tools: 'ครบทุกเครื่องมือที่ร้านอาหารยุคใหม่ต้องการ', businessTypes: ['ร้านอาหาร', 'คาเฟ่', 'เดลิเวอรี', 'หลายสาขา'],
     featuresTitle: 'ระบบเดียว จัดการร้านได้ครบ', featuresDescription: 'ลดความวุ่นวาย เพิ่มความเร็ว และเห็นภาพรวมธุรกิจได้ชัดเจนกว่าเดิม',
     growthTitle: <>เริ่มเล็ก แล้วเติบโต<br/>ไปพร้อมกับร้านคุณ</>, growthDescription: 'ไม่ว่าจะเป็นร้านแรกหรือหลายสิบสาขา SmartPOS ก็พร้อมช่วยให้ทุกออเดอร์เป็นเรื่องง่าย',
-    growthItems: ['สต็อกแม่นยำ', 'แจ้งเตือน LINE OA', 'รายงานเรียลไทม์', 'QR Menu พร้อมใช้'],
+    growthItems: ['ระบบ POS ลื่นไหล', 'จอครัว KDS เรียลไทม์', 'รายงานเรียลไทม์', 'QR Menu พร้อมใช้'],
     ctaTop: 'พร้อมเปิดร้านให้ Smart ขึ้นหรือยัง?', ctaTitle: 'เริ่มต้นใช้งานฟรี', ctaDescription: 'ทดลองทุกฟีเจอร์ฟรี 14 วัน ให้ทีมของเราช่วยตั้งค่าร้าน พร้อมเริ่มขายได้ทันที', ctaButton: 'สมัครร้านของคุณ', footer: 'ให้ทุกเรื่องร้านอาหาร ง่ายในระบบเดียว'
   }
   const [menuOpen, setMenuOpen] = useState(false)

@@ -2,9 +2,9 @@
 
 ระบบบริหารจัดการร้านอาหารและจุดขายแบบคลาวด์ Multi-tenant (Cloud Restaurant POS & Store Management Platform)
 
-## 📖 เอกสารข้อกำหนดความต้องการระบบ (System Requirements)
-สามารถดูเอกสาร Requirement ฉบับเต็ม (SRS / PRD) ได้ที่ไฟล์:
-👉 **[REQUIREMENTS.md](file:///Users/x/Documents/GitHub/1101911/REQUIREMENTS.md)**
+## 📖 เอกสารโครงการ (Project Documentation)
+- 📋 ข้อกำหนดความต้องการระบบ (SRS / PRD): 👉 **[REQUIREMENTS.md](file:///Users/x/Documents/GitHub/1101911/REQUIREMENTS.md)**
+- 🗺️ แผนผังลำดับการใช้งาน (User Flow Specification): 👉 **[USERFLOW.md](file:///Users/x/Documents/GitHub/1101911/USERFLOW.md)**
 
 ---
 

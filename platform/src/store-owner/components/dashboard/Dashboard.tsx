@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query'
-import { AlertTriangle, Box, CircleDollarSign, Clock3, ShoppingBag, UsersRound, UtensilsCrossed } from 'lucide-react'
+import { CircleDollarSign, Clock3, ShoppingBag, UsersRound, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
 import { Panel } from '../PageKit'
@@ -18,11 +18,11 @@ export default function Dashboard({ navigate }: { navigate: (path: string) => vo
   const { language } = useLanguage()
   const english = language === 'en'
   const copy = english ? {
-    loading: 'Loading dashboard data…', overview: 'Daily store overview', kpis: ['Today’s sales', 'Today’s orders', 'Pending', 'Occupied tables', 'Today’s customers', 'Low-stock ingredients'],
-    sales7: '7-day sales', total: 'Total', orderTypes: 'Today’s order types', topItems: 'Top 5 menu items', sold: 'sold', items: 'items', noSales: 'No sales data yet', recent: 'Recent orders', viewAll: 'View all', noOrders: 'No orders yet', lowStock: 'Low-stock ingredients', minimum: 'minimum', orderLabels: ['Dine-in', 'Pickup', 'Delivery'], completed: 'Completed', pending: 'Pending', customer: 'Walk-in customer'
+    loading: 'Loading dashboard data…', overview: 'Daily store overview', kpis: ['Today’s sales', 'Today’s orders', 'Pending', 'Occupied tables', 'Today’s customers'],
+    sales7: '7-day sales', total: 'Total', orderTypes: 'Today’s order types', topItems: 'Top 5 menu items', sold: 'sold', items: 'items', noSales: 'No sales data yet', recent: 'Recent orders', viewAll: 'View all', noOrders: 'No orders yet', orderLabels: ['Dine-in', 'Pickup', 'Delivery'], completed: 'Completed', pending: 'Pending', customer: 'Walk-in customer'
   } : {
-    loading: 'กำลังโหลดข้อมูล Dashboard…', overview: 'ภาพรวมร้านประจำวันที่', kpis: ['ยอดขายวันนี้', 'ออเดอร์วันนี้', 'รอดำเนินการ', 'โต๊ะใช้งาน', 'ลูกค้าวันนี้', 'วัตถุดิบใกล้หมด'],
-    sales7: 'ยอดขาย 7 วัน', total: 'รวม', orderTypes: 'ประเภทออเดอร์วันนี้', topItems: 'เมนูขายดี 5 อันดับ', sold: 'ขาย', items: 'รายการ', noSales: 'ยังไม่มีข้อมูลการขาย', recent: 'ออเดอร์ล่าสุด', viewAll: 'ดูทั้งหมด', noOrders: 'ยังไม่มีออเดอร์', lowStock: 'วัตถุดิบใกล้หมด', minimum: 'ขั้นต่ำ', orderLabels: ['ทานที่ร้าน', 'สั่งกลับบ้าน', 'เดลิเวอรี'], completed: 'สำเร็จแล้ว', pending: 'รอดำเนินการ', customer: 'ลูกค้าหน้าร้าน'
+    loading: 'กำลังโหลดข้อมูล Dashboard…', overview: 'ภาพรวมร้านประจำวันที่', kpis: ['ยอดขายวันนี้', 'ออเดอร์วันนี้', 'รอดำเนินการ', 'โต๊ะใช้งาน', 'ลูกค้าวันนี้'],
+    sales7: 'ยอดขาย 7 วัน', total: 'รวม', orderTypes: 'ประเภทออเดอร์วันนี้', topItems: 'เมนูขายดี 5 อันดับ', sold: 'ขาย', items: 'รายการ', noSales: 'ยังไม่มีข้อมูลการขาย', recent: 'ออเดอร์ล่าสุด', viewAll: 'ดูทั้งหมด', noOrders: 'ยังไม่มีออเดอร์', orderLabels: ['ทานที่ร้าน', 'สั่งกลับบ้าน', 'เดลิเวอรี'], completed: 'สำเร็จแล้ว', pending: 'รอดำเนินการ', customer: 'ลูกค้าหน้าร้าน'
   }
   const { store } = useStore()
   const today = dayStart().toISOString()
@@ -79,18 +79,6 @@ export default function Dashboard({ navigate }: { navigate: (path: string) => vo
         }
       },
       {
-        queryKey: ['dashboard', 'store_inventory', store?.id],
-        enabled: Boolean(store?.id),
-        queryFn: async () => {
-          const { data, error } = await supabase
-            .from('store_inventory')
-            .select('id,ingredient,stock,unit,minimum_stock')
-            .eq('store_id', store.id)
-          if (error) return []
-          return data || []
-        }
-      },
-      {
         queryKey: ['dashboard', 'store_customers', store?.id],
         enabled: Boolean(store?.id),
         queryFn: async () => {
@@ -111,15 +99,13 @@ export default function Dashboard({ navigate }: { navigate: (path: string) => vo
   const orders: any[] = results[0]?.data || []
   const items: any[] = results[1]?.data || []
   const tables: any[] = results[2]?.data || []
-  const inventory: any[] = results[3]?.data || []
-  const customers: any[] = results[4]?.data || []
+  const customers: any[] = results[3]?.data || []
 
   const todayOrders = orders.filter(x => (x.created_at || '') >= today)
   const completedToday = todayOrders.filter(x => x.status === 'completed')
   const revenue = completedToday.reduce((sum, x) => sum + Number(x.total || 0), 0)
   const pending = todayOrders.filter(x => ['pending', 'accepted', 'preparing', 'ready'].includes(x.status)).length
   const occupied = tables.filter(x => x.status === 'occupied').length
-  const lowStock = inventory.filter(x => Number(x.stock || 0) <= Number(x.minimum_stock || 0))
   const completedIds = new Set(orders.filter(x => x.status === 'completed').map(x => x.id))
 
   const topMap = new Map<string, { name: string; quantity: number; revenue: number }>()
@@ -159,8 +145,7 @@ export default function Dashboard({ navigate }: { navigate: (path: string) => vo
     [ShoppingBag, copy.kpis[1], todayOrders.length],
     [Clock3, copy.kpis[2], pending],
     [UtensilsCrossed, copy.kpis[3], `${occupied} / ${tables.length}`],
-    [UsersRound, copy.kpis[4], customers.length],
-    [Box, copy.kpis[5], lowStock.length]
+    [UsersRound, copy.kpis[4], customers.length]
   ]
 
   if (loading) {
@@ -176,7 +161,7 @@ export default function Dashboard({ navigate }: { navigate: (path: string) => vo
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         {kpis.map(([Icon, label, value]: any) => (
           <Panel key={label} className="p-4">
             <span className="grid size-9 place-items-center rounded-xl bg-orange-50 text-orange-500 dark:bg-orange-500/10">
@@ -278,21 +263,6 @@ export default function Dashboard({ navigate }: { navigate: (path: string) => vo
           {!orders.length && <p className="p-8 text-center text-sm text-zinc-400">{copy.noOrders}</p>}
         </Panel>
       </div>
-
-      {lowStock.length > 0 && (
-        <Panel className="p-5">
-          <h2 className="flex items-center gap-2 font-black text-red-500">
-            <AlertTriangle size={18} /> {copy.lowStock}
-          </h2>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {lowStock.map(x => (
-              <span key={x.id} className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-600 dark:bg-red-500/10">
-                {x.ingredient}: {x.stock} {x.unit} / {copy.minimum} {x.minimum_stock}
-              </span>
-            ))}
-          </div>
-        </Panel>
-      )}
     </div>
   )
 }

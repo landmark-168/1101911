@@ -43,7 +43,7 @@ export const ROLE_CONFIG: Record<string, {
     badgeBg: 'bg-purple-600 text-white',
     icon: ShieldCheck,
     desc: 'สิทธิ์สูงสุด เข้าถึงได้ทุกฟังก์ชันและการตั้งค่าร้าน',
-    defaultPermissions: ['dashboard', 'orders', 'pos', 'menu', 'categories', 'tables', 'kitchen', 'inventory', 'promotions', 'customers', 'employees', 'reports', 'settings']
+    defaultPermissions: ['dashboard', 'orders', 'pos', 'menu', 'categories', 'tables', 'kitchen', 'promotions', 'customers', 'employees', 'reports', 'settings']
   },
   manager: {
     label: 'ผู้จัดการร้าน',
@@ -52,8 +52,8 @@ export const ROLE_CONFIG: Record<string, {
     bgLight: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60',
     badgeBg: 'bg-blue-600 text-white',
     icon: Shield,
-    desc: 'จัดการภาพรวม ออเดอร์ เมนู สต็อก และรายงาน',
-    defaultPermissions: ['dashboard', 'orders', 'pos', 'menu', 'categories', 'tables', 'kitchen', 'inventory', 'promotions', 'customers', 'employees', 'reports']
+    desc: 'จัดการภาพรวม ออเดอร์ เมนู และรายงาน',
+    defaultPermissions: ['dashboard', 'orders', 'pos', 'menu', 'categories', 'tables', 'kitchen', 'promotions', 'customers', 'employees', 'reports']
   },
   cashier: {
     label: 'แคชเชียร์',
@@ -105,7 +105,6 @@ export const ALL_PERMISSIONS = [
   { id: 'categories', label: 'Categories', desc: 'จัดการหมวดหมู่อาหาร' },
   { id: 'tables', label: 'Tables', desc: 'จัดการโต๊ะและ QR Code' },
   { id: 'kitchen', label: 'Kitchen KDS', desc: 'หน้าจอจัดการในครัว' },
-  { id: 'inventory', label: 'Inventory', desc: 'คลังวัตถุดิบและสต็อก' },
   { id: 'promotions', label: 'Promotions', desc: 'โปรโมชั่นและส่วนลด' },
   { id: 'customers', label: 'Customers', desc: 'ฐานข้อมูลลูกค้าและสมาชิก' },
   { id: 'employees', label: 'Employees & PIN', desc: 'จัดการพนักงานและกำหนด PIN' },

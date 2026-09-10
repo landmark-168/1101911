@@ -10,7 +10,7 @@ const defaultPlans = [
   },
   {
     name: 'Business', description: 'สำหรับร้านที่ต้องการเติบโต', monthly: 1290, yearly: 1032,
-    features: ['3 สาขา', 'ผู้ใช้งาน 15 คน', 'ทุกฟีเจอร์ใน Starter', 'จัดการสต็อกและวัตถุดิบ', 'Delivery และ LINE OA', 'รายงานเชิงลึก'],
+    features: ['3 สาขา', 'ผู้ใช้งาน 15 คน', 'ทุกฟีเจอร์ใน Starter', 'ระบบ Delivery', 'ระบบสมาชิกและโปรโมชัน', 'รายงานเชิงลึก'],
     button: 'Subscribe Business', accent: true,
   },
   {
@@ -24,8 +24,8 @@ const comparisons = [
   ['จำนวนสาขา', '1', '3', 'ไม่จำกัด'],
   ['จำนวนผู้ใช้งาน', '3', '15', 'ไม่จำกัด'],
   ['POS และ QR Menu', true, true, true],
-  ['จัดการสต็อก', false, true, true],
-  ['Delivery และ LINE OA', false, true, true],
+  ['ระบบ Delivery', false, true, true],
+  ['ระบบสมาชิกและโปรโมชัน', false, true, true],
   ['รายงานเชิงลึก', false, true, true],
   ['API และระบบเชื่อมต่อ', false, false, true],
   ['ผู้ดูแลบัญชีเฉพาะ', false, false, true],
