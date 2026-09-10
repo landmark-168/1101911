@@ -44,7 +44,7 @@ create table if not exists public.payments (
   shop_id uuid not null references public.shops(id) on delete cascade,
   subscription_id uuid references public.subscriptions(id) on delete set null,
   amount numeric(12,2) not null check (amount >= 0),
-  status text not null default 'pending' check (status in ('pending','paid','failed','refunded')),
+  status text not null default 'pending' check (status in ('pending','paid','failed')),
   paid_at timestamptz,
   created_at timestamptz not null default now()
 );

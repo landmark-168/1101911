@@ -257,7 +257,7 @@ export default function AdminRecordsPage({type}){
   }),[rows,query,filter,revenue]);
 
   const paid=(rows || []).filter(x=>x?.status==='paid'),total=paid.reduce((s,x)=>s+Number(x?.amount || 0),0),owners=(rows || []).filter(x=>x?.role==='shop_owner').length;
-  const cards=revenue?[['รายได้รวม',money(total)],['ชำระสำเร็จ',paid.length.toLocaleString()],['รอดำเนินการ',(rows || []).filter(x=>x?.status==='pending').length.toLocaleString()],['คืนเงิน',money((rows || []).filter(x=>x?.status==='refunded').reduce((s,x)=>s+Number(x?.amount || 0),0))]]:[['สมาชิกทั้งหมด',(rows || []).length.toLocaleString()],['เจ้าของร้าน (Shop Owner)',owners.toLocaleString()],['พนักงาน (Staff)',(rows || []).filter(x=>x?.role==='staff').length.toLocaleString()],['Super Admin',(rows || []).filter(x=>x?.role==='super_admin').length.toLocaleString()]];
+  const cards=revenue?[['รายได้รวม',money(total)],['ชำระสำเร็จ',paid.length.toLocaleString()],['รอดำเนินการ',(rows || []).filter(x=>x?.status==='pending').length.toLocaleString()]]:[['สมาชิกทั้งหมด',(rows || []).length.toLocaleString()],['เจ้าของร้าน (Shop Owner)',owners.toLocaleString()],['พนักงาน (Staff)',(rows || []).filter(x=>x?.role==='staff').length.toLocaleString()],['Super Admin',(rows || []).filter(x=>x?.role==='super_admin').length.toLocaleString()]];
 
   const roleStyle = {
     super_admin: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -284,7 +284,7 @@ export default function AdminRecordsPage({type}){
 
     {error&&<p className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-600">{error}</p>}
     
-    <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className={`mt-6 grid gap-4 sm:grid-cols-2 ${revenue ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
       {cards.map(([a,b])=><div key={a} className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm">
         <p className="text-xs font-bold text-zinc-400">{a}</p>
         <p className="mt-2 text-2xl font-black">{b}</p>
@@ -299,7 +299,7 @@ export default function AdminRecordsPage({type}){
         </label>
         <select value={filter} onChange={e=>setFilter(e.target.value)} className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-xs font-bold outline-none">
           <option value="all">ทุกบทบาท (Roles)</option>
-          {(revenue?['paid','pending','failed','refunded']:['shop_owner','staff','super_admin']).map(x=><option key={x} value={x}>{x}</option>)}
+          {(revenue?['paid','pending','failed']:['shop_owner','staff','super_admin']).map(x=><option key={x} value={x}>{x}</option>)}
         </select>
       </div>
 

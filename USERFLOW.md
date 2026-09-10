@@ -14,6 +14,7 @@
 6. [Flow 5: ผู้ดูแลระบบหลัก (Super Admin Flow — แพลตฟอร์มส่วนกลาง)](#flow-5-ผู้ดูแลระบบหลัก-super-admin-flow)
 7. [การทำงานร่วมกันแบบเรียลไทม์ระหว่างบทบาท (Cross-Role End-to-End Flow)](#7-การทำงานร่วมกันแบบเรียลไทม์ระหว่างบทบาท-cross-role-end-to-end-flow)
 8. [เส้นทางกรณีผิดพลาด (Error & Recovery Flow)](#8-เส้นทางกรณีผิดพลาด-error--recovery-flow)
+9. [การยกเลิกออเดอร์ (Cancellation Flow)](#9-การยกเลิกออเดอร์-cancellation-flow)
 
 ---
 
@@ -24,7 +25,7 @@
 ```mermaid
 graph TD
     subgraph Customers["1. ลูกค้า (Customer)"]
-        C1[สแกน QR โต๊ะ / เข้าเว็บหน้าร้าน] --> C2[เลือกเมนู + Option]
+        C1[สแกน QR โต๊ะ / เข้าเว็บหน้าร้านแบบ Guest] --> C2[เลือกเมนู + Option]
         C2 --> C3[ส่งออเดอร์เข้าครัว / สั่ง Delivery]
     end
 
@@ -75,7 +76,8 @@ sequenceDiagram
     participant POS as 🖥️ แคชเชียร์ POS
 
     Customer->>Storefront: 1. สแกน QR Code ประจำโต๊ะ (เช่น โต๊ะ 04)
-    Storefront->>Customer: 2. แสดงเมนูอาหาร รูปภาพ ราคา และโปรโมชัน
+    Storefront->>Storefront: ตรวจสอบ QR Token และเปิด Guest Session โดยไม่ต้องเข้าสู่ระบบ
+    Storefront->>Customer: 2. แสดงเมนูอาหาร รูปภาพ ราคา และโปรโมชันของร้านและโต๊ะที่ระบุ
     Customer->>Storefront: 3. เลือกอาหาร, ตัวเลือกพิเศษ (หวานน้อย/ไม่ใส่ผัก)
     Customer->>Storefront: 4. ตรวจสอบตะกร้าสินค้า (Cart Review)
     Customer->>Storefront: 5. กดยืนยันสั่งอาหาร (Submit Order)
@@ -88,7 +90,7 @@ sequenceDiagram
 ```
 
 **ขั้นตอนการทำงาน (Step-by-step):**
-1. **สแกน QR Code:** ลูกค้าใช้กล้องมือถือสแกน QR Code ที่ติดอยู่บนโต๊ะ ระบบจะเปิดเว็บแอปพลิเคชันโดยระบุเลขโต๊ะโดยอัตโนมัติ
+1. **สแกน QR Code:** ลูกค้าใช้กล้องมือถือสแกน QR Code ที่ติดอยู่บนโต๊ะ ระบบตรวจสอบ QR Token และเปิด Guest Session โดยไม่ต้องสมัครสมาชิกหรือเข้าสู่ระบบ พร้อมระบุร้านและเลขโต๊ะโดยอัตโนมัติ
 2. **เลือกเมนู:** ค้นหาและคัดกรองตามหมวดหมู่ (เครื่องดื่ม, อาหารจานหลัก, ของทานเล่น)
 3. **ปรับแต่งรายการ (Item Customization):** เลือกขนาด, ระดับความหวาน, เพิ่มท็อปปิ้ง และระบุหมายเหตุ
 4. **ยืนยันการสั่ง:** กดส่งรายการ ระบบส่งข้อมูลผ่าน Supabase Realtime ไปยังห้องครัวและแคชเชียร์ทันที
@@ -108,8 +110,9 @@ flowchart TD
     Delivery --> CalcDist[ระบบคำนวณระยะทาง & ค่าจัดส่ง]
     CalcDist --> Browse
     
-    Browse --> Review[ตรวจสอบรายการและยอดรวม]
-    Review --> PayMethod{เลือกวิธีชำระเงิน}
+    Browse --> Review[ตรวจสอบรายการ ค่าจัดส่ง VAT และยอดรวม]
+    Review --> CreateOrder[สร้างออเดอร์สถานะ Pending Payment]
+    CreateOrder --> PayMethod{เลือกวิธีชำระเงิน}
     PayMethod -->|PromptPay QR| QR[ลูกค้าสแกน QR Code และชำระเงิน]
     PayMethod -->|บัตรเครดิต| Stripe[ชำระผ่าน Stripe Gateway]
     PayMethod -->|เก็บเงินปลายทาง| COD[ชำระเงินสดเมื่อได้รับอาหาร]
@@ -120,7 +123,7 @@ flowchart TD
     Stripe --> Submit
     COD --> Submit
     
-    Submit --> Track[หน้าติดตามสถานะคำสั่งซื้อแบบ Live Tracking]
+    Submit --> Track[หน้าติดตามสถานะคำสั่งซื้อ Order Status Tracking]
 ```
 
 ---
@@ -132,7 +135,9 @@ flowchart TD
     A([เริ่มกะการทำงาน]) --> B[เข้าสู่ระบบ / กรอกรหัส PIN 4-6 หลัก]
     B --> C{ตรวจสอบสิทธิ์}
     C -->|PIN ถูกต้อง| D[หน้าแดชบอร์ดจุดขาย POS]
-    C -->|PIN ผิดพลาด| B
+    C -->|PIN ผิดน้อยกว่า 5 ครั้ง| B
+    C -->|PIN ผิดครบ 5 ครั้ง| Lock[ล็อกบัญชี 15 นาทีและบันทึกเหตุการณ์]
+    Lock --> B
 
     D --> E{เลือกการทำงาน}
     E --> F[เปิดโต๊ะใหม่ / เลือกลูกค้า Walk-in]
@@ -144,7 +149,7 @@ flowchart TD
     J --> K[กดยืนยัน 'ส่งเข้าครัว']
 
     G --> L[ลูกค้าแจ้งขอเช็กบิล]
-    L --> M[ตรวจสอบรายการอาหาร + ส่วนลดคูปอง]
+    L --> M[ตรวจสอบรายการอาหาร + ส่วนลดคูปอง + ฐานภาษี/VAT]
     M --> N[เลือกช่องทางชำระเงิน]
     
     N -->|เงินสด| O1[กรอกเงินที่รับ -> คำนวณเงินทอน]
@@ -179,8 +184,10 @@ stateDiagram-v2
     
     ปรุงเสร็จแล้ว_Ready --> เสิร์ฟแล้ว_Served: พนักงานเสิร์ฟมารับอาหารไปส่งที่โต๊ะ
     
-    เข้าคิว_Pending --> ยกเลิก_Cancelled: ยกเลิกออเดอร์ (ระบุเหตุผล เช่น วัตถุดิบหมด)
-    กำลังปรุง_Preparing --> ยกเลิก_Cancelled: ลูกค้ายกเลิกกะทันหัน
+    เข้าคิว_Pending --> ยกเลิก_Cancelled: Guest หรือ Cashier ยกเลิกก่อนเริ่มปรุง
+    กำลังปรุง_Preparing --> รออนุมัติยกเลิก_CancelRequested: Cashier/Kitchen Staff ส่งคำขอพร้อมเหตุผล
+    รออนุมัติยกเลิก_CancelRequested --> ยกเลิก_Cancelled: Manager อนุมัติ
+    รออนุมัติยกเลิก_CancelRequested --> กำลังปรุง_Preparing: Manager ไม่อนุมัติ
     
     เสิร์ฟแล้ว_Served --> เสร็จสมบูรณ์_Completed: แคชเชียร์ปิดบิล
     เสร็จสมบูรณ์_Completed --> [*]: ย้ายออเดอร์ไปแท็บประวัติ
@@ -211,7 +218,8 @@ flowchart TD
 ```
 
 ### 4.2 การจัดการประจำวัน (Daily Management & Operations)
-- **จัดการโปรโมชัน (Promotions):** สร้างโค้ดส่วนลด กำหนดวันหมดอายุและเงื่อนไขยอดซื้อขั้นต่ำ
+- **จัดการโปรโมชัน (Promotions):** สร้างโค้ดส่วนลด กำหนดช่วงเวลา ยอดขั้นต่ำ จำนวนครั้งที่ใช้ และเงื่อนไขการใช้ร่วมกับโปรโมชันอื่น
+- **ตั้งค่าภาษีและค่าจัดส่ง:** เลือก VAT แบบไม่คิดภาษี ราคารวม VAT หรือบวก VAT 7% และเลือกค่าจัดส่งแบบคงที่ ตามระยะทาง หรือแบ่งโซน
 - **จัดการลูกค้า (Customer Management):** ดูข้อมูลลูกค้า ประวัติคำสั่งซื้อ จำนวนครั้งที่ใช้บริการ และยอดซื้อสะสมเฉพาะภายในร้านของตนเอง
 - **จัดการ Subscription:** ดูแพ็กเกจ สถานะ วันหมดอายุ ต่ออายุหรือยกเลิกบริการ และตรวจสอบสิทธิ์ของแพ็กเกจ
 - **รายงานและการเงิน (Reports & Analytics):**
@@ -267,7 +275,7 @@ sequenceDiagram
 
     Note over Customer, Waiter: ขั้นตอนที่ 3: เช็กบิลและชำระเงิน
     Customer->>Waiter: ลูกค้าแจ้งขอเช็กบิล
-    Waiter->>Waiter: เปิดโต๊ะ 02 บน POS สรุปยอดรวม (รวม VAT 7%)
+    Waiter->>Waiter: เปิดโต๊ะ 02 บน POS แสดงฐานภาษี VAT ตามการตั้งค่าร้าน และยอดสุทธิ
     Waiter->>Customer: แสดง QR PromptPay ให้สแกนจ่าย
     Customer->>Waiter: สแกน QR และชำระเงิน
     Waiter->>Waiter: ตรวจสอบยอดชำระด้วยตนเองและกดยืนยัน
@@ -286,8 +294,9 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     Start([ผู้ใช้เริ่มทำรายการ]) --> Check{ตรวจสอบรายการ}
-    Check -->|QR ไม่ถูกต้อง/โต๊ะปิด| QRFail[แจ้งว่า QR ใช้งานไม่ได้และไม่เปิดออเดอร์]
-    Check -->|PIN ผิด| PINFail[แจ้งข้อผิดพลาดและนับจำนวนครั้ง]
+    Check -->|QR Token ไม่ถูกต้อง/หมดอายุ/โต๊ะปิด| QRFail[แจ้งว่า QR ใช้งานไม่ได้และไม่สร้าง Guest Session หรือออเดอร์]
+    Check -->|PIN ผิด 1-4 ครั้ง| PINFail[แจ้งข้อผิดพลาดและนับจำนวนครั้ง]
+    Check -->|PIN ผิดครั้งที่ 5| PINLock[ล็อกบัญชี 15 นาทีและบันทึกเหตุการณ์]
     Check -->|เมนูหมด| ItemFail[แจ้งเมนูไม่พร้อมขายและให้เลือกใหม่]
     Check -->|คูปองไม่ผ่านเงื่อนไข| CouponFail[แสดงเหตุผลและคงยอดเดิม]
     Check -->|ข้อมูลถูกต้อง| Submit[ส่งออเดอร์หรือเริ่มชำระเงิน]
@@ -301,6 +310,27 @@ flowchart TD
     Reconnect -->|แล้ว| Duplicate
     Reconnect -->|ยัง| Offline
 ```
+
+---
+
+## 9. การยกเลิกออเดอร์ (Cancellation Flow)
+
+```mermaid
+flowchart TD
+    Start([มีคำขอยกเลิก]) --> State{สถานะออเดอร์}
+    State -->|Pending| Actor{ผู้ขอยกเลิก}
+    State -->|Preparing| StaffCancel[Kitchen Staff หรือ Cashier ขอยกเลิกพร้อมระบุเหตุผล]
+    State -->|Ready/Served แต่ยังไม่ปิดบิล| CashierCancel[Cashier ยกเลิกพร้อมระบุเหตุผล]
+    State -->|Completed/ปิดบิลแล้ว| CannotCancel[ไม่อนุญาตให้ยกเลิก]
+    Actor -->|Guest| GuestCancel[ยกเลิกได้โดยไม่เสียค่าบริการ]
+    Actor -->|Cashier/Kitchen Staff| StaffCancel
+    StaffCancel --> ManagerDecision{Manager อนุมัติหรือไม่}
+    CashierCancel --> ManagerDecision
+    ManagerDecision -->|ไม่อนุมัติ| KeepOrder[คงออเดอร์และบันทึกเหตุผล]
+    ManagerDecision -->|อนุมัติ| Cancelled[เปลี่ยนสถานะเป็น Cancelled]
+```
+
+**อายุ Guest Session และ QR Token:** Guest Session ใช้งานได้เฉพาะรอบบริการของโต๊ะนั้น เมื่อปิดบิลหรือยกเลิกโต๊ะ Session เดิมสิ้นสุดและไม่สามารถเปิดดูออเดอร์เดิมได้ ระบบต้องสร้าง Session/Token ใหม่เมื่อเปิดโต๊ะรอบถัดไป
 
 ---
 

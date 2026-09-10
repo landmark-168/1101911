@@ -210,7 +210,6 @@ export const interfaceTranslations: Record<string, string> = {
   'ราคา': 'Price',
   'เวลาเตรียม': 'Prep time',
   'ไม่มีคำอธิบาย': 'No description',
-  'นาที': 'min',
 
   // POS & Tables
   'เลือกโต๊ะ': 'Select table',
@@ -365,7 +364,6 @@ export const interfaceTranslations: Record<string, string> = {
   'ตรวจสอบรายการชำระเงินและรายได้ทั้งหมด': 'Review all payment records and revenue.',
   'ชำระสำเร็จ': 'Completed payments',
   'รอดำเนินการ': 'Pending',
-  'คืนเงิน': 'Refunded',
   'ค้นหาชื่อ, อีเมล, เบอร์โทร หรือร้านค้า...': 'Search name, email, phone, or store…',
   'ทุกบทบาท (Roles)': 'All roles',
   'จำนวนเงิน': 'Amount',
