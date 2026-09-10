@@ -3,7 +3,7 @@ import { useQuery, useMutation, QueryClient, QueryClientProvider } from '@tansta
 import { supabase } from '../lib/supabase'
 import {
   Flame, ShoppingCart, Utensils, User, LogOut, Tag, MessageSquare,
-  Clock, Compass, ArrowLeft, Check, MapPin, Search, Store, Navigation,
+  Clock, Compass, ArrowLeft, ArrowRight, Check, MapPin, Search, Store, Navigation,
   Trash2, ChevronRight, Phone, Info, AlertCircle, Copy, Plus, Minus,
   Bell, Receipt, QrCode, DollarSign, X, CheckCircle2, Send, Sparkles, RefreshCw,
   ClipboardList, Bike, ShieldAlert, Award
@@ -927,11 +927,12 @@ function ProductDetailModal({
 
 function OrderProcessStepper({ status, orderType = 'dine_in' }: { status: string; orderType?: string }) {
   const isDelivery = orderType === 'delivery'
+  const isTakeaway = orderType === 'takeaway'
   const steps = [
     { step: 1, label: 'รับออเดอร์', Icon: ClipboardList },
     { step: 2, label: 'กำลังปรุงอาหาร', Icon: Flame },
-    { step: 3, label: isDelivery ? 'ไรเดอร์กำลังส่ง' : 'พร้อมเสิร์ฟ', Icon: isDelivery ? Bike : Utensils },
-    { step: 4, label: isDelivery ? 'จัดส่งสำเร็จ' : 'เสิร์ฟเรียบร้อย', Icon: Sparkles }
+    { step: 3, label: isDelivery ? 'ไรเดอร์กำลังส่ง' : isTakeaway ? 'พร้อมให้มารับ' : 'พร้อมเสิร์ฟ', Icon: isDelivery ? Bike : isTakeaway ? Store : Utensils },
+    { step: 4, label: isDelivery ? 'จัดส่งสำเร็จ' : isTakeaway ? 'รับอาหารแล้ว' : 'เสิร์ฟเรียบร้อย', Icon: Sparkles }
   ]
 
   let currentStep = 1
@@ -1039,6 +1040,23 @@ function StorefrontApp() {
     const saved = localStorage.getItem('sfLastOrder')
     return saved ? JSON.parse(saved) : null
   })
+
+  const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>('delivery')
+  const [pickupTime, setPickupTime] = useState<string>('asap')
+
+  const pickupTimeSlots = (() => {
+    const slots: { value: string; label: string }[] = [{ value: 'asap', label: '⚡ เร็วที่สุด' }]
+    const base = new Date()
+    base.setSeconds(0, 0)
+    base.setMinutes(Math.ceil((base.getMinutes() + 1) / 15) * 15 + 15)
+    for (let i = 0; i < 7; i++) {
+      const t = new Date(base.getTime() + i * 15 * 60000)
+      const h = t.getHours().toString().padStart(2, '0')
+      const m = t.getMinutes().toString().padStart(2, '0')
+      slots.push({ value: `${h}:${m}`, label: `${h}:${m} น.` })
+    }
+    return slots
+  })()
 
   const [address, setAddress] = useState({
     name: customer?.name || '',
@@ -1205,7 +1223,7 @@ function StorefrontApp() {
 
   const taxPercent = Number(settings?.tax_percent ?? 0)
   const serviceChargePercent = Number(settings?.service_charge_percent ?? 0)
-  const deliveryFee = tableId ? 0 : deliveryCalc.deliveryFee
+  const deliveryFee = tableId ? 0 : (deliveryMethod === 'pickup' ? 0 : deliveryCalc.deliveryFee)
   const themeColor = settings?.theme_color || '#F97316'
 
   const serviceChargeAmount = Math.round(cartSubtotal * (serviceChargePercent / 100) * 100) / 100
@@ -1268,31 +1286,35 @@ function StorefrontApp() {
       if (cart.length === 0) throw new Error('ไม่มีสินค้าในตะกร้า')
       if (!customer && !tableId) throw new Error('กรุณาล็อกอินก่อนทำการสั่งซื้อ')
 
-      if (!tableId && deliveryConfig.delivery_enabled === false) {
-        throw new Error('ขออภัย ขณะนี้ร้านค้าปิดรับออเดอร์จัดส่งเดลิเวอรีชั่วคราว')
-      }
-
-      if (!tableId && deliveryCalc.isOutOfRange) {
-        throw new Error(
-          `ตำแหน่งจัดส่งอยู่นอกพื้นที่ให้บริการ (${deliveryCalc.distanceKm} กม. / สูงสุด ${deliveryCalc.maxRadiusKm} กม.) กรุณาเลือกตำแหน่งใหม่อีกครั้ง`
-        )
+      // Only enforce delivery restrictions for actual delivery orders (not pickup)
+      if (!tableId && deliveryMethod === 'delivery') {
+        if (deliveryConfig.delivery_enabled === false) {
+          throw new Error('ขออภัย ขณะนี้ร้านค้าปิดรับออเดอร์จัดส่งเดลิเวอรีชั่วคราว')
+        }
+        if (deliveryCalc.isOutOfRange) {
+          throw new Error(
+            `ตำแหน่งจัดส่งอยู่นอกพื้นที่ให้บริการ (${deliveryCalc.distanceKm} กม. / สูงสุด ${deliveryCalc.maxRadiusKm} กม.) กรุณาเลือกตำแหน่งใหม่อีกครั้ง`
+          )
+        }
       }
 
       const mapUrl = `https://maps.google.com/?q=${address.lat},${address.lng}`
       const deliveryNotes = tableId
         ? `ทานที่ร้าน โต๊ะ ${tableName}`
+        : deliveryMethod === 'pickup'
+        ? `[รับที่ร้าน] เวลานัดรับ: ${pickupTime === 'asap' ? 'เร็วที่สุด' : pickupTime + ' น.'} | ชื่อ: ${address.name || customer?.name || 'ลูกค้า'} โทร: ${address.phone || customer?.phone || '-'} | ไม่มีค่าจัดส่ง`
         : `[เดลิเวอรี] ส่งถึง: ${address.name || customer?.name || 'ลูกค้า'} (${address.phone || customer?.phone || '-'})\nที่อยู่: ${address.address}\nจุดสังเกต: ${address.note || '-'}\nระยะทาง: ${deliveryCalc.distanceKm} กม. | ค่าส่ง: ฿${deliveryFee}\nพิกัด GPS: ${address.lat.toFixed(6)}, ${address.lng.toFixed(6)}\nแผนที่นำทาง: ${mapUrl}`
 
       const orderPayload: any = {
         store_id: storeId,
         table_id: tableId,
         order_number: 'ORD' + Math.floor(1000 + Math.random() * 9000),
-        order_type: tableId ? 'dine_in' : 'delivery',
+        order_type: tableId ? 'dine_in' : deliveryMethod === 'pickup' ? 'takeaway' : 'delivery',
         status: tableId ? 'preparing' : 'pending',
         subtotal: cartSubtotal,
         tax: taxAmount,
         total: cartGrandTotal,
-        customer_name: tableId ? `โต๊ะ ${tableName}` : (address.name || customer?.name || 'เดลิเวอรี'),
+        customer_name: tableId ? `โต๊ะ ${tableName}` : (address.name || customer?.name || (deliveryMethod === 'pickup' ? 'รับที่ร้าน' : 'เดลิเวอรี')),
         notes: deliveryNotes
       }
 
@@ -1343,7 +1365,9 @@ function StorefrontApp() {
         deliveryFee: deliveryFee,
         etaMinutes: deliveryCalc.etaMinutes,
         storeLocation: { lat: storeLat, lng: storeLng, name: shop?.name || 'ร้านค้า' },
-        time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+        time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+        orderType: tableId ? 'dine_in' : (deliveryMethod === 'pickup' ? 'takeaway' : 'delivery'),
+        pickupTime: deliveryMethod === 'pickup' ? (pickupTime === 'asap' ? 'เร็วที่สุด' : pickupTime + ' น.') : null
       }
       setLastOrder(newLastOrder)
       setCart([])
@@ -2290,14 +2314,51 @@ function StorefrontApp() {
         {view === 'checkout' && (
           <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 bg-paper">
             <h1 className="text-2xl sm:text-3xl font-black text-ink">
-              {tableId ? `ยืนยันสั่งอาหาร โต๊ะ ${tableName}` : 'ชำระเงินและปักหมุดจัดส่ง'}
+              {tableId ? `ยืนยันสั่งอาหาร โต๊ะ ${tableName}` : 'ชำระเงินและเลือกวิธีรับอาหาร'}
             </h1>
             <p className="text-xs font-semibold text-smoke mt-1">
-              {tableId ? 'ตรวจสอบรายการอาหารเพื่อสั่งตรงไปยังห้องครัว' : 'ระบุพิกัดสถานที่จัดส่งเดลิเวอรีและเลือกช่องทางชำระเงิน'}
+              {tableId ? 'ตรวจสอบรายการอาหารเพื่อสั่งตรงไปยังห้องครัว' : 'เลือกรับอาหารที่ร้าน (ฟรี) หรือจัดส่งถึงที่พักของคุณ'}
             </p>
 
-            {/* Out of Service Area Alert Banner */}
-            {!tableId && deliveryCalc.isOutOfRange && (
+            {/* ── Delivery Method Selector (only for storefront / non-table) ── */}
+            {!tableId && (
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryMethod('delivery')}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 font-bold text-sm transition-all ${
+                    deliveryMethod === 'delivery'
+                      ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-md'
+                      : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50'
+                  }`}
+                >
+                  <span className="text-2xl">🛵</span>
+                  <span className="font-black text-xs sm:text-sm">จัดส่งถึงบ้าน</span>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    deliveryMethod === 'delivery' ? 'bg-orange-100 text-orange-600' : 'bg-zinc-100 text-zinc-400'
+                  }`}>มีค่าจัดส่ง</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDeliveryMethod('pickup')}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 font-bold text-sm transition-all ${
+                    deliveryMethod === 'pickup'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-md'
+                      : 'border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50'
+                  }`}
+                >
+                  <span className="text-2xl">🏪</span>
+                  <span className="font-black text-xs sm:text-sm">รับที่ร้านเอง</span>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                    deliveryMethod === 'pickup' ? 'bg-emerald-100 text-emerald-600' : 'bg-zinc-100 text-zinc-400'
+                  }`}>ฟรี ไม่มีค่าส่ง</span>
+                </button>
+              </div>
+            )}
+
+            {/* Out of Service Area Alert Banner (only for delivery, not pickup) */}
+            {!tableId && deliveryMethod === 'delivery' && deliveryCalc.isOutOfRange && (
               <div className="mt-4 p-4 rounded-2xl bg-red-50 border-2 border-red-200 text-red-700 flex items-start gap-3 animate-fade-in shadow-xs">
                 <ShieldAlert className="size-6 text-red-500 shrink-0 mt-0.5" />
                 <div className="space-y-1">
@@ -2309,8 +2370,31 @@ function StorefrontApp() {
               </div>
             )}
 
-            {/* Free Delivery Promo Alert Banner */}
-            {!tableId && !deliveryCalc.isOutOfRange && (
+            {/* Pickup Confirmation Banner */}
+            {!tableId && deliveryMethod === 'pickup' && (
+              <div className="mt-4 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 text-emerald-900 flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid size-8 place-items-center rounded-xl bg-emerald-500 text-white font-black text-xs">
+                    🏪
+                  </span>
+                  <div>
+                    <p className="text-xs font-black text-emerald-700 flex items-center gap-1">
+                      <Check size={14} className="text-emerald-600" /> เลือกรับสินค้าที่ร้าน — ไม่มีค่าจัดส่ง!
+                    </p>
+                    <p className="text-[10px] text-zinc-500">
+                      กรุณามารับที่ร้าน: <b className="text-zinc-700">{shop?.name || 'ร้านค้า'}</b>
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-[10px] font-bold text-zinc-400 block">ค่าจัดส่ง</span>
+                  <span className="text-sm font-black text-emerald-600">ฟรี (฿0)</span>
+                </div>
+              </div>
+            )}
+
+            {/* Free Delivery Promo Alert Banner (delivery mode only) */}
+            {!tableId && deliveryMethod === 'delivery' && !deliveryCalc.isOutOfRange && (
               <div className="mt-4 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-200/80 text-orange-950 flex items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-2.5">
                   <span className="grid size-8 place-items-center rounded-xl bg-orange-500 text-white font-black text-xs">
@@ -2355,6 +2439,85 @@ function StorefrontApp() {
                         <p className="text-ember font-black">ทานที่ร้าน (โต๊ะ {tableName})</p>
                         <p className="text-xs text-smoke font-medium">อาหารจะถูกส่งไปยังห้องครัวและนำมาเสิร์ฟที่โต๊ะของคุณทันที</p>
                       </div>
+                    </div>
+                  </div>
+                ) : deliveryMethod === 'pickup' ? (
+                  /* Store Pickup Info Card */
+                  <div className="bg-white border border-line rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
+                    <h2 className="text-sm sm:text-base font-black text-ink flex items-center gap-1.5">
+                      <Store size={17} className="text-emerald-500" /> ข้อมูลผู้รับและการรับที่ร้าน
+                    </h2>
+
+                    {/* Customer Info (Name + Phone) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        placeholder="ชื่อผู้รับ *"
+                        value={address.name}
+                        onChange={e => setAddress({ ...address, name: e.target.value })}
+                        className="w-full border border-line outline-none rounded-xl p-3 bg-soft text-ink text-xs focus:border-emerald-500"
+                      />
+                      <input
+                        type="tel"
+                        placeholder="เบอร์โทรติดต่อ *"
+                        value={address.phone}
+                        onChange={e => setAddress({ ...address, phone: e.target.value })}
+                        className="w-full border border-line outline-none rounded-xl p-3 bg-soft text-ink text-xs focus:border-emerald-500"
+                      />
+                    </div>
+
+                    {/* Store Address Info */}
+                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <span className="text-3xl">🏪</span>
+                        <div>
+                          <p className="text-sm font-black text-emerald-800">{shop?.name || 'ร้านค้า'}</p>
+                          <p className="text-[11px] text-emerald-700 font-medium mt-0.5">
+                            กรุณามารับสินค้าที่ร้านหลังจากได้รับการยืนยันออเดอร์
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-white/70 rounded-xl px-3 py-2">
+                        <MapPin size={13} className="text-emerald-500 shrink-0" />
+                        <span>
+                          {storeLat.toFixed(5)}, {storeLng.toFixed(5)}
+                        </span>
+                        <a
+                          href={`https://maps.google.com/?q=${storeLat},${storeLng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-auto text-emerald-600 underline text-[10px] hover:text-emerald-800 font-bold"
+                        >
+                          เปิดแผนที่ →
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Pickup Time Selector */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-zinc-700 flex items-center gap-1.5">
+                        <Clock size={13} className="text-emerald-500" /> เลือกเวลาที่จะมารับ
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {pickupTimeSlots.map((slot) => (
+                          <button
+                            key={slot.value}
+                            type="button"
+                            onClick={() => setPickupTime(slot.value)}
+                            className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border-2 ${
+                              pickupTime === slot.value
+                                ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+                                : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50'
+                            }`}
+                          >
+                            {slot.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-semibold leading-relaxed">
+                      📌 <b>หมายเหตุ:</b> ร้านจะเตรียมออเดอร์ให้พร้อมก่อนที่คุณมารับ กรุณาตรวจสอบเวลาเปดปิดร้านก่อนมา
                     </div>
                   </div>
                 ) : (
@@ -2535,9 +2698,15 @@ function StorefrontApp() {
                     )}
                     {!tableId && (
                       <div className="flex justify-between items-center">
-                        <span>ค่าจัดส่ง ({deliveryCalc.distanceKm} กม.)</span>
                         <span>
-                          {deliveryCalc.isFree ? (
+                          {deliveryMethod === 'pickup'
+                            ? 'ค่าจัดส่ง (รับที่ร้าน)'
+                            : `ค่าจัดส่ง (${deliveryCalc.distanceKm} กม.)`}
+                        </span>
+                        <span>
+                          {deliveryMethod === 'pickup' ? (
+                            <span className="text-emerald-600 font-bold">ฟรี (รับที่ร้าน)</span>
+                          ) : deliveryCalc.isFree ? (
                             <span className="text-emerald-600 font-bold">ฟรี (โปรโมชั่น)</span>
                           ) : (
                             <b>฿{deliveryFee.toLocaleString()}</b>
@@ -2555,21 +2724,20 @@ function StorefrontApp() {
 
                   <button
                     onClick={() => checkout.mutate()}
-                    disabled={checkout.isPending || (!tableId && (deliveryCalc.isOutOfRange || !deliveryEnabled))}
-                    style={{ backgroundColor: !tableId && (deliveryCalc.isOutOfRange || !deliveryEnabled) ? '#9ca3af' : themeColor }}
-                    className="w-full h-11 sm:h-12 rounded-xl text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer hover:brightness-95"
+                    disabled={
+                      checkout.isPending ||
+                      (deliveryMethod === 'delivery' &&
+                        !tableId &&
+                        (deliveryCalc.isOutOfRange || deliveryConfig.delivery_enabled === false))
+                    }
+                    style={{ backgroundColor: themeColor }}
+                    className="w-full h-12 rounded-xl text-white font-bold text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer hover:brightness-95"
                   >
-                    {checkout.isPending ? (
-                      'กำลังส่งคำสั่งซื้อ...'
-                    ) : !tableId && !deliveryEnabled ? (
-                      'ร้านปิดรับเดลิเวอรีชั่วคราว'
-                    ) : !tableId && deliveryCalc.isOutOfRange ? (
-                      '⚠️ อยู่นอกพื้นที่จัดส่ง'
-                    ) : tableId ? (
-                      `ยืนยันสั่งอาหาร โต๊ะ ${tableName}`
-                    ) : (
-                      'ยืนยันสั่งซื้อเดลิเวอรี'
-                    )}
+                    {checkout.isPending
+                      ? (english ? 'Placing order...' : 'กำลังส่งคำสั่งซื้อ...')
+                      : deliveryMethod === 'delivery' && deliveryCalc.isOutOfRange && !tableId
+                      ? (english ? 'Out of delivery range' : 'อยู่นอกพื้นที่จัดส่ง')
+                      : (english ? 'Confirm Order' : 'ยืนยันการสั่งซื้อ')}
                   </button>
                 </div>
               </aside>
@@ -2577,62 +2745,62 @@ function StorefrontApp() {
           </div>
         )}
 
-        {/* ── VIEW: Order History / Live Delivery Track Status ── */}
+        {/* ── VIEW: Track & Live Order Status ── */}
         {view === 'track' && (
-          <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-5 sm:space-y-6 bg-paper">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-ink">
-                {tableId ? (english ? `Order history — table ${tableName}` : `ประวัติการสั่งอาหาร โต๊ะ ${tableName}`) : (english ? 'Track delivery' : 'ติดตามการจัดส่งเดลิเวอรี')}
+          <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-8 bg-paper space-y-6">
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl sm:text-3xl font-black text-ink flex items-center gap-2">
+                <span>{tableId ? (english ? 'Table Orders' : `รายการอาหารโต๊ะ ${tableName}`) : (english ? 'Order Status' : 'ติดตามสถานะคำสั่งซื้อ')}</span>
               </h1>
-              <p className="text-xs font-semibold text-smoke mt-1">
-                {tableId ? (english ? 'All orders for this table, updated live from the kitchen.' : 'รายการออเดอร์ทั้งหมดของโต๊ะนี้ (อัปเดตเรียลไทม์จากห้องครัว)') : (english ? 'Track order status, rider location, and estimated arrival time live.' : 'ติดตามสถานะออเดอร์ พิกัดไรเดอร์ และเวลาถึงโดยประมาณ (ETA) แบบเรียลไทม์')}
-              </p>
+              <button
+                onClick={() => setView('order')}
+                className="text-xs sm:text-sm font-bold text-smoke hover:text-ink flex items-center gap-1 transition"
+              >
+                {english ? 'Back to menu' : 'กลับไปที่เมนู'} <ArrowRight size={14} />
+              </button>
             </div>
 
-            {/* DINE-IN ORDERS HISTORY FOR THIS TABLE */}
             {tableId ? (() => {
-              const validFoodOrders = (tableOrdersQuery.data || []).filter((ord: any) => {
-                const isServiceOrBill =
-                  ord.order_number?.startsWith('BILL') ||
-                  ord.order_number?.startsWith('SRV') ||
-                  ord.order_type === 'service_request' ||
-                  ord.notes?.startsWith('[เรียกพนักงาน]') ||
-                  ord.customer_name?.includes('เรียกเก็บเงิน') ||
-                  ord.customer_name?.includes('เรียกพนักงาน') ||
-                  (!ord.items || ord.items.length === 0)
-                return !isServiceOrBill
-              })
-
-              const activeFoodOrders = validFoodOrders.filter((o: any) => o.status !== 'cancelled')
-
-              return validFoodOrders.length > 0 ? (
-                <div className="space-y-4 sm:space-y-6">
-                  {validFoodOrders.map((ord: any) => {
+              const tableOrders = (tableOrdersQuery.data || []).filter(
+                (o: any) => o.status !== 'cancelled' && !o.order_number?.startsWith('BILL') && !o.order_number?.startsWith('SRV') && o.items && o.items.length > 0
+              )
+              return tableOrders.length > 0 ? (
+                <div className="space-y-4">
+                  {tableOrders.map((ord: any) => {
                     return (
-                      <div key={ord.id} className="bg-white border border-line rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-md space-y-4">
-                        {/* Inline Single-Row Order Header */}
+                      <div key={ord.id} className="bg-white border border-line rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm space-y-4">
+                        {/* Order Round Header */}
                         <div className="flex items-center justify-between border-b border-zinc-100 pb-3 gap-2">
                           <div className="flex items-center gap-2 min-w-0">
-                            <h2 className="text-sm sm:text-base font-black text-zinc-950 shrink-0">
-                              #{ord.order_number || ord.id.slice(0, 7)}
-                            </h2>
+                            <span className="text-xs sm:text-sm font-black text-zinc-950">
+                              {ord.order_number || `#${ord.id?.slice(0, 8)}`}
+                            </span>
                             <span className="text-zinc-300 font-bold">·</span>
                             <span className="text-xs font-semibold text-zinc-500 truncate">
-                              {english ? 'Ordered at' : 'สั่งเมื่อ'} {new Date(ord.created_at).toLocaleTimeString(english ? 'en-US' : 'th-TH', { hour: '2-digit', minute: '2-digit' })}{english ? '' : ' น.'}
+                              {ord.created_at ? new Date(ord.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : ''}
                             </span>
                           </div>
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
                             ord.status === 'completed'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : ord.status === 'cancelled'
-                              ? 'bg-red-50 text-red-700 border border-red-200'
-                              : 'bg-orange-50 text-orange-600 border border-orange-200'
+                              : ['preparing', 'cooking'].includes(ord.status)
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200 animate-pulse'
+                              : 'bg-blue-50 text-blue-700 border border-blue-200'
                           }`}>
-                            {ord.status === 'pending' ? (english ? '🔥 Waiting for acceptance' : '🔥 รอรับออเดอร์') : ord.status === 'accepted' ? (english ? '📋 Order accepted' : '📋 รับออเดอร์แล้ว') : ord.status === 'preparing' ? (english ? '🍳 Preparing' : '🍳 กำลังปรุงอาหาร') : ord.status === 'ready' ? (english ? '🍽️ Ready to serve' : '🍽️ พร้อมเสิร์ฟ') : ord.status === 'completed' ? (english ? '✨ Served' : '✨ เสิร์ฟเรียบร้อย') : ord.status === 'cancelled' ? (english ? '❌ Cancelled' : '❌ ยกเลิกแล้ว') : ord.status}
+                            {ord.status === 'pending'
+                              ? (english ? 'Pending' : 'รอรับออเดอร์')
+                              : ord.status === 'accepted'
+                              ? (english ? 'Accepted' : 'รับออเดอร์แล้ว')
+                              : ord.status === 'preparing'
+                              ? (english ? 'Cooking' : 'กำลังปรุงอาหาร')
+                              : ord.status === 'ready'
+                              ? (english ? 'Ready' : 'พร้อมเสิร์ฟ')
+                              : ord.status === 'completed'
+                              ? (english ? 'Served' : 'เสิร์ฟเรียบร้อย')
+                              : ord.status}
                           </span>
                         </div>
 
-                        {/* 4 Circular Connected Process Steps */}
                         <OrderProcessStepper status={ord.status} orderType={ord.order_type} />
 
                         {/* Order Items List */}
@@ -2704,95 +2872,156 @@ function StorefrontApp() {
                         : lastOrder.status === 'preparing'
                         ? '🍳 กำลังปรุงอาหาร'
                         : ['ready', 'delivering', 'on_the_way'].includes(lastOrder.status)
-                        ? '🛵 ไรเดอร์กำลังจัดส่ง'
+                        ? (lastOrder.orderType === 'takeaway' ? '🛍️ อาหารพร้อมให้มารับแล้ว' : '🛵 ไรเดอร์กำลังจัดส่ง')
                         : lastOrder.status === 'completed'
-                        ? '✨ จัดส่งสำเร็จ'
+                        ? (lastOrder.orderType === 'takeaway' ? '✨ รับอาหารสำเร็จ' : '✨ จัดส่งสำเร็จ')
                         : lastOrder.status}
                     </span>
                   </div>
 
-                  {/* 4 Circular Connected Process Steps (Delivery) */}
-                  <OrderProcessStepper status={lastOrder.status} orderType="delivery" />
+                  {/* 4 Circular Connected Process Steps */}
+                  <OrderProcessStepper status={lastOrder.status} orderType={lastOrder.orderType || 'delivery'} />
 
-                  {/* ETA & Status Countdown Banner */}
-                  <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 via-indigo-50 to-orange-50 border border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                    <div className="flex items-center gap-3">
-                      <span className="grid size-11 place-items-center rounded-2xl bg-blue-500 text-white text-xl shadow-md animate-bounce">
-                        🛵
-                      </span>
-                      <div>
-                        <span className="text-[10px] font-black uppercase tracking-wider text-blue-600">Live Delivery ETA</span>
-                        <h3 className="text-base sm:text-lg font-black text-zinc-900">
-                          {lastOrder.status === 'completed'
-                            ? 'ส่งมอบอาหารถึงมือเรียบร้อยแล้ว'
-                            : ['ready', 'delivering', 'on_the_way'].includes(lastOrder.status)
-                            ? 'ไรเดอร์กำลังเดินทางมาส่งถึงคุณ'
-                            : 'กำลังเตรียมอาหารในครัว คาดว่าจะออกส่งในเร็วๆ นี้'}
-                        </h3>
-                        <p className="text-xs text-zinc-600 font-medium">
-                          เวลาถึงโดยประมาณ: <b className="text-orange-600 font-black">{formatEtaString(lastOrder.etaMinutes || 25)}</b>
-                        </p>
+                  {lastOrder.orderType === 'takeaway' ? (
+                    /* ── PICKUP / TAKEAWAY TRACKING (NO MAP) ── */
+                    <div className="space-y-4">
+                      {/* Pickup Status Banner */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                        <div className="flex items-center gap-3">
+                          <span className="grid size-11 place-items-center rounded-2xl bg-emerald-500 text-white text-xl shadow-md">
+                            🏪
+                          </span>
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600">รับที่ร้าน — Pickup Order</span>
+                            <h3 className="text-base sm:text-lg font-black text-zinc-900">
+                              {lastOrder.status === 'completed' || lastOrder.status === 'ready'
+                                ? 'ออเดอร์พร้อมให้มารับแล้ว!'
+                                : 'ร้านกำลังเตรียมออเดอร์ของคุณ'}
+                            </h3>
+                            <p className="text-xs text-zinc-600 font-medium">
+                              เวลานัดรับ: <b className="text-emerald-700 font-black">{lastOrder.pickupTime || 'เร็วที่สุด'}</b>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {shop?.phone && (
+                            <a
+                              href={`tel:${shop.phone}`}
+                              className="px-3.5 py-2 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-50 text-xs font-bold text-zinc-800 shadow-xs flex items-center gap-1.5 transition active:scale-95"
+                            >
+                              <Phone size={13} className="text-emerald-500" /> โทรหาร้านค้า
+                            </a>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex gap-2">
-                      {shop?.phone && (
-                        <a
-                          href={`tel:${shop.phone}`}
-                          className="px-3.5 py-2 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-50 text-xs font-bold text-zinc-800 shadow-xs flex items-center gap-1.5 transition active:scale-95"
-                        >
-                          <Phone size={13} className="text-emerald-500" /> โทรหาร้านค้า
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Interactive Live Map Tracking */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs font-bold text-zinc-700">
-                      <span className="flex items-center gap-1.5">
-                        <Navigation size={14} className="text-orange-500" /> แผนที่เส้นทางการจัดส่งสด (Live Tracking Map)
-                      </span>
-                      <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
-                        <span className="size-2 rounded-full bg-emerald-500 animate-ping" /> Realtime GPS
-                      </span>
-                    </div>
-
-                    <DeliveryRouteMap
-                      mode="live_track"
-                      height="320px"
-                      storeLocation={lastOrder.storeLocation || { lat: storeLat, lng: storeLng, name: shop?.name || 'ร้านค้า' }}
-                      customerLocation={{
-                        lat: lastOrder.address?.lat || address.lat,
-                        lng: lastOrder.address?.lng || address.lng,
-                        address: lastOrder.address?.address || 'ที่อยู่จัดส่ง'
-                      }}
-                      riderProgress={riderProgress}
-                      riderStatus={lastOrder.status}
-                    />
-                  </div>
-
-                  {/* Delivery Location Details */}
-                  {lastOrder.address && (
-                    <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/80 space-y-2 text-xs">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      {/* Store Location Card */}
+                      <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-3 text-xs">
                         <span className="font-bold text-zinc-900 flex items-center gap-1.5">
-                          <MapPin size={15} className="text-orange-500" /> สถานที่จัดส่งปลายทาง:
+                          <Store size={14} className="text-emerald-600" /> สถานที่รับสินค้า (หน้าร้าน):
                         </span>
-                        <a
-                          href={`https://maps.google.com/?q=${lastOrder.address.lat},${lastOrder.address.lng}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-orange-600 font-bold hover:underline flex items-center gap-1 text-xs"
-                        >
-                          <Navigation size={12} /> นำทางด้วย Google Maps
-                        </a>
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl">🏪</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-black text-emerald-900 text-sm">{shop?.name || 'ร้านค้า'}</p>
+                            <p className="text-zinc-600 mt-0.5">ผู้สั่ง: <b>{lastOrder.address?.name || customer?.name}</b> (โทร {lastOrder.address?.phone || customer?.phone})</p>
+                            <p className="text-zinc-400 text-[11px] mt-0.5">พิกัดร้าน: {storeLat.toFixed(5)}, {storeLng.toFixed(5)}</p>
+                          </div>
+                          <a
+                            href={`https://maps.google.com/?q=${storeLat},${storeLng}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-3 py-1.5 rounded-xl bg-white border border-emerald-300 text-emerald-700 font-bold text-xs hover:bg-emerald-100 transition flex items-center gap-1 shrink-0 shadow-xs"
+                          >
+                            <Navigation size={12} /> เปิดแผนที่ Google Maps
+                          </a>
+                        </div>
                       </div>
-                      <p className="text-zinc-600 font-medium break-words leading-relaxed">
-                        <b>{lastOrder.address.name || customer?.name}</b> ({lastOrder.address.phone || customer?.phone}) — {lastOrder.address.address}
-                        {lastOrder.address.note && <span className="block text-zinc-400 text-[11px] mt-0.5">จุดสังเกต: {lastOrder.address.note}</span>}
-                      </p>
                     </div>
+                  ) : (
+                    /* ── DELIVERY TRACKING (WITH LIVE MAP) ── */
+                    <>
+                      {/* ETA & Status Countdown Banner */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 via-indigo-50 to-orange-50 border border-blue-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                        <div className="flex items-center gap-3">
+                          <span className="grid size-11 place-items-center rounded-2xl bg-blue-500 text-white text-xl shadow-md animate-bounce">
+                            🛵
+                          </span>
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-blue-600">Live Delivery ETA</span>
+                            <h3 className="text-base sm:text-lg font-black text-zinc-900">
+                              {lastOrder.status === 'completed'
+                                ? 'ส่งมอบอาหารถึงมือเรียบร้อยแล้ว'
+                                : ['ready', 'delivering', 'on_the_way'].includes(lastOrder.status)
+                                ? 'ไรเดอร์กำลังเดินทางมาส่งถึงคุณ'
+                                : 'กำลังเตรียมอาหารในครัว คาดว่าจะออกส่งในเร็วๆ นี้'}
+                            </h3>
+                            <p className="text-xs text-zinc-600 font-medium">
+                              เวลาถึงโดยประมาณ: <b className="text-orange-600 font-black">{formatEtaString(lastOrder.etaMinutes || 25)}</b>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          {shop?.phone && (
+                            <a
+                              href={`tel:${shop.phone}`}
+                              className="px-3.5 py-2 rounded-xl bg-white border border-zinc-200 hover:bg-zinc-50 text-xs font-bold text-zinc-800 shadow-xs flex items-center gap-1.5 transition active:scale-95"
+                            >
+                              <Phone size={13} className="text-emerald-500" /> โทรหาร้านค้า
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Interactive Live Map Tracking */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-zinc-700">
+                          <span className="flex items-center gap-1.5">
+                            <Navigation size={14} className="text-orange-500" /> แผนที่เส้นทางการจัดส่งสด (Live Tracking Map)
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                            <span className="size-2 rounded-full bg-emerald-500 animate-ping" /> Realtime GPS
+                          </span>
+                        </div>
+
+                        <DeliveryRouteMap
+                          mode="live_track"
+                          height="320px"
+                          storeLocation={lastOrder.storeLocation || { lat: storeLat, lng: storeLng, name: shop?.name || 'ร้านค้า' }}
+                          customerLocation={{
+                            lat: lastOrder.address?.lat || address.lat,
+                            lng: lastOrder.address?.lng || address.lng,
+                            address: lastOrder.address?.address || 'ที่อยู่จัดส่ง'
+                          }}
+                          riderProgress={riderProgress}
+                          riderStatus={lastOrder.status}
+                        />
+                      </div>
+
+                      {/* Delivery Location Details */}
+                      {lastOrder.address && (
+                        <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200/80 space-y-2 text-xs">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                            <span className="font-bold text-zinc-900 flex items-center gap-1.5">
+                              <MapPin size={15} className="text-orange-500" /> สถานที่จัดส่งปลายทาง:
+                            </span>
+                            <a
+                              href={`https://maps.google.com/?q=${lastOrder.address.lat},${lastOrder.address.lng}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-orange-600 font-bold hover:underline flex items-center gap-1 text-xs"
+                            >
+                              <Navigation size={12} /> นำทางด้วย Google Maps
+                            </a>
+                          </div>
+                          <p className="text-zinc-600 font-medium break-words leading-relaxed">
+                            <b>{lastOrder.address.name || customer?.name}</b> ({lastOrder.address.phone || customer?.phone}) — {lastOrder.address.address}
+                            {lastOrder.address.note && <span className="block text-zinc-400 text-[11px] mt-0.5">จุดสังเกต: {lastOrder.address.note}</span>}
+                          </p>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {/* Items Ordered List */}
@@ -2807,7 +3036,7 @@ function StorefrontApp() {
                       ))}
                     </div>
                     <div className="flex justify-between items-center pt-2 text-sm font-black text-zinc-900 border-t border-zinc-200">
-                      <span>ยอดรวมทั้งสิ้น (รวมค่าจัดส่ง)</span>
+                      <span>ยอดรวมทั้งสิ้น{lastOrder.orderType !== 'takeaway' ? ' (รวมค่าจัดส่ง)' : ''}</span>
                       <span className="text-base text-orange-600 font-black">฿{Number(lastOrder.total || 0).toLocaleString()}</span>
                     </div>
                   </div>
