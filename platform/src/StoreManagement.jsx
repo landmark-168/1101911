@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  BarChart3, Bell, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign,
-  Eye, LayoutDashboard, LogOut, Menu, MoreHorizontal, Package, Pencil, Search, Settings,
+  BarChart3, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign,
+  Eye, LayoutDashboard, LogOut, Package, Pencil, Search, Settings,
   ShieldCheck, Store, Trash2, UserRoundCheck, Users, X, Zap,
 } from 'lucide-react'
 import { deleteStore, fetchStores, requireSuperAdmin, signOut, updateStore, updateStoreStatus } from './lib/database'
@@ -22,39 +22,583 @@ const initialStores = [
   { id:'SP-2836', name:'ชาใจดี', owner:'อรอุมา พรชัย', email:'ornuma@chajaidee.co', phone:'088-671-4430', package:'Starter', status:'Pending', created:'9 ธ.ค. 2026', province:'นครราชสีมา' },
 ]
 
-const navItems = [['Dashboard',LayoutDashboard,'/admin'],['ร้านค้า',Store,'/admin/stores'],['แพ็กเกจ',Package,'/admin/packages'],['รายได้',CircleDollarSign,'/admin/revenue'],['สมาชิก',Users,'/admin/members'],['Analytics',BarChart3,'/admin/analytics']]
-const statusStyle = { Active:'bg-emerald-50 text-emerald-700 ring-emerald-200', Pending:'bg-amber-50 text-amber-700 ring-amber-200', Suspended:'bg-red-50 text-red-600 ring-red-200' }
-const planStyle = { Starter:'bg-zinc-100 text-zinc-600', Business:'bg-orange-100 text-orange-700', Enterprise:'bg-violet-100 text-violet-700' }
+const navItems = [
+  ['แดชบอร์ด', LayoutDashboard, '/admin'],
+  ['ร้านค้า', Store, '/admin/stores'],
+  ['แพ็กเกจ', Package, '/admin/packages'],
+  ['รายได้', CircleDollarSign, '/admin/revenue'],
+  ['สมาชิก', Users, '/admin/members'],
+  ['สถิติและการวิเคราะห์', BarChart3, '/admin/analytics'],
+]
 
-function Logo(){return <a href="/" className="flex items-center gap-2.5"><span className="grid size-9 place-items-center rounded-xl bg-orange-500 text-white"><Zap size={18} fill="currentColor"/></span><span className="text-lg font-extrabold text-white">Smart<span className="text-orange-500">POS</span></span><span className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-zinc-400">ADMIN</span></a>}
-
-function Sidebar({open,onClose,storeCount}){return <><button onClick={onClose} className={`fixed inset-0 z-40 bg-zinc-950/50 backdrop-blur-sm transition lg:hidden ${open?'visible opacity-100':'invisible opacity-0'}`} aria-label="ปิดเมนู"/><aside className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col bg-zinc-950 px-4 pb-5 pt-5 text-white transition-transform duration-300 lg:translate-x-0 ${open?'translate-x-0':'-translate-x-full'}`}><div className="flex h-12 items-center justify-between px-2"><Logo/><button onClick={onClose} className="grid size-9 place-items-center rounded-lg text-zinc-400 hover:bg-white/10 lg:hidden"><X size={20}/></button></div><p className="mt-8 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-zinc-600">Management</p><nav className="mt-3 space-y-1">{navItems.map(([label,Icon,href])=><a key={label} href={href} className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${label==='ร้านค้า'?'bg-orange-500 text-white shadow-lg shadow-orange-500/15':'text-zinc-400 hover:bg-white/5 hover:text-white'}`}><Icon size={19}/>{label}{label==='ร้านค้า'&&<span className="ml-auto rounded-full bg-white/15 px-2 py-0.5 text-[10px]">{Number(storeCount || 0).toLocaleString()}</span>}</a>)}</nav><p className="mt-8 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-zinc-600">System</p><a href="/admin/settings" className="mt-3 flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-zinc-400 hover:bg-white/5 hover:text-white"><Settings size={19}/>Setting</a><button onClick={signOut} className="mt-1 flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-zinc-400 hover:bg-red-500/10 hover:text-red-400"><LogOut size={19}/>ออกจากระบบ</button></aside></>}
-
-function StoreModal({store,onClose}){if(!store)return null;return <div className="fixed inset-0 z-[70] grid place-items-center bg-zinc-950/55 p-4 backdrop-blur-sm" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><div className="w-full max-w-lg rounded-[24px] bg-white p-6 shadow-2xl sm:p-7"><div className="flex items-start justify-between"><div className="flex items-center gap-3"><span className="grid size-12 place-items-center rounded-2xl bg-orange-100 text-xl font-black text-orange-600">{store.name[0]}</span><div><h2 className="text-lg font-black">{store.name}</h2><p className="mt-1 text-xs text-zinc-400">{store.code||store.id}</p></div></div><button onClick={onClose} className="grid size-9 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100"><X size={18}/></button></div><div className="mt-6 grid gap-4 rounded-2xl bg-zinc-50 p-5 sm:grid-cols-2">{[['รหัสร้าน',store.code||store.id],['ประเภทร้าน',store.shopType||'-'],['เจ้าของร้าน',store.owner||'-'],['อีเมล',store.email||'-'],['เบอร์โทร',store.phone||'-'],['จังหวัด',store.province||'-'],['ที่อยู่',store.address||'-'],['พิกัด',(store.latitude&&store.longitude)?`${store.latitude}, ${store.longitude}`:'-'],['วันที่สมัคร',store.created||'-']].map(([k,v])=><div key={k} className={k==='ที่อยู่'?'sm:col-span-2':''}><p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">{k}</p><p className="mt-1 text-sm font-semibold text-zinc-700">{v}</p></div>)}</div><div className="mt-5 flex items-center justify-between"><span className={`rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${statusStyle[store.status]}`}>{store.status}</span><button onClick={onClose} className="h-10 rounded-xl bg-zinc-950 px-5 text-sm font-bold text-white">ปิด</button></div></div></div>}
-
-const storeForm = store => ({name:store?.name||'',owner:store?.owner||'',logoUrl:store?.logoUrl||'',shopType:store?.shopType||'',phone:store?.phone||'',email:store?.email||'',province:store?.province||'',address:store?.address||'',status:store?.status||'Pending',latitude:store?.latitude ?? '',longitude:store?.longitude ?? ''})
-
-function EditStoreModal({store,onClose,onSave}){
-  const [form,setForm]=useState(()=>storeForm(store)); const [saving,setSaving]=useState(false); const [error,setError]=useState('')
-  useEffect(()=>{setForm(storeForm(store));setError('')},[store])
-  if(!store)return null
-  const setValue=(field,value)=>setForm(current=>({...current,[field]:value}))
-  const submit=async event=>{event.preventDefault();if(!form.name.trim()||!form.owner.trim()||!form.shopType.trim()||!form.phone.trim()||!form.email.trim()||!form.province.trim()||!form.address.trim()){setError('กรุณากรอกข้อมูลที่จำเป็นให้ครบ');return}if(!/^\S+@\S+\.\S+$/.test(form.email)){setError('รูปแบบอีเมลไม่ถูกต้อง');return}if((form.latitude!==''&&(!Number.isFinite(Number(form.latitude))||Number(form.latitude)<-90||Number(form.latitude)>90))||(form.longitude!==''&&(!Number.isFinite(Number(form.longitude))||Number(form.longitude)<-180||Number(form.longitude)>180))){setError('พิกัดละติจูด/ลองจิจูดไม่ถูกต้อง');return}setSaving(true);setError('');try{await onSave(store.id,{...form,ownerId:store.ownerId});onClose()}catch(err){setError(err.message)}finally{setSaving(false)}}
-  const inputClass="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-  return <div className="fixed inset-0 z-[70] grid place-items-center bg-zinc-950/55 p-4 backdrop-blur-sm" onMouseDown={event=>event.target===event.currentTarget&&onClose()}><form onSubmit={submit} className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col rounded-[24px] bg-white shadow-2xl"><div className="flex items-center justify-between border-b border-zinc-100 p-6 sm:px-7"><div><h2 className="text-lg font-black">แก้ไขข้อมูลร้านค้า</h2><p className="mt-1 text-xs text-zinc-400">{store.code||store.id}</p></div><button type="button" onClick={onClose} className="grid size-9 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100"><X size={18}/></button></div><div className="overflow-y-auto p-6 sm:px-7"><div className="grid gap-5 sm:grid-cols-2"><label className="sm:col-span-2"><span className="mb-2 block text-sm font-bold">ชื่อร้าน *</span><input required value={form.name} onChange={event=>setValue('name',event.target.value)} className={inputClass}/></label><label><span className="mb-2 block text-sm font-bold">ชื่อเจ้าของร้าน *</span><input required value={form.owner} onChange={event=>setValue('owner',event.target.value)} className={inputClass}/></label><label><span className="mb-2 block text-sm font-bold">ประเภทร้าน *</span><input required value={form.shopType} onChange={event=>setValue('shopType',event.target.value)} className={inputClass}/></label><label><span className="mb-2 block text-sm font-bold">อีเมลร้าน *</span><input required type="email" value={form.email} onChange={event=>setValue('email',event.target.value)} className={inputClass}/></label><label><span className="mb-2 block text-sm font-bold">เบอร์โทร *</span><input required value={form.phone} onChange={event=>setValue('phone',event.target.value)} className={inputClass}/></label><label><span className="mb-2 block text-sm font-bold">จังหวัด *</span><input required value={form.province} onChange={event=>setValue('province',event.target.value)} className={inputClass}/></label><label className="sm:col-span-2"><span className="mb-2 block text-sm font-bold">ที่อยู่ *</span><textarea required rows="3" value={form.address} onChange={event=>setValue('address',event.target.value)} className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"/></label><label className="sm:col-span-2"><span className="mb-2 block text-sm font-bold">URL โลโก้</span><input type="url" value={form.logoUrl} onChange={event=>setValue('logoUrl',event.target.value)} className={inputClass} placeholder="https://..."/></label><label><span className="mb-2 block text-sm font-bold">ละติจูด</span><input type="number" step="any" value={form.latitude} onChange={event=>setValue('latitude',event.target.value)} className={inputClass}/></label><label><span className="mb-2 block text-sm font-bold">ลองจิจูด</span><input type="number" step="any" value={form.longitude} onChange={event=>setValue('longitude',event.target.value)} className={inputClass}/></label><label className="sm:col-span-2"><span className="mb-2 block text-sm font-bold">สถานะร้าน</span><select value={form.status} onChange={event=>setValue('status',event.target.value)} className={`${inputClass} bg-white`}><option>Pending</option><option>Active</option><option>Suspended</option></select></label></div>{error&&<p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-600">{error}</p>}</div><div className="flex gap-3 border-t border-zinc-100 p-6 sm:px-7"><button type="button" onClick={onClose} className="h-11 flex-1 rounded-xl border border-zinc-200 text-sm font-bold">ยกเลิก</button><button disabled={saving} className="h-11 flex-1 rounded-xl bg-orange-500 text-sm font-bold text-white disabled:opacity-60">{saving?'กำลังบันทึก…':'บันทึกการแก้ไข'}</button></div></form></div>
+const statusStyle = {
+  Active: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  Pending: 'bg-amber-50 text-amber-700 ring-amber-200',
+  Suspended: 'bg-red-50 text-red-600 ring-red-200',
 }
 
-export default function StoreManagement(){
-  const [stores,setStores]=useState([]); const [query,setQuery]=useState(''); const [status,setStatus]=useState('All'); const [page,setPage]=useState(1); const [sidebar,setSidebar]=useState(false); const [selected,setSelected]=useState(null); const [editing,setEditing]=useState(null); const [menu,setMenu]=useState(null); const [loading,setLoading]=useState(true); const [dbError,setDbError]=useState(''); const perPage=5
-  useEffect(()=>{let live=true;(async()=>{try{const auth=await requireSuperAdmin();if(!auth.session){window.location.replace('/login');return}if(!auth.allowed){window.location.replace('/');return}const rows=await fetchStores();if(live)setStores(rows)}catch(error){if(live)setDbError(error.message)}finally{if(live)setLoading(false)}})();return()=>{live=false}},[])
-  const filtered=useMemo(()=>stores.filter(s=>(!query||`${s.name} ${s.owner} ${s.email} ${s.id}`.toLowerCase().includes(query.toLowerCase()))&&(status==='All'||s.status===status)),[stores,query,status]); const pages=Math.max(1,Math.ceil(filtered.length/perPage)); const shown=filtered.slice((page-1)*perPage,page*perPage)
-  const filter=(setter,value)=>{setter(value);setPage(1)}; const changeStatus=async(id,next)=>{try{await updateStoreStatus(id,next);setStores(x=>x.map(s=>s.id===id?{...s,status:next}:s));setDbError('')}catch(error){setDbError(error.message)}setMenu(null)}; const remove=async id=>{if(!window.confirm('ยืนยันการลบร้านค้านี้?'))return;try{await deleteStore(id);setStores(x=>x.filter(s=>s.id!==id));setDbError('')}catch(error){setDbError(error.message)}setMenu(null)}
-  const saveStore=async(id,changes)=>{const saved=await updateStore(id,changes);setStores(items=>items.map(store=>store.id===id?saved:store));setDbError('')}
-  if(loading)return <div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังตรวจสอบสิทธิ์…</div>
-  return <div className="min-h-screen bg-[#f7f7f8] text-zinc-950"><Sidebar open={sidebar} onClose={()=>setSidebar(false)} storeCount={stores.length}/><div className="lg:pl-[270px]">
-  <AdminHeader onOpenSidebar={() => setSidebar(true)} category="Management" title="จัดการร้านค้า" />
-  <main className="p-4 sm:p-6 lg:p-8"><div className="mx-auto max-w-[1500px]"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><h1 className="text-2xl font-black tracking-tight sm:text-3xl">จัดการร้านค้า</h1><p className="mt-2 text-sm text-zinc-500">ตรวจสอบ อนุมัติ และจัดการร้านค้าทั้งหมดในระบบ</p></div><div className="flex gap-2"><div className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-right shadow-sm"><p className="text-[10px] text-zinc-400">ร้านค้าทั้งหมด</p><p className="text-lg font-black">{stores.length.toLocaleString()}</p></div><div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-right"><p className="text-[10px] text-amber-600">รออนุมัติ</p><p className="text-lg font-black text-amber-700">{stores.filter(x=>x.status==='Pending').length}</p></div></div></div>
-  <section className="mt-7 overflow-visible rounded-2xl border border-zinc-200/80 bg-white shadow-sm"><div className="border-b border-zinc-100 p-4 sm:p-5"><div className="flex flex-col gap-3 xl:flex-row"><div className="relative flex-1"><Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400"/><input value={query} onChange={e=>filter(setQuery,e.target.value)} className="h-11 w-full rounded-xl border border-zinc-200 bg-zinc-50 pl-10 pr-4 text-sm outline-none focus:border-orange-300 focus:bg-white focus:ring-4 focus:ring-orange-100" placeholder="ค้นหาชื่อร้าน, Owner, Email หรือ Store ID..."/></div><div className="grid grid-cols-2 gap-3 sm:flex"><div className="relative"><select value={status} onChange={e=>filter(setStatus,e.target.value)} className="h-11 w-full appearance-none rounded-xl border border-zinc-200 bg-white pl-4 pr-9 text-xs font-semibold outline-none sm:w-40"><option value="All">ทุกสถานะ</option><option>Active</option><option>Pending</option><option>Suspended</option></select><ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400"/></div></div></div></div>
-  <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left"><thead><tr className="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-400"><th className="px-6 py-3.5 font-bold">ชื่อร้าน</th><th className="px-4 py-3.5 font-bold">Owner</th><th className="px-4 py-3.5 font-bold">Status</th><th className="px-4 py-3.5 font-bold">Created Date</th><th className="px-6 py-3.5 text-right font-bold">Action</th></tr></thead><tbody>{shown.map(s=><tr key={s.id} className="border-t border-zinc-100 hover:bg-orange-50/30"><td className="px-6 py-4"><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-orange-100 text-sm font-black text-orange-600">{s.name[0]}</span><div><p className="text-sm font-bold">{s.name}</p><p className="mt-0.5 text-[10px] text-zinc-400">{s.id} · {s.province}</p></div></div></td><td className="px-4 py-4"><p className="text-xs font-semibold text-zinc-700">{s.owner}</p><p className="mt-1 text-[10px] text-zinc-400">{s.email}</p></td><td className="px-4 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${statusStyle[s.status]}`}><span className="size-1.5 rounded-full bg-current"/>{s.status}</span></td><td className="px-4 py-4 text-xs text-zinc-500">{s.created}</td><td className="relative px-6 py-4 text-right"><button onClick={()=>setMenu(menu===s.id?null:s.id)} className="grid size-9 place-items-center rounded-lg border border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"><MoreHorizontal size={18}/></button>{menu===s.id&&<div className="absolute bottom-14 right-6 z-30 w-44 rounded-xl border border-zinc-200 bg-white p-1.5 text-left shadow-xl"><button onClick={()=>{setSelected(s);setMenu(null)}} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold hover:bg-zinc-50"><Eye size={15}/>View Detail</button><button onClick={()=>{setEditing(s);setMenu(null)}} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold hover:bg-zinc-50"><Pencil size={15}/>Edit Store</button>{s.status!=='Active'&&<button onClick={()=>changeStatus(s.id,'Active')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-emerald-600 hover:bg-emerald-50"><UserRoundCheck size={15}/>Approve</button>}{s.status!=='Suspended'&&<button onClick={()=>changeStatus(s.id,'Suspended')} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-amber-600 hover:bg-amber-50"><ShieldCheck size={15}/>Suspend</button>}<div className="my-1 h-px bg-zinc-100"/><button onClick={()=>remove(s.id)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-50"><Trash2 size={15}/>Delete</button></div>}</td></tr>)}</tbody></table>{!shown.length&&<div className="py-16 text-center"><Store size={32} className="mx-auto text-zinc-300"/><p className="mt-3 text-sm font-bold text-zinc-500">ไม่พบร้านค้าที่ค้นหา</p></div>}</div>
-  <div className="flex flex-col items-center justify-between gap-3 border-t border-zinc-100 px-5 py-4 sm:flex-row"><p className="text-xs text-zinc-400">แสดง {filtered.length?((page-1)*perPage)+1:0}–{Math.min(page*perPage,filtered.length)} จาก {filtered.length} ร้าน</p><div className="flex items-center gap-1"><button disabled={page===1} onClick={()=>setPage(p=>p-1)} className="grid size-9 place-items-center rounded-lg border border-zinc-200 disabled:opacity-35"><ChevronLeft size={16}/></button>{Array.from({length:pages},(_,i)=>i+1).map(p=><button key={p} onClick={()=>setPage(p)} className={`grid size-9 place-items-center rounded-lg text-xs font-bold ${page===p?'bg-orange-500 text-white':'border border-zinc-200 bg-white text-zinc-500'}`}>{p}</button>)}<button disabled={page===pages} onClick={()=>setPage(p=>p+1)} className="grid size-9 place-items-center rounded-lg border border-zinc-200 disabled:opacity-35"><ChevronRight size={16}/></button></div></div></section></div></main></div><StoreModal store={selected} onClose={()=>setSelected(null)}/><EditStoreModal store={editing} onClose={()=>setEditing(null)} onSave={saveStore}/></div>
+const statusLabel = {
+  Active: 'เปิดใช้งาน',
+  Pending: 'รออนุมัติ',
+  Suspended: 'ระงับการใช้งาน',
+}
+
+function Logo() {
+  return (
+    <a href="/" className="flex items-center gap-2.5">
+      <span className="grid size-9 place-items-center rounded-xl bg-orange-500 text-white">
+        <Zap size={18} fill="currentColor" />
+      </span>
+      <span className="text-lg font-extrabold text-white">
+        Smart<span className="text-orange-500">POS</span>
+      </span>
+      <span className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-bold text-zinc-400">
+        ผู้ดูแลระบบ
+      </span>
+    </a>
+  )
+}
+
+function Sidebar({ open, onClose, storeCount }) {
+  return (
+    <>
+      <button
+        onClick={onClose}
+        className={`fixed inset-0 z-40 bg-zinc-950/50 backdrop-blur-sm transition lg:hidden ${open ? 'visible opacity-100' : 'invisible opacity-0'}`}
+        aria-label="ปิดเมนู"
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col bg-zinc-950 px-4 pb-5 pt-5 text-white transition-transform duration-300 lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="flex h-12 items-center justify-between px-2">
+          <Logo />
+          <button onClick={onClose} className="grid size-9 place-items-center rounded-lg text-zinc-400 hover:bg-white/10 lg:hidden">
+            <X size={20} />
+          </button>
+        </div>
+        <p className="mt-8 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-zinc-600">การจัดการ</p>
+        <nav className="mt-3 space-y-1">
+          {navItems.map(([label, Icon, href]) => (
+            <a
+              key={label}
+              href={href}
+              className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${label === 'ร้านค้า' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/15' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}
+            >
+              <Icon size={19} />
+              {label}
+              {label === 'ร้านค้า' && (
+                <span className="ml-auto rounded-full bg-white/15 px-2 py-0.5 text-[10px]">
+                  {Number(storeCount || 0).toLocaleString()}
+                </span>
+              )}
+            </a>
+          ))}
+        </nav>
+        <p className="mt-8 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-zinc-600">ระบบ</p>
+        <a
+          href="/admin/settings"
+          className="mt-3 flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-zinc-400 hover:bg-white/5 hover:text-white"
+        >
+          <Settings size={19} />
+          ตั้งค่าระบบ
+        </a>
+        <button
+          onClick={signOut}
+          className="mt-1 flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+        >
+          <LogOut size={19} />
+          ออกจากระบบ
+        </button>
+      </aside>
+    </>
+  )
+}
+
+function StoreModal({ store, onClose }) {
+  if (!store) return null
+  return (
+    <div
+      className="fixed inset-0 z-[70] grid place-items-center bg-zinc-950/55 p-4 backdrop-blur-sm"
+      onMouseDown={e => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-lg rounded-[24px] bg-white p-6 shadow-2xl sm:p-7">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <span className="grid size-12 place-items-center rounded-2xl bg-orange-100 text-xl font-black text-orange-600">
+              {store.name[0]}
+            </span>
+            <div>
+              <h2 className="text-lg font-black">{store.name}</h2>
+              <p className="mt-1 text-xs text-zinc-400">{store.code || store.id}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="grid size-9 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="mt-6 grid gap-4 rounded-2xl bg-zinc-50 p-5 sm:grid-cols-2">
+          {[
+            ['รหัสร้านค้า', store.code || store.id],
+            ['ประเภทร้านค้า', store.shopType || '-'],
+            ['ชื่อเจ้าของร้าน', store.owner || '-'],
+            ['อีเมล', store.email || '-'],
+            ['เบอร์โทรศัพท์', store.phone || '-'],
+            ['จังหวัด', store.province || '-'],
+            ['ที่อยู่', store.address || '-'],
+            ['พิกัดตำแหน่ง', (store.latitude && store.longitude) ? `${store.latitude}, ${store.longitude}` : '-'],
+            ['วันที่สมัครใช้งาน', store.created || '-'],
+          ].map(([k, v]) => (
+            <div key={k} className={k === 'ที่อยู่' ? 'sm:col-span-2' : ''}>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">{k}</p>
+              <p className="mt-1 text-sm font-semibold text-zinc-700">{v}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 flex items-center justify-between">
+          <span className={`rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${statusStyle[store.status] || statusStyle.Pending}`}>
+            {statusLabel[store.status] || store.status}
+          </span>
+          <button onClick={onClose} className="h-10 rounded-xl bg-zinc-950 px-5 text-sm font-bold text-white">
+            ปิด
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const storeForm = store => ({
+  name: store?.name || '',
+  owner: store?.owner || '',
+  logoUrl: store?.logoUrl || '',
+  shopType: store?.shopType || '',
+  phone: store?.phone || '',
+  email: store?.email || '',
+  province: store?.province || '',
+  address: store?.address || '',
+  status: store?.status || 'Pending',
+  latitude: store?.latitude ?? '',
+  longitude: store?.longitude ?? '',
+})
+
+function EditStoreModal({ store, onClose, onSave }) {
+  const [form, setForm] = useState(() => storeForm(store))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setForm(storeForm(store))
+    setError('')
+  }, [store])
+
+  if (!store) return null
+
+  const setValue = (field, value) => setForm(current => ({ ...current, [field]: value }))
+
+  const submit = async event => {
+    event.preventDefault()
+    if (!form.name.trim() || !form.owner.trim() || !form.shopType.trim() || !form.phone.trim() || !form.email.trim() || !form.province.trim() || !form.address.trim()) {
+      setError('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน')
+      return
+    }
+    if (!/^\S+@\S+\.\S+$/.test(form.email)) {
+      setError('รูปแบบอีเมลไม่ถูกต้อง')
+      return
+    }
+    if (
+      (form.latitude !== '' && (!Number.isFinite(Number(form.latitude)) || Number(form.latitude) < -90 || Number(form.latitude) > 90)) ||
+      (form.longitude !== '' && (!Number.isFinite(Number(form.longitude)) || Number(form.longitude) < -180 || Number(form.longitude) > 180))
+    ) {
+      setError('พิกัดละติจูดหรือลองจิจูดไม่ถูกต้อง')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      await onSave(store.id, { ...form, ownerId: store.ownerId })
+      onClose()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputClass = 'h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100'
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] grid place-items-center bg-zinc-950/55 p-4 backdrop-blur-sm"
+      onMouseDown={event => event.target === event.currentTarget && onClose()}
+    >
+      <form onSubmit={submit} className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col rounded-[24px] bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-zinc-100 p-6 sm:px-7">
+          <div>
+            <h2 className="text-lg font-black">แก้ไขข้อมูลร้านค้า</h2>
+            <p className="mt-1 text-xs text-zinc-400">{store.code || store.id}</p>
+          </div>
+          <button type="button" onClick={onClose} className="grid size-9 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-100">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="overflow-y-auto p-6 sm:px-7">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <label className="sm:col-span-2">
+              <span className="mb-2 block text-sm font-bold">ชื่อร้านค้า *</span>
+              <input required value={form.name} onChange={event => setValue('name', event.target.value)} className={inputClass} />
+            </label>
+            <label>
+              <span className="mb-2 block text-sm font-bold">ชื่อเจ้าของร้าน *</span>
+              <input required value={form.owner} onChange={event => setValue('owner', event.target.value)} className={inputClass} />
+            </label>
+            <label>
+              <span className="mb-2 block text-sm font-bold">ประเภทร้านค้า *</span>
+              <input required value={form.shopType} onChange={event => setValue('shopType', event.target.value)} className={inputClass} />
+            </label>
+            <label>
+              <span className="mb-2 block text-sm font-bold">อีเมลร้านค้า *</span>
+              <input required type="email" value={form.email} onChange={event => setValue('email', event.target.value)} className={inputClass} />
+            </label>
+            <label>
+              <span className="mb-2 block text-sm font-bold">เบอร์โทรศัพท์ *</span>
+              <input required value={form.phone} onChange={event => setValue('phone', event.target.value)} className={inputClass} />
+            </label>
+            <label>
+              <span className="mb-2 block text-sm font-bold">จังหวัด *</span>
+              <input required value={form.province} onChange={event => setValue('province', event.target.value)} className={inputClass} />
+            </label>
+            <label className="sm:col-span-2">
+              <span className="mb-2 block text-sm font-bold">ที่อยู่ร้านค้า *</span>
+              <textarea
+                required
+                rows="3"
+                value={form.address}
+                onChange={event => setValue('address', event.target.value)}
+                className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+              />
+            </label>
+            <label className="sm:col-span-2">
+              <span className="mb-2 block text-sm font-bold">ลิงก์รูปภาพโลโก้</span>
+              <input type="url" value={form.logoUrl} onChange={event => setValue('logoUrl', event.target.value)} className={inputClass} placeholder="https://..." />
+            </label>
+            <label>
+              <span className="mb-2 block text-sm font-bold">ละติจูด</span>
+              <input type="number" step="any" value={form.latitude} onChange={event => setValue('latitude', event.target.value)} className={inputClass} />
+            </label>
+            <label>
+              <span className="mb-2 block text-sm font-bold">ลองจิจูด</span>
+              <input type="number" step="any" value={form.longitude} onChange={event => setValue('longitude', event.target.value)} className={inputClass} />
+            </label>
+            <label className="sm:col-span-2">
+              <span className="mb-2 block text-sm font-bold">สถานะการใช้งาน</span>
+              <select value={form.status} onChange={event => setValue('status', event.target.value)} className={`${inputClass} bg-white`}>
+                <option value="Pending">รออนุมัติ</option>
+                <option value="Active">เปิดใช้งาน</option>
+                <option value="Suspended">ระงับการใช้งาน</option>
+              </select>
+            </label>
+          </div>
+          {error && <p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-600">{error}</p>}
+        </div>
+        <div className="flex gap-3 border-t border-zinc-100 p-6 sm:px-7">
+          <button type="button" onClick={onClose} className="h-11 flex-1 rounded-xl border border-zinc-200 text-sm font-bold">
+            ยกเลิก
+          </button>
+          <button disabled={saving} className="h-11 flex-1 rounded-xl bg-orange-500 text-sm font-bold text-white disabled:opacity-60">
+            {saving ? 'กำลังบันทึกข้อมูล…' : 'บันทึกการแก้ไข'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+export default function StoreManagement() {
+  const [stores, setStores] = useState([])
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState('All')
+  const [page, setPage] = useState(1)
+  const [sidebar, setSidebar] = useState(false)
+  const [selected, setSelected] = useState(null)
+  const [editing, setEditing] = useState(null)
+  const [menu, setMenu] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [dbError, setDbError] = useState('')
+  const perPage = 5
+
+  useEffect(() => {
+    let live = true
+    ;(async () => {
+      try {
+        const auth = await requireSuperAdmin()
+        if (!auth.session) {
+          window.location.replace('/login')
+          return
+        }
+        if (!auth.allowed) {
+          window.location.replace('/')
+          return
+        }
+        const rows = await fetchStores()
+        if (live) setStores(rows)
+      } catch (error) {
+        if (live) setDbError(error.message)
+      } finally {
+        if (live) setLoading(false)
+      }
+    })()
+    return () => {
+      live = false
+    }
+  }, [])
+
+  const filtered = useMemo(
+    () =>
+      stores.filter(
+        s =>
+          (!query || `${s.name} ${s.owner} ${s.email} ${s.id}`.toLowerCase().includes(query.toLowerCase())) &&
+          (status === 'All' || s.status === status)
+      ),
+    [stores, query, status]
+  )
+
+  const pages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const shown = filtered.slice((page - 1) * perPage, page * perPage)
+
+  const filter = (setter, value) => {
+    setter(value)
+    setPage(1)
+  }
+
+  const changeStatus = async (id, next) => {
+    try {
+      await updateStoreStatus(id, next)
+      setStores(x => x.map(s => (s.id === id ? { ...s, status: next } : s)))
+      setDbError('')
+    } catch (error) {
+      setDbError(error.message)
+    }
+    setMenu(null)
+  }
+
+  const remove = async id => {
+    if (!window.confirm('ยืนยันการลบร้านค้านี้ออกจากระบบ?')) return
+    try {
+      await deleteStore(id)
+      setStores(x => x.filter(s => s.id !== id))
+      setDbError('')
+    } catch (error) {
+      setDbError(error.message)
+    }
+    setMenu(null)
+  }
+
+  const saveStore = async (id, changes) => {
+    const saved = await updateStore(id, changes)
+    setStores(items => items.map(store => (store.id === id ? saved : store)))
+    setDbError('')
+  }
+
+  if (loading) return <div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังตรวจสอบสิทธิ์การใช้งาน…</div>
+
+  return (
+    <div className="min-h-screen bg-[#f7f7f8] text-zinc-950">
+      <Sidebar open={sidebar} onClose={() => setSidebar(false)} storeCount={stores.length} />
+      <div className="lg:pl-[270px]">
+        <AdminHeader onOpenSidebar={() => setSidebar(true)} category="การจัดการ" title="จัดการร้านค้า" />
+        <main className="p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-[1500px]">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+              <div>
+                <h1 className="text-2xl font-black tracking-tight sm:text-3xl">จัดการร้านค้า</h1>
+                <p className="mt-2 text-sm text-zinc-500">ตรวจสอบ อนุมัติ และจัดการข้อมูลร้านค้าทั้งหมดในระบบ</p>
+              </div>
+              <div className="flex gap-2">
+                <div className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-right shadow-sm">
+                  <p className="text-[10px] text-zinc-400">ร้านค้าทั้งหมด</p>
+                  <p className="text-lg font-black">{stores.length.toLocaleString()}</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-right">
+                  <p className="text-[10px] text-amber-600">รออนุมัติ</p>
+                  <p className="text-lg font-black text-amber-700">{stores.filter(x => x.status === 'Pending').length}</p>
+                </div>
+              </div>
+            </div>
+
+            <section className="mt-7 overflow-visible rounded-2xl border border-zinc-200/80 bg-white shadow-sm">
+              <div className="border-b border-zinc-100 p-4 sm:p-5">
+                <div className="flex flex-col gap-3 xl:flex-row">
+                  <div className="relative flex-1">
+                    <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                    <input
+                      value={query}
+                      onChange={e => filter(setQuery, e.target.value)}
+                      className="h-11 w-full rounded-xl border border-zinc-200 bg-zinc-50 pl-10 pr-4 text-sm outline-none focus:border-orange-300 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                      placeholder="ค้นหาชื่อร้าน, เจ้าของ, อีเมล หรือรหัสร้านค้า..."
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 sm:flex">
+                    <div className="relative">
+                      <select
+                        value={status}
+                        onChange={e => filter(setStatus, e.target.value)}
+                        className="h-11 w-full appearance-none rounded-xl border border-zinc-200 bg-white pl-4 pr-9 text-xs font-semibold outline-none sm:w-44"
+                      >
+                        <option value="All">สถานะทั้งหมด</option>
+                        <option value="Active">เปิดใช้งาน</option>
+                        <option value="Pending">รออนุมัติ</option>
+                        <option value="Suspended">ระงับการใช้งาน</option>
+                      </select>
+                      <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left">
+                  <thead>
+                    <tr className="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-400">
+                      <th className="px-6 py-3.5 font-bold">ชื่อร้านค้า</th>
+                      <th className="px-4 py-3.5 font-bold">เจ้าของร้าน</th>
+                      <th className="px-4 py-3.5 font-bold">สถานะ</th>
+                      <th className="px-4 py-3.5 font-bold">วันที่สมัคร</th>
+                      <th className="px-6 py-3.5 text-right font-bold">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shown.map(s => (
+                      <tr key={s.id} className="border-t border-zinc-100 hover:bg-orange-50/30">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <span className="grid size-10 place-items-center rounded-xl bg-orange-100 text-sm font-black text-orange-600">
+                              {s.name[0]}
+                            </span>
+                            <div>
+                              <p className="text-sm font-bold">{s.name}</p>
+                              <p className="mt-0.5 text-[10px] text-zinc-400">
+                                {s.id} · {s.province}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="text-xs font-semibold text-zinc-700">{s.owner}</p>
+                          <p className="mt-1 text-[10px] text-zinc-400">{s.email}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${statusStyle[s.status] || statusStyle.Pending}`}>
+                            <span className="size-1.5 rounded-full bg-current" />
+                            {statusLabel[s.status] || s.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-xs text-zinc-500">{s.created}</td>
+                        <td className="relative px-6 py-4 text-right">
+                          <button
+                            onClick={() => setMenu(menu === s.id ? null : s.id)}
+                            className="grid size-9 place-items-center rounded-lg border border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50"
+                          >
+                            <span className="text-sm font-black">•••</span>
+                          </button>
+                          {menu === s.id && (
+                            <div className="absolute bottom-14 right-6 z-30 w-44 rounded-xl border border-zinc-200 bg-white p-1.5 text-left shadow-xl">
+                              <button
+                                onClick={() => {
+                                  setSelected(s)
+                                  setMenu(null)
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold hover:bg-zinc-50"
+                              >
+                                <Eye size={15} />
+                                ดูรายละเอียด
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditing(s)
+                                  setMenu(null)
+                                }}
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold hover:bg-zinc-50"
+                              >
+                                <Pencil size={15} />
+                                แก้ไขร้านค้า
+                              </button>
+                              {s.status !== 'Active' && (
+                                <button
+                                  onClick={() => changeStatus(s.id, 'Active')}
+                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-emerald-600 hover:bg-emerald-50"
+                                >
+                                  <UserRoundCheck size={15} />
+                                  อนุมัติร้านค้า
+                                </button>
+                              )}
+                              {s.status !== 'Suspended' && (
+                                <button
+                                  onClick={() => changeStatus(s.id, 'Suspended')}
+                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-amber-600 hover:bg-amber-50"
+                                >
+                                  <ShieldCheck size={15} />
+                                  ระงับชั่วคราว
+                                </button>
+                              )}
+                              <div className="my-1 h-px bg-zinc-100" />
+                              <button
+                                onClick={() => remove(s.id)}
+                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-50"
+                              >
+                                <Trash2 size={15} />
+                                ลบร้านค้า
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!shown.length && (
+                  <div className="py-16 text-center">
+                    <Store size={32} className="mx-auto text-zinc-300" />
+                    <p className="mt-3 text-sm font-bold text-zinc-500">ไม่พบข้อมูลร้านค้าที่ค้นหา</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col items-center justify-between gap-3 border-t border-zinc-100 px-5 py-4 sm:flex-row">
+                <p className="text-xs text-zinc-400">
+                  แสดง {filtered.length ? (page - 1) * perPage + 1 : 0}–{Math.min(page * perPage, filtered.length)} จาก {filtered.length} ร้านค้า
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={page === 1}
+                    onClick={() => setPage(p => p - 1)}
+                    className="grid size-9 place-items-center rounded-lg border border-zinc-200 disabled:opacity-35"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  {Array.from({ length: pages }, (_, i) => i + 1).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`grid size-9 place-items-center rounded-lg text-xs font-bold ${page === p ? 'bg-orange-500 text-white' : 'border border-zinc-200 bg-white text-zinc-500'}`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                  <button
+                    disabled={page === pages}
+                    onClick={() => setPage(p => p + 1)}
+                    className="grid size-9 place-items-center rounded-lg border border-zinc-200 disabled:opacity-35"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+      <StoreModal store={selected} onClose={() => setSelected(null)} />
+      <EditStoreModal store={editing} onClose={() => setEditing(null)} onSave={saveStore} />
+    </div>
+  )
 }

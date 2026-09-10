@@ -10,6 +10,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
+import { useLanguage } from '../../../lib/language'
 import { printTableQRViaBluetooth } from '../pos/bluetoothPrinter'
 
 // Web Audio API Bill Request Chime (Bell Ring)
@@ -454,6 +455,8 @@ function TableActionModal({
 
 // ─── Main Tables Management Component ─────────────────────────────────────────
 export default function TablesManagement() {
+  const { language } = useLanguage()
+  const english = language === 'en'
   const { store } = useStore()
   const qc = useQueryClient()
   const key = ['store_tables', store.id]
@@ -812,10 +815,10 @@ export default function TablesManagement() {
         <div>
           <span className="text-xs font-black tracking-widest text-orange-500 uppercase">Live Store Workspace</span>
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-950 dark:text-white tracking-tight">
-            ผังโต๊ะ & จัดการโต๊ะ (Tables)
+            {english ? 'Table layout & management' : 'ผังโต๊ะ & จัดการโต๊ะ'}
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 font-medium">
-            ภาพรวมผังโต๊ะ สถานะลูกค้า และจัดการ QR Code ประจำโต๊ะ
+            {english ? 'Table overview, guest status, and table QR codes' : 'ภาพรวมผังโต๊ะ สถานะลูกค้า และจัดการ QR Code ประจำโต๊ะ'}
           </p>
         </div>
 
@@ -834,10 +837,10 @@ export default function TablesManagement() {
                 ? 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-700 dark:text-amber-300'
                 : 'bg-white border-zinc-200 text-zinc-400 dark:bg-zinc-900 dark:border-zinc-800'
             }`}
-            title={soundEnabled ? 'ปิดเสียงแจ้งเตือนเรียกเก็บเงิน' : 'เปิดเสียงแจ้งเตือนเรียกเก็บเงิน'}
+            title={soundEnabled ? (english ? 'Disable bill request alerts' : 'ปิดเสียงแจ้งเตือนเรียกเก็บเงิน') : (english ? 'Enable bill request alerts' : 'เปิดเสียงแจ้งเตือนเรียกเก็บเงิน')}
           >
             {soundEnabled ? <Volume2 size={16} className="text-amber-500 animate-pulse" /> : <VolumeX size={16} />}
-            <span>{soundEnabled ? 'เสียงเตือนเปิดอยู่' : 'ปิดเสียงเตือน'}</span>
+            <span>{soundEnabled ? (english ? 'Sound alerts on' : 'เสียงเตือนเปิดอยู่') : (english ? 'Sound alerts off' : 'ปิดเสียงเตือน')}</span>
           </button>
 
           {/* Add Table Button */}
@@ -845,14 +848,14 @@ export default function TablesManagement() {
             onClick={() => setIsAddTableOpen(true)}
             className="flex h-11 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-5 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:bg-orange-600 transition active:scale-95 cursor-pointer"
           >
-            <Plus size={18} strokeWidth={3} /> เพิ่มโต๊ะใหม่
+            <Plus size={18} strokeWidth={3} /> {english ? 'Add table' : 'เพิ่มโต๊ะใหม่'}
           </button>
         </div>
       </div>
 
       <div className="flex flex-col gap-2 rounded-2xl border border-zinc-200/80 bg-white px-4 py-3 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0"><p className="text-xs font-black text-zinc-800 dark:text-white">ลิงก์ Online Store</p><p className="mt-0.5 truncate font-mono text-[11px] text-zinc-500 dark:text-zinc-400">{storefrontLink}</p></div>
-        <div className="flex shrink-0 gap-2"><button type="button" onClick={copyStorefrontLink} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-zinc-200 px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"><Copy size={14} />{storefrontCopied ? 'คัดลอกแล้ว' : 'คัดลอก'}</button><a href={storefrontLink} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-orange-500 px-3 text-xs font-bold text-white hover:bg-orange-600"><ExternalLink size={14} />เปิดร้าน</a></div>
+        <div className="min-w-0"><p className="text-xs font-black text-zinc-800 dark:text-white">{english ? 'Online store link' : 'ลิงก์ร้านออนไลน์'}</p><p className="mt-0.5 truncate font-mono text-[11px] text-zinc-500 dark:text-zinc-400">{storefrontLink}</p></div>
+        <div className="flex shrink-0 gap-2"><button type="button" onClick={copyStorefrontLink} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-zinc-200 px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"><Copy size={14} />{storefrontCopied ? (english ? 'Copied' : 'คัดลอกแล้ว') : (english ? 'Copy' : 'คัดลอก')}</button><a href={storefrontLink} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-orange-500 px-3 text-xs font-bold text-white hover:bg-orange-600"><ExternalLink size={14} />{english ? 'Open store' : 'เปิดร้าน'}</a></div>
       </div>
 
       {/* Quick KPI Stat Chips */}
@@ -862,8 +865,8 @@ export default function TablesManagement() {
             {totalTables}
           </div>
           <div>
-            <p className="text-[11px] font-bold text-zinc-400">โต๊ะทั้งหมด</p>
-            <p className="text-xs font-extrabold text-zinc-900 dark:text-white">{totalTables} โต๊ะในร้าน</p>
+            <p className="text-[11px] font-bold text-zinc-400">{english ? 'All tables' : 'โต๊ะทั้งหมด'}</p>
+            <p className="text-xs font-extrabold text-zinc-900 dark:text-white">{totalTables} {english ? 'tables in store' : 'โต๊ะในร้าน'}</p>
           </div>
         </div>
 
@@ -872,8 +875,8 @@ export default function TablesManagement() {
             {availableTables}
           </div>
           <div>
-            <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">โต๊ะว่าง (พร้อมรับ)</p>
-            <p className="text-xs font-extrabold text-emerald-900 dark:text-emerald-200">{availableTables} โต๊ะ</p>
+            <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{english ? 'Available tables' : 'โต๊ะว่าง (พร้อมรับ)'}</p>
+            <p className="text-xs font-extrabold text-emerald-900 dark:text-emerald-200">{availableTables} {english ? 'tables' : 'โต๊ะ'}</p>
           </div>
         </div>
 
@@ -882,8 +885,8 @@ export default function TablesManagement() {
             {occupiedTables}
           </div>
           <div>
-            <p className="text-[11px] font-bold text-red-600 dark:text-red-400">กำลังรับประทาน</p>
-            <p className="text-xs font-extrabold text-red-900 dark:text-red-200">{occupiedTables} โต๊ะมีลูกค้า</p>
+            <p className="text-[11px] font-bold text-red-600 dark:text-red-400">{english ? 'Dining' : 'กำลังรับประทาน'}</p>
+            <p className="text-xs font-extrabold text-red-900 dark:text-red-200">{occupiedTables} {english ? 'tables with guests' : 'โต๊ะมีลูกค้า'}</p>
           </div>
         </div>
 
@@ -900,10 +903,10 @@ export default function TablesManagement() {
           </div>
           <div>
             <p className={`text-[11px] font-bold ${callingTables.length > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-zinc-400'}`}>
-              เรียกเก็บเงิน
+              {english ? 'Bill requested' : 'เรียกเก็บเงิน'}
             </p>
             <p className="text-xs font-extrabold">
-              {callingTables.length > 0 ? `${callingTables.length} โต๊ะรอดำเนินการ` : 'ไม่มีโต๊ะเรียก'}
+              {callingTables.length > 0 ? (english ? `${callingTables.length} tables pending` : `${callingTables.length} โต๊ะรอดำเนินการ`) : (english ? 'No table calls' : 'ไม่มีโต๊ะเรียก')}
             </p>
           </div>
         </div>
@@ -921,7 +924,7 @@ export default function TablesManagement() {
                 : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
             }`}
           >
-            <LayoutGrid size={14} /> มุมมองการ์ด (Grid)
+            <LayoutGrid size={14} /> {english ? 'Grid view' : 'มุมมองการ์ด'}
           </button>
           <button
             onClick={() => setViewMode('table')}
@@ -931,7 +934,7 @@ export default function TablesManagement() {
                 : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white'
             }`}
           >
-            <List size={14} /> มุมมองตาราง (List)
+            <List size={14} /> {english ? 'List view' : 'มุมมองตาราง'}
           </button>
         </div>
 
@@ -941,7 +944,7 @@ export default function TablesManagement() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="ค้นหาเบอร์โต๊ะ…"
+            placeholder={english ? 'Search table number…' : 'ค้นหาเบอร์โต๊ะ…'}
             className="h-10 w-full rounded-2xl border border-zinc-200/80 bg-white pl-10 pr-4 text-xs font-bold shadow-2xs outline-none focus:border-orange-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white"
           />
         </div>

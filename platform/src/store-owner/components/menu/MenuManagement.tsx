@@ -8,6 +8,7 @@ import {
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
 import { PageHeader, Panel } from '../PageKit'
+import { useLanguage } from '../../../lib/language'
 
 type MenuItem = {
   id: string
@@ -35,6 +36,8 @@ const blank = {
 }
 
 export default function MenuManagement() {
+  const { language } = useLanguage()
+  const english = language === 'en'
   const { store } = useStore()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
@@ -290,10 +293,10 @@ export default function MenuManagement() {
             STORE WORKSPACE
           </p>
           <h1 className="mt-1 text-2xl font-black tracking-tight text-zinc-950 dark:text-white sm:text-3xl">
-            Menu Items
+            {english ? 'Menu items' : 'รายการเมนู'}
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            จัดการรายการอาหาร เครื่องดื่ม ราคา และสถานะพร้อมขายแบบเรียลไทม์
+            {english ? 'Manage menu items, prices, and availability in real time' : 'จัดการรายการอาหาร เครื่องดื่ม ราคา และสถานะพร้อมขายแบบเรียลไทม์'}
           </p>
         </div>
         <button
@@ -301,41 +304,41 @@ export default function MenuManagement() {
           className="flex h-11 items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 text-sm font-bold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600 active:scale-[0.98]"
         >
           <Plus size={18} strokeWidth={2.5} />
-          <span>เพิ่มเมนูใหม่</span>
+          <span>{english ? 'Add menu item' : 'เพิ่มเมนูใหม่'}</span>
         </button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-xs font-bold text-zinc-400">เมนูทั้งหมด</p>
+          <p className="text-xs font-bold text-zinc-400">{english ? 'All menu items' : 'เมนูทั้งหมด'}</p>
           <p className="mt-1.5 text-2xl font-black text-zinc-900 dark:text-white">{stats.total}</p>
           <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-400">
-            <Layers size={12} /> {stats.catCount} หมวดหมู่
+            <Layers size={12} /> {stats.catCount} {english ? 'categories' : 'หมวดหมู่'}
           </span>
         </div>
 
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 shadow-sm dark:border-emerald-900/30 dark:bg-emerald-950/20">
-          <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">พร้อมขาย (Active)</p>
+          <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{english ? 'Available' : 'พร้อมขาย (Active)'}</p>
           <p className="mt-1.5 text-2xl font-black text-emerald-700 dark:text-emerald-300">{stats.available}</p>
           <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 size={12} /> เปิดให้ลูกค้าสั่ง
+            <CheckCircle2 size={12} /> {english ? 'Available to customers' : 'เปิดให้ลูกค้าสั่ง'}
           </span>
         </div>
 
         <div className="rounded-2xl border border-red-100 bg-red-50/50 p-4 shadow-sm dark:border-red-900/30 dark:bg-red-950/20">
-          <p className="text-xs font-bold text-red-600 dark:text-red-400">สินค้าหมด (Out of Stock)</p>
+          <p className="text-xs font-bold text-red-600 dark:text-red-400">{english ? 'Out of stock' : 'สินค้าหมด (Out of Stock)'}</p>
           <p className="mt-1.5 text-2xl font-black text-red-700 dark:text-red-300">{stats.unavailable}</p>
           <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-red-600 dark:text-red-400">
-            <AlertCircle size={12} /> ซ่อนชั่วคราว
+            <AlertCircle size={12} /> {english ? 'Hidden temporarily' : 'ซ่อนชั่วคราว'}
           </span>
         </div>
 
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-xs font-bold text-zinc-400">หมวดหมู่ทั้งหมด</p>
+          <p className="text-xs font-bold text-zinc-400">{english ? 'All categories' : 'หมวดหมู่ทั้งหมด'}</p>
           <p className="mt-1.5 text-2xl font-black text-zinc-900 dark:text-white">{stats.catCount}</p>
           <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-400">
-            <Sparkles size={12} /> หมวดหลักของร้าน
+            <Sparkles size={12} /> {english ? 'Store categories' : 'หมวดหลักของร้าน'}
           </span>
         </div>
       </div>
@@ -351,7 +354,7 @@ export default function MenuManagement() {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="ค้นหาชื่อเมนู, หมวดหมู่, คำอธิบาย..."
+                placeholder={english ? 'Search menu, category, description…' : 'ค้นหาชื่อเมนู, หมวดหมู่, คำอธิบาย...'}
                 className="h-10 w-full rounded-xl border border-zinc-200 bg-zinc-50 pl-10 pr-4 text-sm outline-none transition focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:ring-orange-500/20"
               />
               {search && (
@@ -368,9 +371,9 @@ export default function MenuManagement() {
             <div className="flex items-center gap-2">
               <div className="flex rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
                 {[
-                  { id: 'all', label: 'ทั้งหมด' },
-                  { id: 'available', label: 'พร้อมขาย' },
-                  { id: 'unavailable', label: 'สินค้าหมด' },
+                  { id: 'all', label: english ? 'All' : 'ทั้งหมด' },
+                  { id: 'available', label: english ? 'Available' : 'พร้อมขาย' },
+                  { id: 'unavailable', label: english ? 'Out of stock' : 'สินค้าหมด' },
                 ].map(tab => (
                   <button
                     key={tab.id}

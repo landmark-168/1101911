@@ -8,6 +8,7 @@ import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
 import { PageHeader, Panel } from '../PageKit'
 import DeliveryRouteMap from '../../../components/DeliveryRouteMap'
+import { useLanguage } from '../../../lib/language'
 
 const statuses = ['pending', 'accepted', 'preparing', 'delivering', 'ready', 'completed', 'cancelled']
 const nextStep: Record<string, { status: string; label: string }> = {
@@ -131,6 +132,11 @@ function playCancellationAlert() {
 }
 
 export default function Orders() {
+  const { language } = useLanguage()
+  const english = language === 'en'
+  const statusLabels: Record<string, string> = english ? { pending: 'Pending', accepted: 'Preparing', preparing: 'Preparing', delivering: 'Out for delivery', ready: 'Ready to serve / deliver', completed: 'Completed', cancelled: 'Cancelled' } : {}
+  const paymentLabels: Record<string, string> = english ? { unpaid: 'Unpaid', paid: 'Paid', not_required: 'No payment required' } : {}
+  const channelLabels: Record<string, string> = english ? { dine_in: 'Dine in', takeaway: 'Takeaway', delivery: 'Delivery' } : {}
   const { store } = useStore()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
@@ -337,7 +343,7 @@ export default function Orders() {
         </button>
       )}
 
-      <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]"><button onClick={() => setActiveTab('pending')} className={`rounded-2xl border p-4 text-left transition ${activeTab === 'pending' ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-100' : 'border-zinc-200 bg-white hover:border-amber-200 dark:border-zinc-800 dark:bg-zinc-900'}`}><span className="text-xs font-bold text-amber-600">ต้องรับออเดอร์</span><b className="mt-1 block text-2xl dark:text-white">{counts.pending}</b></button><button onClick={() => setActiveTab('preparing')} className={`rounded-2xl border p-4 text-left transition ${activeTab === 'preparing' ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100' : 'border-zinc-200 bg-white hover:border-indigo-200 dark:border-zinc-800 dark:bg-zinc-900'}`}><span className="text-xs font-bold text-indigo-600">กำลังทำ</span><b className="mt-1 block text-2xl dark:text-white">{counts.preparing}</b></button><button onClick={() => setActiveTab('ready')} className={`rounded-2xl border p-4 text-left transition ${activeTab === 'ready' ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-100' : 'border-zinc-200 bg-white hover:border-purple-200 dark:border-zinc-800 dark:bg-zinc-900'}`}><span className="text-xs font-bold text-purple-600">พร้อมส่ง / พร้อมรับ</span><b className="mt-1 block text-2xl dark:text-white">{counts.ready}</b></button><button onClick={() => qc.invalidateQueries({ queryKey: ['orders', store.id] })} className="grid size-14 place-items-center self-center rounded-2xl border border-zinc-200 bg-white text-zinc-500 transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900" title="รีเฟรชออเดอร์"><RefreshCw size={18} className={query.isFetching ? 'animate-spin' : ''}/></button></div>
+      <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]"><button onClick={() => setActiveTab('pending')} className={`rounded-2xl border p-4 text-left transition ${activeTab === 'pending' ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-100' : 'border-zinc-200 bg-white hover:border-amber-200 dark:border-zinc-800 dark:bg-zinc-900'}`}><span className="text-xs font-bold text-amber-600">{english ? 'Orders to accept' : 'ต้องรับออเดอร์'}</span><b className="mt-1 block text-2xl dark:text-white">{counts.pending}</b></button><button onClick={() => setActiveTab('preparing')} className={`rounded-2xl border p-4 text-left transition ${activeTab === 'preparing' ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100' : 'border-zinc-200 bg-white hover:border-indigo-200 dark:border-zinc-800 dark:bg-zinc-900'}`}><span className="text-xs font-bold text-indigo-600">{english ? 'Preparing' : 'กำลังทำ'}</span><b className="mt-1 block text-2xl dark:text-white">{counts.preparing}</b></button><button onClick={() => setActiveTab('ready')} className={`rounded-2xl border p-4 text-left transition ${activeTab === 'ready' ? 'border-purple-400 bg-purple-50 ring-2 ring-purple-100' : 'border-zinc-200 bg-white hover:border-purple-200 dark:border-zinc-800 dark:bg-zinc-900'}`}><span className="text-xs font-bold text-purple-600">{english ? 'Ready for pickup / delivery' : 'พร้อมส่ง / พร้อมรับ'}</span><b className="mt-1 block text-2xl dark:text-white">{counts.ready}</b></button><button onClick={() => qc.invalidateQueries({ queryKey: ['orders', store.id] })} className="grid size-14 place-items-center self-center rounded-2xl border border-zinc-200 bg-white text-zinc-500 transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900" title={english ? 'Refresh orders' : 'รีเฟรชออเดอร์'}><RefreshCw size={18} className={query.isFetching ? 'animate-spin' : ''}/></button></div>
 
       <Panel>
         {/* Search Header */}
@@ -347,10 +353,10 @@ export default function Orders() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="ค้นหาเลขออเดอร์, ชื่อลูกค้า, เบอร์โทร..."
+              placeholder={english ? 'Search order number, customer, phone…' : 'ค้นหาเลขออเดอร์, ชื่อลูกค้า, เบอร์โทร...'}
               className="h-10 w-full rounded-xl border border-zinc-200 bg-zinc-50 pl-10 pr-4 text-sm outline-none transition focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:focus:ring-orange-500/20"
             />
-          </div><div className="flex rounded-xl bg-zinc-100 p-1 text-xs font-bold dark:bg-zinc-800">{[['active','งานที่ต้องทำ'],['all','ทั้งหมด'],['completed','สำเร็จ'],['cancelled','ยกเลิก']].map(([id,label]) => <button key={id} onClick={() => setActiveTab(id)} className={`rounded-lg px-3 py-2 transition ${activeTab === id ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500'}`}>{label}</button>)}</div>
+          </div><div className="flex rounded-xl bg-zinc-100 p-1 text-xs font-bold dark:bg-zinc-800">{[['active',english?'To do':'งานที่ต้องทำ'],['all',english?'All':'ทั้งหมด'],['completed',english?'Completed':'สำเร็จ'],['cancelled',english?'Cancelled':'ยกเลิก']].map(([id,label]) => <button key={id} onClick={() => setActiveTab(id)} className={`rounded-lg px-3 py-2 transition ${activeTab === id ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white' : 'text-zinc-500'}`}>{label}</button>)}</div>
         </div>
 
         {selectedPayableOrders.length > 0 && (
@@ -381,21 +387,21 @@ export default function Orders() {
                 <tr className="border-b border-zinc-100 bg-zinc-50/70 text-[11px] font-bold uppercase tracking-wider text-zinc-400 dark:border-zinc-800 dark:bg-zinc-800/50">
                   <th className="w-10 px-3 py-3.5"><input type="checkbox" checked={payableOrders.length > 0 && selectedPayableOrders.length === payableOrders.length} onChange={toggleAllPaymentOrders} className="size-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500" title="เลือกบิลที่ยังไม่ชำระทั้งหมด" /></th>
                   <th className="px-3 py-3.5">Order</th>
-                  <th className="px-3 py-3.5">ช่องทาง / โต๊ะ</th>
-                  <th className="px-3 py-3.5 text-right">ยอดรวม</th>
+                  <th className="px-3 py-3.5">{english ? 'Channel / table' : 'ช่องทาง / โต๊ะ'}</th>
+                  <th className="px-3 py-3.5 text-right">{english ? 'Total' : 'ยอดรวม'}</th>
                   <th className="px-3 py-3.5">Status</th>
-                  <th className="px-3 py-3.5">ชำระเงิน</th>
+                  <th className="px-3 py-3.5">{english ? 'Payment' : 'ชำระเงิน'}</th>
                   <th className="px-3 py-3.5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-xs dark:divide-zinc-800">
                 {filteredOrders.map((o: any) => {
                   const cust = parseCustomerInfo(o.customer_name, o.order_type, o.notes)
-                  const st = statusConfig[o.status] || { label: o.status, bg: 'bg-zinc-100', text: 'text-zinc-600', border: 'border-zinc-200' }
+                  const st = { ...(statusConfig[o.status] || { label: o.status, bg: 'bg-zinc-100', text: 'text-zinc-600', border: 'border-zinc-200' }), label: statusLabels[o.status] || statusConfig[o.status]?.label || o.status }
                   const paymentStatus = getPaymentStatus(o)
-                  const payment = paymentStatusConfig[paymentStatus]
+                  const payment = { ...(paymentStatusConfig[paymentStatus] || paymentStatusConfig.unpaid), label: paymentLabels[paymentStatus] || paymentStatusConfig[paymentStatus]?.label || paymentStatus }
                   const canSelectForPayment = o.status !== 'cancelled' && paymentStatus !== 'paid'
-                  const ch = channelConfig[o.order_type] || { label: o.order_type, icon: '📦', bg: 'bg-zinc-100 text-zinc-600' }
+                  const ch = { ...(channelConfig[o.order_type] || { label: o.order_type, icon: '📦', bg: 'bg-zinc-100 text-zinc-600' }), label: channelLabels[o.order_type] || channelConfig[o.order_type]?.label || o.order_type }
                   const next = o.status === 'pending' && o.order_type !== 'delivery' ? undefined : nextStep[o.status]
 
                   return (

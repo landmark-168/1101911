@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
+import { useLanguage } from '../../../lib/language'
 import DeliveryRouteMap from '../../../components/DeliveryRouteMap'
 
 const PRESET_COLORS = [
@@ -68,6 +69,8 @@ const emptySettings = {
 
 export default function Settings() {
   const { store } = useStore()
+  const { language } = useLanguage()
+  const english = language === 'en'
   const qc = useQueryClient()
   const [form, setForm] = useState<any>(emptySettings)
   const [activeTab, setActiveTab] = useState<string>('all')
@@ -326,10 +329,10 @@ export default function Settings() {
             Configuration
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-zinc-950 dark:text-white tracking-tight">
-            ตั้งค่าร้านค้า (Store Settings)
+            {english ? 'Store settings' : 'ตั้งค่าร้านค้า'}
           </h1>
           <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 font-medium">
-            จัดการภาพลักษณ์ สโลแกน เวลาทำการ ภาษี และช่องทางติดต่อ
+            {english ? 'Manage branding, slogan, business hours, taxes, and contact channels.' : 'จัดการภาพลักษณ์ สโลแกน เวลาทำการ ภาษี และช่องทางติดต่อ'}
           </p>
         </div>
 
@@ -341,7 +344,7 @@ export default function Settings() {
           className="flex h-11 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-black text-white shadow-lg transition active:scale-95 disabled:opacity-50 cursor-pointer hover:brightness-95"
         >
           {save.isPending ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-          <span>{save.isPending ? 'กำลังบันทึก…' : 'บันทึกการเปลี่ยนแปลง'}</span>
+          <span>{save.isPending ? (english ? 'Saving…' : 'กำลังบันทึก…') : (english ? 'Save changes' : 'บันทึกการเปลี่ยนแปลง')}</span>
         </button>
       </div>
 
@@ -363,7 +366,7 @@ export default function Settings() {
               }`}
             >
               <Icon size={14} />
-              <span>{tab.label}</span>
+              <span>{english ? ({ all: 'All', branding: 'Branding & theme', info: 'Store info & hours', delivery: 'Delivery & location', taxes: 'Taxes & fees' }[tab.id] || tab.label) : tab.label}</span>
             </button>
           )
         })}
@@ -377,7 +380,7 @@ export default function Settings() {
             <div className="flex items-center gap-2">
               <Palette size={18} style={{ color: activeThemeColor }} />
               <h2 className="text-base font-black text-zinc-950 dark:text-white">
-                ภาพลักษณ์ ธีมสี และตัวอย่างหน้าร้าน (Branding, Theme & Preview)
+                {english ? 'Branding, theme & preview' : 'ภาพลักษณ์ ธีมสี และตัวอย่างหน้าร้าน'}
               </h2>
             </div>
 
@@ -391,7 +394,7 @@ export default function Settings() {
                     : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400'
                 }`}
               >
-                <Smartphone size={12} /> มือถือ
+                <Smartphone size={12} /> {english ? 'Mobile' : 'มือถือ'}
               </button>
               <button
                 type="button"
@@ -402,7 +405,7 @@ export default function Settings() {
                     : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400'
                 }`}
               >
-                <Monitor size={12} /> เต็มจอ
+                <Monitor size={12} /> {english ? 'Desktop' : 'เต็มจอ'}
               </button>
             </div>
           </div>
@@ -418,7 +421,7 @@ export default function Settings() {
                 {/* Logo Picker */}
                 <div className="space-y-2.5">
                   <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                    โลโก้ร้านค้า (Store Logo)
+                    {english ? 'Store logo' : 'โลโก้ร้านค้า'}
                   </label>
                   
                   <div className="flex items-center gap-3">
@@ -453,14 +456,14 @@ export default function Settings() {
                           disabled={uploadingLogo}
                           className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition shadow-xs cursor-pointer dark:bg-zinc-700 dark:hover:bg-zinc-600 truncate"
                         >
-                          <Upload size={12} /> {uploadingLogo ? 'กำลังโหลด…' : 'เลือกรูปโลโก้'}
+                          <Upload size={12} /> {uploadingLogo ? (english ? 'Loading…' : 'กำลังโหลด…') : (english ? 'Choose logo' : 'เลือกรูปโลโก้')}
                         </button>
                         {form.logo_url && (
                           <button
                             type="button"
                             onClick={() => setForm({ ...form, logo_url: '' })}
                             className="p-1.5 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold transition cursor-pointer dark:border-red-900/50 shrink-0"
-                            title="ลบรูปโลโก้"
+                            title={english ? 'Remove logo' : 'ลบรูปโลโก้'}
                           >
                             <Trash2 size={13} />
                           </button>
@@ -468,7 +471,7 @@ export default function Settings() {
                       </div>
                       <input
                         type="text"
-                        placeholder="ลิงก์รูปภาพ (URL)..."
+                        placeholder={english ? 'Image URL…' : 'ลิงก์รูปภาพ (URL)...'}
                         value={form.logo_url || ''}
                         onChange={e => setForm({ ...form, logo_url: e.target.value })}
                         className="h-8 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 text-[10px] font-mono outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
@@ -480,7 +483,7 @@ export default function Settings() {
                 {/* Banner Picker */}
                 <div className="space-y-2.5">
                   <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                    ภาพแบนเนอร์ร้าน (Banner Cover)
+                    {english ? 'Store banner' : 'ภาพแบนเนอร์ร้าน'}
                   </label>
                   
                   <div className="flex items-center gap-3">
@@ -515,14 +518,14 @@ export default function Settings() {
                           disabled={uploadingBanner}
                           className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold transition shadow-xs cursor-pointer dark:bg-zinc-700 dark:hover:bg-zinc-600 truncate"
                         >
-                          <Upload size={12} /> {uploadingBanner ? 'กำลังโหลด…' : 'เลือกรูปแบนเนอร์'}
+                          <Upload size={12} /> {uploadingBanner ? (english ? 'Loading…' : 'กำลังโหลด…') : (english ? 'Choose banner' : 'เลือกรูปแบนเนอร์')}
                         </button>
                         {form.banner_url && (
                           <button
                             type="button"
                             onClick={() => setForm({ ...form, banner_url: '' })}
                             className="p-1.5 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 text-xs font-bold transition cursor-pointer dark:border-red-900/50 shrink-0"
-                            title="ลบรูปแบนเนอร์"
+                            title={english ? 'Remove banner' : 'ลบรูปแบนเนอร์'}
                           >
                             <Trash2 size={13} />
                           </button>
@@ -530,7 +533,7 @@ export default function Settings() {
                       </div>
                       <input
                         type="text"
-                        placeholder="ลิงก์แบนเนอร์ (URL)..."
+                        placeholder={english ? 'Banner URL…' : 'ลิงก์แบนเนอร์ (URL)...'}
                         value={form.banner_url || ''}
                         onChange={e => setForm({ ...form, banner_url: e.target.value })}
                         className="h-8 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 text-[10px] font-mono outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
@@ -543,7 +546,7 @@ export default function Settings() {
               {/* Theme Color Picker */}
               <div className="space-y-2.5 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                 <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                  สีประจำร้าน (Brand Theme Color)
+                  {english ? 'Brand theme color' : 'สีประจำร้าน'}
                 </label>
                 
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -695,21 +698,21 @@ export default function Settings() {
         <div className="rounded-3xl border border-zinc-200/80 bg-white p-5 sm:p-7 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-6 animate-fade-in">
           <div className="flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800">
             <Store size={18} style={{ color: activeThemeColor }} />
-            <h2 className="text-base font-black text-zinc-950 dark:text-white">ข้อมูลพื้นฐานและเวลาทำการ (Store Information & Hours)</h2>
+            <h2 className="text-base font-black text-zinc-950 dark:text-white">{english ? 'Store information & hours' : 'ข้อมูลพื้นฐานและเวลาทำการ'}</h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {/* Store Name */}
             <div className="space-y-1.5">
               <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                ชื่อร้าน (Store Name) <span className="text-red-500">*</span>
+                {english ? 'Store name' : 'ชื่อร้าน'} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 required
                 value={form.store_name || ''}
                 onChange={e => setForm({ ...form, store_name: e.target.value })}
-                placeholder="เช่น ครัวน้องยีน"
+                placeholder={english ? 'For example: My restaurant' : 'เช่น ครัวน้องยีน'}
                 className="h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 px-4 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
               />
             </div>
@@ -717,7 +720,7 @@ export default function Settings() {
             {/* Store Slug */}
             <div className="space-y-1.5">
               <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                สลัก URL ร้านค้า (Store Slug) <span className="text-red-500">*</span>
+                {english ? 'Store URL slug' : 'สลัก URL ร้านค้า'} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -733,10 +736,10 @@ export default function Settings() {
             <div className="sm:col-span-2 space-y-2.5 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-700">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
-                  <Clock size={14} style={{ color: activeThemeColor }} /> เวลาเปิด-ปิดร้าน (Opening Hours)
+                  <Clock size={14} style={{ color: activeThemeColor }} /> {english ? 'Opening hours' : 'เวลาเปิด-ปิดร้าน'}
                 </label>
                 <span className="text-[11px] text-zinc-400 font-medium">
-                  * แสดงบนหน้าแรกของลูกค้า
+                  {english ? '* Shown on the customer storefront' : '* แสดงบนหน้าแรกของลูกค้า'}
                 </span>
               </div>
 
@@ -744,7 +747,7 @@ export default function Settings() {
                 type="text"
                 value={form.opening_hours_text || ''}
                 onChange={e => setForm({ ...form, opening_hours_text: e.target.value })}
-                placeholder="เช่น เปิดให้บริการทุกวัน 11:00 – 23:00 น."
+                placeholder={english ? 'For example: Open daily 11:00 AM – 11:00 PM' : 'เช่น เปิดให้บริการทุกวัน 11:00 – 23:00 น.'}
                 className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-4 text-xs font-bold outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
               />
 
@@ -762,7 +765,13 @@ export default function Settings() {
                         : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
                     }`}
                   >
-                    {preset}
+                    {english ? ({
+                      'เปิดให้บริการทุกวัน 11:00 – 23:00 น.': 'Open daily 11:00 AM – 11:00 PM',
+                      'เปิดให้บริการทุกวัน 10:00 – 22:00 น.': 'Open daily 10:00 AM – 10:00 PM',
+                      'เปิดทุกวัน 09:00 – 21:00 น.': 'Open daily 9:00 AM – 9:00 PM',
+                      'เปิดให้บริการ 24 ชั่วโมง': 'Open 24 hours',
+                      'จันทร์ - ศุกร์ 10:00 – 22:00 น. (หยุด ส.-อา.)': 'Mon–Fri 10:00 AM – 10:00 PM (closed weekends)'
+                    }[preset] || preset) : preset}
                   </button>
                 ))}
               </div>
@@ -771,7 +780,7 @@ export default function Settings() {
             {/* Phone */}
             <div className="space-y-1.5">
               <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                เบอร์โทรศัพท์ร้าน (Phone)
+                {english ? 'Phone' : 'เบอร์โทรศัพท์ร้าน'}
               </label>
               <input
                 type="tel"
@@ -799,13 +808,13 @@ export default function Settings() {
             {/* Address */}
             <div className="sm:col-span-2 space-y-1.5">
               <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                ที่อยู่ร้านค้า (Address)
+                {english ? 'Store address' : 'ที่อยู่ร้านค้า'}
               </label>
               <textarea
                 rows={2}
                 value={form.address || ''}
                 onChange={e => setForm({ ...form, address: e.target.value })}
-                placeholder="ระบุที่อยู่และทำเลของร้าน..."
+                placeholder={english ? 'Enter the store address and location…' : 'ระบุที่อยู่และทำเลของร้าน...'}
                 className="w-full rounded-2xl border border-zinc-200 bg-zinc-50/50 p-3.5 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
               />
             </div>
@@ -813,7 +822,7 @@ export default function Settings() {
             {/* Google Maps URL */}
             <div className="sm:col-span-2 space-y-1.5">
               <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                พิกัด Google Maps (Location URL)
+                {english ? 'Google Maps location URL' : 'พิกัด Google Maps'}
               </label>
               <input
                 type="url"
@@ -835,10 +844,10 @@ export default function Settings() {
               <Bike size={20} style={{ color: activeThemeColor }} />
               <div>
                 <h2 className="text-base font-black text-zinc-950 dark:text-white">
-                  ระบบจัดส่งเดลิเวอรี & พิกัดร้านค้า (Delivery & Location)
+                  {english ? 'Delivery & location' : 'ระบบจัดส่งเดลิเวอรี & พิกัดร้านค้า'}
                 </h2>
                 <p className="text-xs text-zinc-400 font-medium">
-                  กำหนดพิกัดร้านค้า รัศมีให้บริการ อัตราค่าจัดส่งตามระยะทาง และเวลาถึงโดยประมาณ (ETA)
+                  {english ? 'Set the store coordinates, delivery radius, distance-based fees, and estimated arrival time.' : 'กำหนดพิกัดร้านค้า รัศมีให้บริการ อัตราค่าจัดส่งตามระยะทาง และเวลาถึงโดยประมาณ (ETA)'}
                 </p>
               </div>
             </div>
@@ -857,7 +866,7 @@ export default function Settings() {
                 className="size-4 accent-orange-500 rounded"
               />
               <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                {form.delivery_enabled !== false ? 'เปิดรับออเดอร์เดลิเวอรี' : 'ปิดรับออเดอร์เดลิเวอรี'}
+                {form.delivery_enabled !== false ? (english ? 'Delivery orders enabled' : 'เปิดรับออเดอร์เดลิเวอรี') : (english ? 'Delivery orders disabled' : 'ปิดรับออเดอร์เดลิเวอรี')}
               </span>
             </label>
           </div>
@@ -866,10 +875,10 @@ export default function Settings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
-                <MapPin size={15} style={{ color: activeThemeColor }} /> พิกัดร้านค้าบนแผนที่ (Store Coordinates)
+                <MapPin size={15} style={{ color: activeThemeColor }} /> {english ? 'Store coordinates' : 'พิกัดร้านค้าบนแผนที่'}
               </label>
               <span className="text-[11px] text-zinc-400 font-medium">
-                * แตะบนแผนที่หรือลากหมุด 🏬 เพื่อเปลี่ยนตำแหน่งร้าน
+                {english ? '* Click the map or drag the pin to change the store location' : '* แตะบนแผนที่หรือลากหมุด 🏬 เพื่อเปลี่ยนตำแหน่งร้าน'}
               </span>
             </div>
 
@@ -878,12 +887,12 @@ export default function Settings() {
               pickerTarget="store"
               height="340px"
               showSearch={true}
-              searchPlaceholder="🔍 พิมพ์ค้นหาที่ตั้งร้านค้า, ตลาด, อาคาร, ซอย, ถนน..."
+              searchPlaceholder={english ? '🔍 Search a store location, market, building, street…' : '🔍 พิมพ์ค้นหาที่ตั้งร้านค้า, ตลาด, อาคาร, ซอย, ถนน...'}
               radiusKm={form.delivery_radius_km || 10}
               storeLocation={{
                 lat: Number(form.latitude || 13.7563),
                 lng: Number(form.longitude || 100.5018),
-                name: form.store_name || 'ร้านค้า'
+                name: form.store_name || (english ? 'Store' : 'ร้านค้า')
               }}
               onChangeLocation={(lat, lng) => {
                 setForm(prev => ({
@@ -902,7 +911,7 @@ export default function Settings() {
             {/* Lat / Lng inputs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
               <div className="space-y-1.5">
-                <label className="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400">ละติจูด (Latitude)</label>
+                <label className="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400">{english ? 'Latitude' : 'ละติจูด'}</label>
                 <input
                   type="number"
                   step="0.000001"
@@ -913,7 +922,7 @@ export default function Settings() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400">ลองจิจูด (Longitude)</label>
+                <label className="block text-[11px] font-bold text-zinc-500 dark:text-zinc-400">{english ? 'Longitude' : 'ลองจิจูด'}</label>
                 <input
                   type="number"
                   step="0.000001"
@@ -931,10 +940,10 @@ export default function Settings() {
             <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700 sm:col-span-2 lg:col-span-1">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                  รัศมีจัดส่งสูงสุด (Radius)
+                  {english ? 'Maximum delivery radius' : 'รัศมีจัดส่งสูงสุด'}
                 </label>
                 <span className="text-xs font-black text-orange-600 dark:text-orange-400">
-                  {form.delivery_radius_km || 10} กม.
+                  {form.delivery_radius_km || 10} {english ? 'km' : 'กม.'}
                 </span>
               </div>
               <input
@@ -958,7 +967,7 @@ export default function Settings() {
                         : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
                     }`}
                   >
-                    {r} กม.
+                    {r} {english ? 'km' : 'กม.'}
                   </button>
                 ))}
               </div>
@@ -968,7 +977,7 @@ export default function Settings() {
             <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                  ค่าส่งเริ่มต้น (Base Fare)
+                  {english ? 'Base delivery fee' : 'ค่าส่งเริ่มต้น'}
                 </label>
                 <DollarSign size={14} style={{ color: activeThemeColor }} />
               </div>
@@ -983,16 +992,16 @@ export default function Settings() {
                   className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-8 pr-3 text-sm font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                 />
               </div>
-              <p className="text-[10px] text-zinc-400">ค่าจัดส่งสำหรับ 1 กิโลเมตรแรก</p>
+              <p className="text-[10px] text-zinc-400">{english ? 'Delivery fee for the first kilometre' : 'ค่าจัดส่งสำหรับ 1 กิโลเมตรแรก'}</p>
             </div>
 
             {/* Fee Per KM */}
             <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                  ค่าส่งต่อกิโลเมตร (Per KM)
+                  {english ? 'Fee per kilometre' : 'ค่าส่งต่อกิโลเมตร'}
                 </label>
-                <span className="text-[10px] font-bold text-zinc-400">฿ / กม.</span>
+                <span className="text-[10px] font-bold text-zinc-400">฿ / {english ? 'km' : 'กม.'}</span>
               </div>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-zinc-400">฿</span>
@@ -1005,17 +1014,17 @@ export default function Settings() {
                   className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-8 pr-3 text-sm font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                 />
               </div>
-              <p className="text-[10px] text-zinc-400">คิดเพิ่มกิโลเมตรละ (หลังพ้น 1 กม. แรก)</p>
+              <p className="text-[10px] text-zinc-400">{english ? 'Charged for each kilometre after the first' : 'คิดเพิ่มกิโลเมตรละ (หลังพ้น 1 กม. แรก)'}</p>
             </div>
 
             {/* Min / Max Capped Fee */}
             <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
               <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                ค่าส่งขั้นต่ำ / ขั้นสูง
+                {english ? 'Minimum / maximum fee' : 'ค่าส่งขั้นต่ำ / ขั้นสูง'}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <span className="text-[10px] text-zinc-400 font-bold block mb-1">ขั้นต่ำ (Min)</span>
+                  <span className="text-[10px] text-zinc-400 font-bold block mb-1">{english ? 'Minimum' : 'ขั้นต่ำ (Min)'}</span>
                   <input
                     type="number"
                     min="0"
@@ -1026,7 +1035,7 @@ export default function Settings() {
                   />
                 </div>
                 <div>
-                  <span className="text-[10px] text-zinc-400 font-bold block mb-1">สูงสุด (Max)</span>
+                  <span className="text-[10px] text-zinc-400 font-bold block mb-1">{english ? 'Maximum' : 'สูงสุด (Max)'}</span>
                   <input
                     type="number"
                     min="0"
@@ -1043,7 +1052,7 @@ export default function Settings() {
             <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                  ส่งฟรีเมื่อซื้อครบ (Free Delivery)
+                  {english ? 'Free-delivery threshold' : 'ส่งฟรีเมื่อซื้อครบ'}
                 </label>
                 <Sparkles size={14} className="text-amber-500" />
               </div>
@@ -1058,14 +1067,14 @@ export default function Settings() {
                   className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-8 pr-3 text-sm font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                 />
               </div>
-              <p className="text-[10px] text-zinc-400">หากไม่ต้องการมีโปรส่งฟรี ให้ใส่ 0</p>
+              <p className="text-[10px] text-zinc-400">{english ? 'Enter 0 to disable free delivery.' : 'หากไม่ต้องการมีโปรส่งฟรี ให้ใส่ 0'}</p>
             </div>
 
             {/* Prep Time (ETA) */}
             <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                  เวลาปรุงอาหารเฉลี่ย (Prep Time)
+                  {english ? 'Average preparation time' : 'เวลาปรุงอาหารเฉลี่ย'}
                 </label>
                 <Clock size={14} style={{ color: activeThemeColor }} />
               </div>
@@ -1079,9 +1088,9 @@ export default function Settings() {
                   onChange={e => setForm({ ...form, avg_prep_time_minutes: Number(e.target.value) })}
                   className="h-10 w-full rounded-xl border border-zinc-200 bg-white px-3 pr-12 text-sm font-black outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">นาที</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-zinc-400">{english ? 'min' : 'นาที'}</span>
               </div>
-              <p className="text-[10px] text-zinc-400">ใช้คำนวณเวลารออาหารและเวลาเดินทางรวม (ETA)</p>
+              <p className="text-[10px] text-zinc-400">{english ? 'Used to estimate food waiting time and total travel time.' : 'ใช้คำนวณเวลารออาหารและเวลาเดินทางรวม (ETA)'}</p>
             </div>
           </div>
         </div>
@@ -1092,7 +1101,7 @@ export default function Settings() {
         <div className="rounded-3xl border border-zinc-200/80 bg-white p-5 sm:p-7 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 space-y-6 animate-fade-in">
           <div className="flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-800">
             <Receipt size={18} style={{ color: activeThemeColor }} />
-            <h2 className="text-base font-black text-zinc-950 dark:text-white">ภาษีและค่าธรรมเนียม (Tax & Fees)</h2>
+            <h2 className="text-base font-black text-zinc-950 dark:text-white">{english ? 'Taxes & fees' : 'ภาษีและค่าธรรมเนียม'}</h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -1100,7 +1109,7 @@ export default function Settings() {
             <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                  ภาษีมูลค่าเพิ่ม (VAT / Tax)
+                  {english ? 'VAT / tax' : 'ภาษีมูลค่าเพิ่ม'}
                 </label>
                 <Percent size={14} style={{ color: activeThemeColor }} />
               </div>
@@ -1132,7 +1141,7 @@ export default function Settings() {
                         : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
                     }`}
                   >
-                    {pct === 0 ? 'ไม่มีภาษี (0%)' : 'VAT 7%'}
+                    {pct === 0 ? (english ? 'No tax (0%)' : 'ไม่มีภาษี (0%)') : 'VAT 7%'}
                   </button>
                 ))}
               </div>
@@ -1142,7 +1151,7 @@ export default function Settings() {
             <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                  ค่าบริการ (Service Charge)
+                  {english ? 'Service charge' : 'ค่าบริการ'}
                 </label>
                 <Percent size={14} style={{ color: activeThemeColor }} />
               </div>
@@ -1174,7 +1183,7 @@ export default function Settings() {
                         : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300'
                     }`}
                   >
-                    {pct === 0 ? 'ไม่มี (0%)' : '10%'}
+                    {pct === 0 ? (english ? 'None (0%)' : 'ไม่มี (0%)') : '10%'}
                   </button>
                 ))}
               </div>
@@ -1184,7 +1193,7 @@ export default function Settings() {
             <div className="space-y-2 rounded-2xl bg-zinc-50 p-4 border border-zinc-200/80 dark:bg-zinc-800/50 dark:border-zinc-700">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black text-zinc-800 dark:text-zinc-200">
-                  ค่าจัดส่งเริ่มต้น (Delivery Fee)
+                  {english ? 'Starting delivery fee' : 'ค่าจัดส่งเริ่มต้น'}
                 </label>
                 <DollarSign size={14} style={{ color: activeThemeColor }} />
               </div>
@@ -1202,7 +1211,7 @@ export default function Settings() {
               </div>
 
               <p className="text-[10px] text-zinc-400 pt-1">
-                ค่าจัดส่งพื้นฐานสำหรับออเดอร์ประเภทจัดส่งเดลิเวอรี
+                {english ? 'Base delivery charge for delivery orders.' : 'ค่าจัดส่งพื้นฐานสำหรับออเดอร์ประเภทจัดส่งเดลิเวอรี'}
               </p>
             </div>
           </div>
@@ -1212,7 +1221,7 @@ export default function Settings() {
       {/* ── Bottom Save Action Bar ── */}
       <div className="flex items-center justify-between p-5 rounded-3xl border border-zinc-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-900 shadow-sm">
         <div className="text-xs text-zinc-400 font-medium">
-          ข้อมูลจะถูกซิงค์ตรงไปยังฐานข้อมูลและอัปเดตหน้าร้านทันที
+          {english ? 'Changes sync to the database and update the storefront immediately.' : 'ข้อมูลจะถูกซิงค์ตรงไปยังฐานข้อมูลและอัปเดตหน้าร้านทันที'}
         </div>
 
         <button
@@ -1222,7 +1231,7 @@ export default function Settings() {
           className="flex h-12 items-center justify-center gap-2 rounded-2xl px-8 text-sm font-black text-white shadow-lg transition active:scale-95 disabled:opacity-50 cursor-pointer hover:brightness-95"
         >
           {save.isPending ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-          <span>{save.isPending ? 'กำลังบันทึกข้อมูล…' : 'บันทึกการตั้งค่าทั้งหมด'}</span>
+          <span>{save.isPending ? (english ? 'Saving…' : 'กำลังบันทึกข้อมูล…') : (english ? 'Save all settings' : 'บันทึกการตั้งค่าทั้งหมด')}</span>
         </button>
       </div>
     </div>

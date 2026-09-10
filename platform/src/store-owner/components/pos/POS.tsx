@@ -4,6 +4,7 @@ import { Minus, Plus, Printer, Check, Receipt, CheckCircle, Bluetooth, Search } 
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
+import { useLanguage } from '../../../lib/language'
 import { printReceiptViaBluetooth, printQROnlyViaBluetooth } from './bluetoothPrinter'
 
 // Helper: Standard Thai PromptPay Payload Generator (EMVCo QR)
@@ -57,6 +58,8 @@ function generatePromptPayPayload(target: string, amount?: number): string {
 }
 
 export default function POS() {
+  const { language } = useLanguage()
+  const english = language === 'en'
   const { store } = useStore()
   const qc = useQueryClient()
 
@@ -540,7 +543,7 @@ export default function POS() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs font-bold text-orange-500 uppercase">POINT OF SALE</p>
-            <h1 className="text-3xl font-black dark:text-white">{isBatchPayment ? `รับชำระเงิน ${batchPaymentOrders.data?.length || paymentOrderIds.length} บิล` : editOrderId ? `แก้ไขบิล #${editOrder.data?.order_number || ''}` : 'New order'}</h1>
+            <h1 className="text-3xl font-black dark:text-white">{isBatchPayment ? (english ? `Receive payment for ${batchPaymentOrders.data?.length || paymentOrderIds.length} bills` : `รับชำระเงิน ${batchPaymentOrders.data?.length || paymentOrderIds.length} บิล`) : editOrderId ? (english ? `Edit bill #${editOrder.data?.order_number || ''}` : `แก้ไขบิล #${editOrder.data?.order_number || ''}`) : (english ? 'New order' : 'ออเดอร์ใหม่')}</h1>
           </div>
           <div className="flex gap-2">
             <select
@@ -564,10 +567,10 @@ export default function POS() {
                 disabled={Boolean(editOrderId) || isBatchPayment}
                 className="h-11 rounded-xl border bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
               >
-                <option value="">เลือกโต๊ะ</option>
+                <option value="">{english ? 'Select table' : 'เลือกโต๊ะ'}</option>
                 {tables.data?.map((x: any) => (
                   <option key={x.id} value={x.id}>
-                    โต๊ะ {x.table_number} · {x.status === 'occupied' ? 'ไม่ว่าง' : 'ว่าง'}
+                    {english ? 'Table' : 'โต๊ะ'} {x.table_number} · {x.status === 'occupied' ? (english ? 'Occupied' : 'ไม่ว่าง') : (english ? 'Available' : 'ว่าง')}
                   </option>
                 ))}
               </select>
@@ -578,10 +581,10 @@ export default function POS() {
         <div className="mt-5">
           <div className="relative max-w-md">
             <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-            <input value={menuSearch} onChange={event => setMenuSearch(event.target.value)} placeholder="ค้นหาเมนู" className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-10 pr-3 text-sm outline-none focus:border-orange-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" />
+            <input value={menuSearch} onChange={event => setMenuSearch(event.target.value)} placeholder={english ? 'Search menu' : 'ค้นหาเมนู'} className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-10 pr-3 text-sm outline-none focus:border-orange-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" />
           </div>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            <button type="button" onClick={() => setSelectedMenuCategory('all')} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${selectedMenuCategory === 'all' ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}>ทั้งหมด</button>
+            <button type="button" onClick={() => setSelectedMenuCategory('all')} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${selectedMenuCategory === 'all' ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}>{english ? 'All' : 'ทั้งหมด'}</button>
             {menuCategories.map(category => <button key={category} type="button" onClick={() => setSelectedMenuCategory(category)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${selectedMenuCategory === category ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}>{category}</button>)}
           </div>
         </div>
@@ -617,14 +620,14 @@ export default function POS() {
         </div>
 
         {!menu.isLoading && !filteredMenu.length && (
-          <p className="mt-16 text-center text-zinc-400">ไม่พบเมนูที่ค้นหา</p>
+          <p className="mt-16 text-center text-zinc-400">{english ? 'No menu items found' : 'ไม่พบเมนูที่ค้นหา'}</p>
         )}
       </section>
 
       {/* Aside Bill Cart */}
       <aside className="h-fit rounded-2xl border bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex items-start justify-between gap-3">
-          <div><h2 className="text-lg font-black dark:text-white">Current bill</h2><p className="mt-1 text-xs text-zinc-400">{selectedTableObj ? `โต๊ะ ${selectedTableObj.table_number}` : type === 'takeaway' ? 'สั่งกลับบ้าน' : type === 'delivery' ? 'เดลิเวอรี' : 'เลือกโต๊ะเพื่อเริ่มบิล'}</p></div>
+          <div><h2 className="text-lg font-black dark:text-white">{english ? 'Current bill' : 'บิลปัจจุบัน'}</h2><p className="mt-1 text-xs text-zinc-400">{selectedTableObj ? `${english ? 'Table' : 'โต๊ะ'} ${selectedTableObj.table_number}` : type === 'takeaway' ? (english ? 'Takeaway' : 'สั่งกลับบ้าน') : type === 'delivery' ? (english ? 'Delivery' : 'เดลิเวอรี') : (english ? 'Select a table to start a bill' : 'เลือกโต๊ะเพื่อเริ่มบิล')}</p></div>
         </div>
         <div className="my-5 max-h-72 overflow-y-auto space-y-3">
           {cart.map(x => (
@@ -635,22 +638,22 @@ export default function POS() {
                 <b className="w-4 text-center text-sm dark:text-white">{x.qty}</b>
                 <button disabled={isBatchPayment} onClick={() => { if (editOrderId) setEditDirty(true); setCart(c => c.map(i => (i.id === x.id ? { ...i, qty: i.qty + 1 } : i))) }} className="grid size-7 place-items-center rounded-lg bg-zinc-100 dark:bg-zinc-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-45"><Plus size={12} /></button>
               </div>
-              <input disabled={isBatchPayment} value={(x as any).notes || ''} onChange={event => { if (editOrderId) setEditDirty(true); setCart(items => items.map(item => item.id === x.id ? { ...item, notes: event.target.value } : item)) }} placeholder="หมายเหตุถึงครัว เช่น ไม่ใส่ผัก / เผ็ดน้อย" className="h-8 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 text-xs outline-none focus:border-orange-400 disabled:opacity-45 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
+              <input disabled={isBatchPayment} value={(x as any).notes || ''} onChange={event => { if (editOrderId) setEditDirty(true); setCart(items => items.map(item => item.id === x.id ? { ...item, notes: event.target.value } : item)) }} placeholder={english ? 'Kitchen note, e.g. no vegetables / mild' : 'หมายเหตุถึงครัว เช่น ไม่ใส่ผัก / เผ็ดน้อย'} className="h-8 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 text-xs outline-none focus:border-orange-400 disabled:opacity-45 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
             </div>
           ))}
           {!cart.length && (
-            <p className="text-center text-xs text-zinc-400 py-6">ยังไม่มีรายการในบิล</p>
+            <p className="text-center text-xs text-zinc-400 py-6">{english ? 'No items in this bill yet' : 'ยังไม่มีรายการในบิล'}</p>
           )}
         </div>
 
         <div className="mb-4">
-          <label className="mb-1.5 block text-xs font-bold text-zinc-600 dark:text-zinc-300">หมายเหตุทั้งบิล</label>
+          <label className="mb-1.5 block text-xs font-bold text-zinc-600 dark:text-zinc-300">{english ? 'Bill note' : 'หมายเหตุทั้งบิล'}</label>
           <textarea disabled={isBatchPayment} value={orderNote} onChange={event => { if (editOrderId) setEditDirty(true); setOrderNote(event.target.value) }} placeholder="เช่น ลูกค้ารอรับเอง / แจ้งเมื่ออาหารพร้อม" rows={2} className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs outline-none focus:border-orange-400 disabled:opacity-45 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
         </div>
 
         <div className="space-y-2 border-y py-4 text-sm dark:border-zinc-700">
           <div className="flex justify-between text-zinc-500">
-            <span>รวมค่าอาหาร (Subtotal)</span>
+            <span>{english ? 'Subtotal' : 'รวมค่าอาหาร (Subtotal)'}</span>
             <span>฿{subtotal.toLocaleString()}</span>
           </div>
           {serviceChargePercent > 0 && (
@@ -666,7 +669,7 @@ export default function POS() {
             </div>
           )}
           <div className="flex justify-between text-xl font-black dark:text-white pt-1">
-            <span>ยอดสุทธิ (Total)</span>
+            <span>{english ? 'Total' : 'ยอดสุทธิ (Total)'}</span>
             <span style={{ color: themeColor }}>฿{total.toLocaleString()}</span>
           </div>
         </div>

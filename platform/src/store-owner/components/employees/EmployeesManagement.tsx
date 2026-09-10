@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
+import { useLanguage } from '../../../lib/language'
 
 export interface Employee {
   id: string
@@ -114,6 +115,8 @@ export const ALL_PERMISSIONS = [
 
 export default function EmployeesManagement() {
   const { store } = useStore()
+  const { language } = useLanguage()
+  const english = language === 'en'
   const qc = useQueryClient()
   const themeColor = (store as any)?.theme_color || '#F97316'
 
@@ -366,12 +369,12 @@ export default function EmployeesManagement() {
                 Staff & Access Control
               </p>
               <h1 className="text-2xl font-black text-zinc-950 dark:text-white sm:text-3xl">
-                จัดการพนักงานและระบบ PIN
+                {english ? 'Employee & PIN management' : 'จัดการพนักงานและระบบ PIN'}
               </h1>
             </div>
           </div>
           <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-            สร้างบัญชีพนักงาน กำหนดรหัส PIN สำหรับปลดล็อคเครื่อง POS และเลือกแสดงสิทธิ์ตามแต่ละตำแหน่ง
+            {english ? 'Create employee accounts, assign PINs for POS access, and manage permissions by role.' : 'สร้างบัญชีพนักงาน กำหนดรหัส PIN สำหรับปลดล็อคเครื่อง POS และเลือกแสดงสิทธิ์ตามแต่ละตำแหน่ง'}
           </p>
         </div>
 
@@ -382,7 +385,7 @@ export default function EmployeesManagement() {
             className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-xs font-bold text-zinc-700 shadow-xs transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 cursor-pointer"
           >
             <Lock size={15} className="text-orange-500" />
-            <span>ทดสอบกด PIN</span>
+            <span>{english ? 'Test PIN' : 'ทดสอบกด PIN'}</span>
           </button>
 
           <button
@@ -390,7 +393,7 @@ export default function EmployeesManagement() {
             className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-xs font-bold text-zinc-700 shadow-xs transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700 cursor-pointer"
           >
             <Printer size={15} className="text-blue-500" />
-            <span>พิมพ์การ์ด PIN</span>
+            <span>{english ? 'Print PIN cards' : 'พิมพ์การ์ด PIN'}</span>
           </button>
 
           <button
@@ -402,7 +405,7 @@ export default function EmployeesManagement() {
             className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-md transition hover:brightness-95 cursor-pointer active:scale-95"
           >
             <UserPlus size={16} />
-            <span>เพิ่มพนักงานใหม่</span>
+            <span>{english ? 'Add employee' : 'เพิ่มพนักงานใหม่'}</span>
           </button>
         </div>
       </div>
@@ -411,56 +414,56 @@ export default function EmployeesManagement() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center justify-between text-zinc-400">
-            <span className="text-xs font-medium">พนักงานทั้งหมด</span>
+            <span className="text-xs font-medium">{english ? 'All employees' : 'พนักงานทั้งหมด'}</span>
             <Users size={16} />
           </div>
           <p className="mt-2 text-2xl font-black text-zinc-900 dark:text-white">{stats.total}</p>
-          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">ใช้งาน {stats.active} คน</span>
+          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{english ? `${stats.active} active` : `ใช้งาน ${stats.active} คน`}</span>
         </div>
 
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center justify-between text-purple-500">
-            <span className="text-xs font-medium">เจ้าของ/ผู้จัดการ</span>
+            <span className="text-xs font-medium">{english ? 'Owner / manager' : 'เจ้าของ/ผู้จัดการ'}</span>
             <ShieldCheck size={16} />
           </div>
           <p className="mt-2 text-2xl font-black text-purple-600 dark:text-purple-400">{stats.owners}</p>
-          <span className="text-[10px] text-zinc-400">สิทธิ์ดูแลร้านเต็ม</span>
+          <span className="text-[10px] text-zinc-400">{english ? 'Full store access' : 'สิทธิ์ดูแลร้านเต็ม'}</span>
         </div>
 
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center justify-between text-emerald-500">
-            <span className="text-xs font-medium">แคชเชียร์</span>
+            <span className="text-xs font-medium">{english ? 'Cashier' : 'แคชเชียร์'}</span>
             <CircleDollarSign size={16} />
           </div>
           <p className="mt-2 text-2xl font-black text-emerald-600 dark:text-emerald-400">{stats.cashiers}</p>
-          <span className="text-[10px] text-zinc-400">คิดเงิน / POS</span>
+          <span className="text-[10px] text-zinc-400">{english ? 'Checkout / POS' : 'คิดเงิน / POS'}</span>
         </div>
 
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center justify-between text-amber-500">
-            <span className="text-xs font-medium">พนักงานครัว</span>
+            <span className="text-xs font-medium">{english ? 'Kitchen staff' : 'พนักงานครัว'}</span>
             <ChefHat size={16} />
           </div>
           <p className="mt-2 text-2xl font-black text-amber-600 dark:text-amber-400">{stats.kitchen}</p>
-          <span className="text-[10px] text-zinc-400">หน้าจอ KDS ครัว</span>
+          <span className="text-[10px] text-zinc-400">{english ? 'Kitchen KDS' : 'หน้าจอ KDS ครัว'}</span>
         </div>
 
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center justify-between text-cyan-500">
-            <span className="text-xs font-medium">พนักงานเสิร์ฟ</span>
+            <span className="text-xs font-medium">{english ? 'Service staff' : 'พนักงานเสิร์ฟ'}</span>
             <Utensils size={16} />
           </div>
           <p className="mt-2 text-2xl font-black text-cyan-600 dark:text-cyan-400">{stats.waiters}</p>
-          <span className="text-[10px] text-zinc-400">หน้าร้าน / โต๊ะ</span>
+          <span className="text-[10px] text-zinc-400">{english ? 'Front of house / tables' : 'หน้าร้าน / โต๊ะ'}</span>
         </div>
 
         <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
           <div className="flex items-center justify-between text-orange-500">
-            <span className="text-xs font-medium">มีรหัส PIN</span>
+            <span className="text-xs font-medium">{english ? 'Has PIN' : 'มีรหัส PIN'}</span>
             <KeyRound size={16} />
           </div>
           <p className="mt-2 text-2xl font-black text-orange-600 dark:text-orange-400">{stats.withPin}</p>
-          <span className="text-[10px] text-zinc-400">พร้อมล็อคอิน POS</span>
+          <span className="text-[10px] text-zinc-400">{english ? 'Ready for POS sign-in' : 'พร้อมล็อคอิน POS'}</span>
         </div>
       </div>
 
@@ -469,7 +472,7 @@ export default function EmployeesManagement() {
         {/* Top filter row: Role Pills */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-bold text-zinc-400 mr-1">เลือกแสดงโรล:</span>
+            <span className="text-xs font-bold text-zinc-400 mr-1">{english ? 'Show roles:' : 'เลือกแสดงโรล:'}</span>
             <button
               onClick={() => setSelectedRoleFilter('all')}
               className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
@@ -478,7 +481,7 @@ export default function EmployeesManagement() {
                   : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
               }`}
             >
-              ทั้งหมด ({stats.total})
+              {english ? `All (${stats.total})` : `ทั้งหมด (${stats.total})`}
             </button>
 
             {Object.entries(ROLE_CONFIG).map(([key, cfg]) => {
@@ -496,7 +499,7 @@ export default function EmployeesManagement() {
                   }`}
                 >
                   <Icon size={13} />
-                  <span>{cfg.label}</span>
+                  <span>{english ? cfg.labelEn : cfg.label}</span>
                   <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-white/20' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
                     {count}
                   </span>
@@ -540,27 +543,27 @@ export default function EmployeesManagement() {
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="ค้นหาชื่อพนักงาน, ตำแหน่ง, เบอร์โทร หรือรหัส PIN..."
+              placeholder={english ? 'Search employee, role, phone, or PIN…' : 'ค้นหาชื่อพนักงาน, ตำแหน่ง, เบอร์โทร หรือรหัส PIN...'}
               className="w-full rounded-xl border border-zinc-200 bg-zinc-50 pl-10 pr-4 py-2 text-xs font-medium text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:bg-white focus:outline-none dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-white dark:focus:bg-zinc-800"
             />
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <span className="text-xs text-zinc-400 shrink-0">สถานะ:</span>
+            <span className="text-xs text-zinc-400 shrink-0">{english ? 'Status:' : 'สถานะ:'}</span>
             <select
               value={selectedStatusFilter}
               onChange={e => setSelectedStatusFilter(e.target.value)}
               className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-bold text-zinc-700 focus:border-orange-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
             >
-              <option value="all">สถานะทั้งหมด</option>
-              <option value="active">🟢 ใช้งาน (Active)</option>
-              <option value="inactive">⚪ พักงาน (Inactive)</option>
+              <option value="all">{english ? 'All statuses' : 'สถานะทั้งหมด'}</option>
+              <option value="active">{english ? '🟢 Active' : '🟢 ใช้งาน (Active)'}</option>
+              <option value="inactive">{english ? '⚪ Inactive' : '⚪ พักงาน (Inactive)'}</option>
             </select>
 
             <button
               onClick={() => qc.invalidateQueries({ queryKey: ['store-employees', store.id] })}
               className="grid size-9 place-items-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 cursor-pointer"
-              title="รีเฟรชข้อมูล"
+              title={english ? 'Refresh data' : 'รีเฟรชข้อมูล'}
             >
               <RefreshCw size={14} className={isFetching ? 'animate-spin text-orange-500' : ''} />
             </button>
@@ -572,7 +575,7 @@ export default function EmployeesManagement() {
       {isLoading ? (
         <div className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-2xl border border-zinc-200 bg-white p-12 text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900">
           <RefreshCw size={24} className="animate-spin text-orange-500" />
-          <p className="text-xs font-bold">กำลังโหลดข้อมูลพนักงาน…</p>
+          <p className="text-xs font-bold">{english ? 'Loading employee data…' : 'กำลังโหลดข้อมูลพนักงาน…'}</p>
         </div>
       ) : filteredEmployees.length === 0 ? (
         <div className="flex min-h-64 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-zinc-200 bg-white p-12 text-center text-zinc-400 dark:border-zinc-800 dark:bg-zinc-900">
@@ -581,7 +584,7 @@ export default function EmployeesManagement() {
           </div>
           <div>
             <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-              {searchQuery || selectedRoleFilter !== 'all' ? 'ไม่พบพนักงานที่ตรงกับเงื่อนไขค้นหา' : 'ยังไม่มีข้อมูลพนักงาน'}
+              {searchQuery || selectedRoleFilter !== 'all' ? (english ? 'No employees match your filters' : 'ไม่พบพนักงานที่ตรงกับเงื่อนไขค้นหา') : (english ? 'No employee data yet' : 'ยังไม่มีข้อมูลพนักงาน')}
             </h3>
             <p className="mt-1 text-xs text-zinc-400">
               {searchQuery || selectedRoleFilter !== 'all' ? 'ลองล้างการค้นหาหรือเลือกโรลอื่น' : 'คลิกปุ่ม "เพิ่มพนักงานใหม่" เพื่อสร้างบัญชีและกำหนดรหัส PIN'}

@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Bell, ChevronDown, Menu, Search, LogOut, Home } from 'lucide-react'
 import { getCurrentProfile, signOut } from './lib/database'
+import { LanguageToggle, useLanguage } from './lib/language'
 
 export default function AdminHeader({ onOpenSidebar, title, category }) {
+  const { language } = useLanguage()
+  const english = language === 'en'
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [profileData, setProfileData] = useState(null)
@@ -19,7 +22,7 @@ export default function AdminHeader({ onOpenSidebar, title, category }) {
   const email = profileData?.session?.user?.email || 'admin@smartpos.co'
   const name = user?.full_name || 'Admin100'
   const initial = name.substring(0, 2).toUpperCase()
-  const roleLabel = user?.role === 'super_admin' ? 'ผู้ดูแลระบบ' : 'เจ้าของร้าน'
+  const roleLabel = user?.role === 'super_admin' ? (english ? 'Administrator' : 'ผู้ดูแลระบบ') : (english ? 'Store owner' : 'เจ้าของร้าน')
 
   return (
     <header className="sticky top-0 z-30 flex h-[72px] items-center border-b border-zinc-200 bg-white/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
@@ -38,15 +41,16 @@ export default function AdminHeader({ onOpenSidebar, title, category }) {
       )}
 
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
+        <LanguageToggle />
         <div className="relative">
-          <button onClick={()=>{ setNotificationsOpen(!notificationsOpen); setUserMenuOpen(false); }} className="relative grid size-10 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-500 transition hover:bg-zinc-50" aria-label="การแจ้งเตือน">
+          <button onClick={()=>{ setNotificationsOpen(!notificationsOpen); setUserMenuOpen(false); }} className="relative grid size-10 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-500 transition hover:bg-zinc-50" aria-label={english ? 'Notifications' : 'การแจ้งเตือน'}>
             <Bell size={18}/>
             <span className="absolute right-2 top-2 size-2 rounded-full bg-orange-500 ring-2 ring-white"/>
           </button>
           {notificationsOpen && (
             <div className="absolute right-0 top-12 w-72 rounded-2xl border border-zinc-200 bg-white p-3 shadow-2xl z-50">
-              <div className="flex items-center justify-between px-2 py-1"><b className="text-sm">การแจ้งเตือน</b><span className="text-[10px] font-bold text-orange-600">3 รายการใหม่</span></div>
-              {['มีร้านค้าใหม่สมัครใช้งาน','การชำระเงินสำเร็จ ฿1,290','รายงานประจำเดือนพร้อมแล้ว'].map((x,i)=><div key={x} className="mt-2 flex gap-3 rounded-xl bg-zinc-50 p-3"><span className={`mt-1 size-2 shrink-0 rounded-full ${i<2?'bg-orange-500':'bg-zinc-300'}`}/><div><p className="text-xs font-semibold">{x}</p><p className="mt-1 text-[10px] text-zinc-400">{i+1} ชั่วโมงที่แล้ว</p></div></div>)}
+              <div className="flex items-center justify-between px-2 py-1"><b className="text-sm">{english ? 'Notifications' : 'การแจ้งเตือน'}</b><span className="text-[10px] font-bold text-orange-600">{english ? '3 new items' : '3 รายการใหม่'}</span></div>
+              {(english ? ['A new store has signed up', 'Payment of ฿1,290 completed', 'Monthly report is ready'] : ['มีร้านค้าใหม่สมัครใช้งาน','การชำระเงินสำเร็จ ฿1,290','รายงานประจำเดือนพร้อมแล้ว']).map((x,i)=><div key={x} className="mt-2 flex gap-3 rounded-xl bg-zinc-50 p-3"><span className={`mt-1 size-2 shrink-0 rounded-full ${i<2?'bg-orange-500':'bg-zinc-300'}`}/><div><p className="text-xs font-semibold">{x}</p><p className="mt-1 text-[10px] text-zinc-400">{english ? `${i+1} hours ago` : `${i+1} ชั่วโมงที่แล้ว`}</p></div></div>)}
             </div>
           )}
         </div>

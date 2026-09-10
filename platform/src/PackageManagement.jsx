@@ -1,13 +1,382 @@
 import { useEffect, useState } from 'react'
-import { BarChart3, Check, CircleDollarSign, LayoutDashboard, LogOut, Menu, Package, Pencil, Plus, Settings, Store, Trash2, Users, X, Zap } from 'lucide-react'
+import { BarChart3, Check, CircleDollarSign, LayoutDashboard, LogOut, Package, Pencil, Plus, Settings, Store, Trash2, Users, X, Zap } from 'lucide-react'
 import { fetchPackages, removePackage, requireSuperAdmin, savePackage, signOut } from './lib/database'
 import AdminHeader from './AdminHeader'
 
-const nav=[['Dashboard',LayoutDashboard,'/admin'],['ร้านค้า',Store,'/admin/stores'],['แพ็กเกจ',Package,'/admin/packages'],['รายได้',CircleDollarSign,'/admin/revenue'],['สมาชิก',Users,'/admin/members'],['Analytics',BarChart3,'/admin/analytics']]
-const blank={name:'',slug:'',description:'',monthly_price:'',yearly_price:'',duration_days:30,status:'active',features:[]}
+const nav = [
+  ['แดชบอร์ด', LayoutDashboard, '/admin'],
+  ['ร้านค้า', Store, '/admin/stores'],
+  ['แพ็กเกจ', Package, '/admin/packages'],
+  ['รายได้', CircleDollarSign, '/admin/revenue'],
+  ['สมาชิก', Users, '/admin/members'],
+  ['การวิเคราะห์', BarChart3, '/admin/analytics'],
+]
 
-function Sidebar({open,close}){return <><button onClick={close} className={`fixed inset-0 z-40 bg-zinc-950/50 lg:hidden ${open?'block':'hidden'}`}/><aside className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col bg-zinc-950 p-4 text-white transition-transform lg:translate-x-0 ${open?'translate-x-0':'-translate-x-full'}`}><div className="flex h-14 items-center justify-between px-2"><a href="/" className="flex items-center gap-2"><span className="grid size-9 place-items-center rounded-xl bg-orange-500"><Zap size={18} fill="currentColor"/></span><b className="text-lg">Smart<span className="text-orange-500">POS</span></b><small className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-zinc-400">ADMIN</small></a><button onClick={close} className="lg:hidden"><X/></button></div><p className="mt-7 px-3 text-[10px] font-bold uppercase tracking-widest text-zinc-600">Management</p><nav className="mt-3 space-y-1">{nav.map(([label,Icon,href])=><a key={label} href={href} className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${label==='แพ็กเกจ'?'bg-orange-500 shadow-lg shadow-orange-500/20':'text-zinc-400 hover:bg-white/5 hover:text-white'}`}><Icon size={19}/>{label}</a>)}</nav><p className="mt-7 px-3 text-[10px] font-bold uppercase tracking-widest text-zinc-600">System</p><a href="/admin/settings" className="mt-3 flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-zinc-400"><Settings size={19}/>Setting</a><button onClick={signOut} className="mt-1 flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-zinc-400 hover:bg-red-500/10 hover:text-red-400"><LogOut size={19}/>ออกจากระบบ</button></aside></>}
+const blank = {
+  name: '',
+  slug: '',
+  description: '',
+  monthly_price: '',
+  yearly_price: '',
+  duration_days: 30,
+  status: 'active',
+  features: [],
+}
 
-function PackageModal({item,onClose,onSaved}){const [form,setForm]=useState(item?{...item,features:[...(item.features||[])]}:blank);const [feature,setFeature]=useState('');const [saving,setSaving]=useState(false);const [error,setError]=useState('');const set=(k,v)=>setForm(p=>({...p,[k]:v}));const submit=async e=>{e.preventDefault();if(!form.name.trim()||!form.slug.trim()){setError('กรุณากรอกชื่อและ Slug');return}setSaving(true);try{const saved=await savePackage(form,item?.id);onSaved(saved);onClose()}catch(err){setError(err.message)}finally{setSaving(false)}};const addFeature=()=>{if(feature.trim()){set('features',[...form.features,feature.trim()]);setFeature('')}};return <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-zinc-950/60 p-4 backdrop-blur-sm"><form onSubmit={submit} className="my-6 w-full max-w-xl rounded-[26px] bg-white p-6 shadow-2xl sm:p-7"><div className="flex items-start justify-between"><div><h2 className="text-xl font-black">{item?'แก้ไขแพ็กเกจ':'สร้างแพ็กเกจ'}</h2><p className="mt-1 text-xs text-zinc-400">กำหนดราคา ฟีเจอร์ ระยะเวลา และสถานะ</p></div><button type="button" onClick={onClose} className="grid size-9 place-items-center rounded-lg hover:bg-zinc-100"><X size={18}/></button></div><div className="mt-6 grid gap-5 sm:grid-cols-2"><label className="text-sm font-bold">ชื่อแพ็กเกจ<input value={form.name} onChange={e=>set('name',e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 font-normal outline-none focus:border-orange-400" placeholder="Business"/></label><label className="text-sm font-bold">Slug<input value={form.slug} onChange={e=>set('slug',e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 font-normal outline-none focus:border-orange-400" placeholder="business"/></label><label className="text-sm font-bold">ราคารายเดือน<input type="number" min="0" value={form.monthly_price} onChange={e=>set('monthly_price',e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 font-normal outline-none focus:border-orange-400"/></label><label className="text-sm font-bold">ราคารายปี<input type="number" min="0" value={form.yearly_price} onChange={e=>set('yearly_price',e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 font-normal outline-none focus:border-orange-400"/></label><label className="text-sm font-bold">ระยะเวลา (วัน)<input type="number" min="1" value={form.duration_days} onChange={e=>set('duration_days',e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 font-normal outline-none focus:border-orange-400"/></label><label className="text-sm font-bold">สถานะ<select value={form.status} onChange={e=>set('status',e.target.value)} className="mt-2 h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 font-normal outline-none focus:border-orange-400"><option value="active">Active</option><option value="inactive">Inactive</option></select></label></div><label className="mt-5 block text-sm font-bold">คำอธิบาย<textarea value={form.description} onChange={e=>set('description',e.target.value)} className="mt-2 min-h-20 w-full rounded-xl border border-zinc-200 p-3 font-normal outline-none focus:border-orange-400"/></label><div className="mt-5"><p className="text-sm font-bold">Features</p><div className="mt-2 flex gap-2"><input value={feature} onChange={e=>setFeature(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addFeature()}}} className="h-11 flex-1 rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-orange-400" placeholder="เพิ่มฟีเจอร์"/><button type="button" onClick={addFeature} className="rounded-xl bg-zinc-950 px-4 text-sm font-bold text-white">เพิ่ม</button></div><div className="mt-3 space-y-2">{form.features.map((f,i)=><div key={`${f}-${i}`} className="flex items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2 text-sm"><Check size={14} className="text-emerald-500"/><span className="flex-1">{f}</span><button type="button" onClick={()=>set('features',form.features.filter((_,x)=>x!==i))} className="text-zinc-400 hover:text-red-500"><X size={15}/></button></div>)}</div></div>{error&&<p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-xs font-bold text-red-600">{error}</p>}<div className="mt-6 flex gap-3"><button type="button" onClick={onClose} className="h-11 flex-1 rounded-xl border border-zinc-200 text-sm font-bold">ยกเลิก</button><button disabled={saving} className="h-11 flex-1 rounded-xl bg-orange-500 text-sm font-bold text-white disabled:opacity-60">{saving?'กำลังบันทึก…':'บันทึกแพ็กเกจ'}</button></div></form></div>}
+function Sidebar({ open, close }) {
+  return (
+    <>
+      <button
+        onClick={close}
+        aria-label="ปิดเมนู"
+        className={`fixed inset-0 z-40 bg-zinc-950/50 lg:hidden ${open ? 'block' : 'hidden'}`}
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-[270px] flex-col bg-zinc-950 p-4 text-white transition-transform lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="flex h-14 items-center justify-between px-2">
+          <a href="/" className="flex items-center gap-2">
+            <span className="grid size-9 place-items-center rounded-xl bg-orange-500">
+              <Zap size={18} fill="currentColor" />
+            </span>
+            <b className="text-lg">
+              Smart<span className="text-orange-500">POS</span>
+            </b>
+            <small className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-zinc-400">ผู้ดูแลระบบ</small>
+          </a>
+          <button onClick={close} className="lg:hidden" aria-label="ปิด">
+            <X />
+          </button>
+        </div>
+        <p className="mt-7 px-3 text-[10px] font-bold uppercase tracking-widest text-zinc-600">การจัดการ</p>
+        <nav className="mt-3 space-y-1">
+          {nav.map(([label, Icon, href]) => (
+            <a
+              key={label}
+              href={href}
+              className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold ${label === 'แพ็กเกจ' ? 'bg-orange-500 shadow-lg shadow-orange-500/20' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}
+            >
+              <Icon size={19} />
+              {label}
+            </a>
+          ))}
+        </nav>
+        <p className="mt-7 px-3 text-[10px] font-bold uppercase tracking-widest text-zinc-600">ระบบ</p>
+        <a href="/admin/settings" className="mt-3 flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-zinc-400 hover:bg-white/5 hover:text-white">
+          <Settings size={19} />
+          ตั้งค่าระบบ
+        </a>
+        <button
+          onClick={signOut}
+          className="mt-1 flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+        >
+          <LogOut size={19} />
+          ออกจากระบบ
+        </button>
+      </aside>
+    </>
+  )
+}
 
-export default function PackageManagement(){const [sidebar,setSidebar]=useState(false);const [items,setItems]=useState([]);const [editing,setEditing]=useState(undefined);const [modal,setModal]=useState(false);const [loading,setLoading]=useState(true);const [error,setError]=useState('');useEffect(()=>{(async()=>{try{const auth=await requireSuperAdmin();if(!auth.session){location.replace('/login');return}if(!auth.allowed){location.replace('/');return}setItems(await fetchPackages())}catch(e){setError(e.message)}finally{setLoading(false)}})()},[]);const remove=async item=>{if(!confirm(`ลบแพ็กเกจ ${item.name}?`))return;try{await removePackage(item.id);setItems(x=>x.filter(p=>p.id!==item.id))}catch(e){setError(e.message)}};const open=item=>{setEditing(item);setModal(true)};if(loading)return <div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลดแพ็กเกจ…</div>;return <div className="min-h-screen bg-[#f7f7f8]"><Sidebar open={sidebar} close={()=>setSidebar(false)}/><div className="lg:pl-[270px]"><AdminHeader onOpenSidebar={() => setSidebar(true)} category="Management" title="จัดการแพ็กเกจ" /><main className="p-4 sm:p-7 lg:p-8"><div className="mx-auto max-w-[1400px]"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><h1 className="text-3xl font-black">จัดการแพ็กเกจ</h1><p className="mt-2 text-sm text-zinc-500">สร้างและกำหนดราคาแพ็กเกจสำหรับร้านค้า</p></div><button onClick={()=>open(null)} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 text-sm font-bold text-white shadow-lg shadow-orange-500/20"><Plus size={17}/>เพิ่มแพ็กเกจ</button></div>{error&&<p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{error}</p>}<div className="mt-7 grid gap-5 lg:grid-cols-3">{items.map(item=><article key={item.id} className="flex flex-col rounded-[24px] border border-zinc-200 bg-white p-6 shadow-sm"><div className="flex items-start justify-between"><div><h2 className="text-xl font-black">{item.name}</h2><p className="mt-1 text-xs text-zinc-400">/{item.slug}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${item.status==='active'?'bg-emerald-100 text-emerald-700':'bg-zinc-100 text-zinc-500'}`}>{item.status}</span></div><p className="mt-4 min-h-10 text-sm leading-6 text-zinc-500">{item.description}</p><div className="mt-5 grid grid-cols-2 gap-3"><div className="rounded-xl bg-orange-50 p-3"><p className="text-[10px] text-orange-600">รายเดือน</p><p className="mt-1 text-lg font-black">฿{Number(item.monthly_price).toLocaleString()}</p></div><div className="rounded-xl bg-zinc-50 p-3"><p className="text-[10px] text-zinc-500">รายปี</p><p className="mt-1 text-lg font-black">฿{Number(item.yearly_price).toLocaleString()}</p></div></div><p className="mt-4 text-xs font-bold text-zinc-500">ระยะเวลา {item.duration_days} วัน</p><ul className="mt-4 flex-1 space-y-2">{(item.features||[]).map(f=><li key={f} className="flex gap-2 text-xs text-zinc-600"><Check size={14} className="shrink-0 text-emerald-500"/>{f}</li>)}</ul><div className="mt-6 flex gap-2 border-t border-zinc-100 pt-4"><button onClick={()=>open(item)} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-zinc-200 text-xs font-bold hover:bg-zinc-50"><Pencil size={14}/>แก้ไข</button><button onClick={()=>remove(item)} className="grid size-10 place-items-center rounded-xl border border-red-100 text-red-500 hover:bg-red-50"><Trash2 size={15}/></button></div></article>)}</div>{!items.length&&!error&&<div className="mt-10 rounded-2xl border border-dashed border-zinc-300 py-16 text-center text-sm text-zinc-400">ยังไม่มีแพ็กเกจ</div>}</div></main></div>{modal&&<PackageModal item={editing} onClose={()=>setModal(false)} onSaved={saved=>setItems(x=>editing?x.map(p=>p.id===saved.id?saved:p):[...x,saved].sort((a,b)=>a.monthly_price-b.monthly_price))}/>}</div>}
+function PackageModal({ item, onClose, onSaved }) {
+  const [form, setForm] = useState(item ? { ...item, features: [...(item.features || [])] } : blank)
+  const [feature, setFeature] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  const submit = async e => {
+    e.preventDefault()
+    if (!form.name.trim() || !form.slug.trim()) {
+      setError('กรุณากรอกชื่อและชื่ออ้างอิง (Slug)')
+      return
+    }
+    setSaving(true)
+    try {
+      const saved = await savePackage(form, item?.id)
+      onSaved(saved)
+      onClose()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const addFeature = () => {
+    if (feature.trim()) {
+      set('features', [...form.features, feature.trim()])
+      setFeature('')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-zinc-950/60 p-4 backdrop-blur-sm">
+      <form onSubmit={submit} className="my-6 w-full max-w-xl rounded-[26px] bg-white p-6 shadow-2xl sm:p-7">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-black">{item ? 'แก้ไขแพ็กเกจ' : 'สร้างแพ็กเกจใหม่'}</h2>
+            <p className="mt-1 text-xs text-zinc-400">กำหนดราคา คุณสมบัติ ระยะเวลา และสถานะการใช้งาน</p>
+          </div>
+          <button type="button" onClick={onClose} className="grid size-9 place-items-center rounded-lg hover:bg-zinc-100">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+          <label className="text-sm font-bold">
+            ชื่อแพ็กเกจ
+            <input
+              value={form.name}
+              onChange={e => set('name', e.target.value)}
+              className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 font-normal outline-none focus:border-orange-400"
+              placeholder="เช่น ธุรกิจ (Business)"
+            />
+          </label>
+          <label className="text-sm font-bold">
+            ชื่ออ้างอิง (Slug)
+            <input
+              value={form.slug}
+              onChange={e => set('slug', e.target.value)}
+              className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 font-normal outline-none focus:border-orange-400"
+              placeholder="business"
+            />
+          </label>
+          <label className="text-sm font-bold">
+            ราคารายเดือน (บาท)
+            <input
+              type="number"
+              min="0"
+              value={form.monthly_price}
+              onChange={e => set('monthly_price', e.target.value)}
+              className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 font-normal outline-none focus:border-orange-400"
+            />
+          </label>
+          <label className="text-sm font-bold">
+            ราคารายปี (บาท)
+            <input
+              type="number"
+              min="0"
+              value={form.yearly_price}
+              onChange={e => set('yearly_price', e.target.value)}
+              className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 font-normal outline-none focus:border-orange-400"
+            />
+          </label>
+          <label className="text-sm font-bold">
+            ระยะเวลาใช้งาน (วัน)
+            <input
+              type="number"
+              min="1"
+              value={form.duration_days}
+              onChange={e => set('duration_days', e.target.value)}
+              className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 font-normal outline-none focus:border-orange-400"
+            />
+          </label>
+          <label className="text-sm font-bold">
+            สถานะ
+            <select
+              value={form.status}
+              onChange={e => set('status', e.target.value)}
+              className="mt-2 h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 font-normal outline-none focus:border-orange-400"
+            >
+              <option value="active">เปิดใช้งาน</option>
+              <option value="inactive">ปิดใช้งาน</option>
+            </select>
+          </label>
+        </div>
+        <label className="mt-5 block text-sm font-bold">
+          คำอธิบายแพ็กเกจ
+          <textarea
+            value={form.description}
+            onChange={e => set('description', e.target.value)}
+            className="mt-2 min-h-20 w-full rounded-xl border border-zinc-200 p-3 font-normal outline-none focus:border-orange-400"
+          />
+        </label>
+        <div className="mt-5">
+          <p className="text-sm font-bold">คุณสมบัติและฟีเจอร์</p>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={feature}
+              onChange={e => setFeature(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addFeature()
+                }
+              }}
+              className="h-11 flex-1 rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-orange-400"
+              placeholder="พิมพ์ฟีเจอร์แล้วกดเพิ่ม..."
+            />
+            <button type="button" onClick={addFeature} className="rounded-xl bg-zinc-950 px-4 text-sm font-bold text-white">
+              เพิ่ม
+            </button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {form.features.map((f, i) => (
+              <div key={`${f}-${i}`} className="flex items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2 text-sm">
+                <Check size={14} className="text-emerald-500" />
+                <span className="flex-1">{f}</span>
+                <button type="button" onClick={() => set('features', form.features.filter((_, x) => x !== i))} className="text-zinc-400 hover:text-red-500">
+                  <X size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+        {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-xs font-bold text-red-600">{error}</p>}
+        <div className="mt-6 flex gap-3">
+          <button type="button" onClick={onClose} className="h-11 flex-1 rounded-xl border border-zinc-200 text-sm font-bold">
+            ยกเลิก
+          </button>
+          <button disabled={saving} className="h-11 flex-1 rounded-xl bg-orange-500 text-sm font-bold text-white disabled:opacity-60">
+            {saving ? 'กำลังบันทึก…' : 'บันทึกแพ็กเกจ'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+export default function PackageManagement() {
+  const [sidebar, setSidebar] = useState(false)
+  const [items, setItems] = useState([])
+  const [editing, setEditing] = useState(undefined)
+  const [modal, setModal] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const auth = await requireSuperAdmin()
+        if (!auth.session) {
+          location.replace('/login')
+          return
+        }
+        if (!auth.allowed) {
+          location.replace('/')
+          return
+        }
+        setItems(await fetchPackages())
+      } catch (e) {
+        setError(e.message)
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  const remove = async item => {
+    if (!confirm(`ยืนยันการลบแพ็กเกจ ${item.name}?`)) return
+    try {
+      await removePackage(item.id)
+      setItems(x => x.filter(p => p.id !== item.id))
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  const open = item => {
+    setEditing(item)
+    setModal(true)
+  }
+
+  if (loading) {
+    return <div className="grid min-h-screen place-items-center bg-zinc-50 text-sm font-bold text-zinc-500">กำลังโหลดแพ็กเกจ…</div>
+  }
+
+  return (
+    <div className="min-h-screen bg-[#f7f7f8]">
+      <Sidebar open={sidebar} close={() => setSidebar(false)} />
+      <div className="lg:pl-[270px]">
+        <AdminHeader onOpenSidebar={() => setSidebar(true)} category="การจัดการ" title="จัดการแพ็กเกจ" />
+        <main className="p-4 sm:p-7 lg:p-8">
+          <div className="mx-auto max-w-[1400px]">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+              <div>
+                <h1 className="text-3xl font-black">จัดการแพ็กเกจ</h1>
+                <p className="mt-2 text-sm text-zinc-500">สร้างและกำหนดราคาแพ็กเกจสำหรับร้านค้า</p>
+              </div>
+              <button
+                onClick={() => open(null)}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 text-sm font-bold text-white shadow-lg shadow-orange-500/20"
+              >
+                <Plus size={17} />
+                เพิ่มแพ็กเกจ
+              </button>
+            </div>
+            {error && <p className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{error}</p>}
+            <div className="mt-7 grid gap-5 lg:grid-cols-3">
+              {items.map(item => (
+                <article key={item.id} className="flex flex-col rounded-[24px] border border-zinc-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-xl font-black">{item.name}</h2>
+                      <p className="mt-1 text-xs text-zinc-400">/{item.slug}</p>
+                    </div>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${item.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}
+                    >
+                      {item.status === 'active' ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                    </span>
+                  </div>
+                  <p className="mt-4 min-h-10 text-sm leading-6 text-zinc-500">{item.description}</p>
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-orange-50 p-3">
+                      <p className="text-[10px] text-orange-600">รายเดือน</p>
+                      <p className="mt-1 text-lg font-black">฿{Number(item.monthly_price).toLocaleString()}</p>
+                    </div>
+                    <div className="rounded-xl bg-zinc-50 p-3">
+                      <p className="text-[10px] text-zinc-500">รายปี</p>
+                      <p className="mt-1 text-lg font-black">฿{Number(item.yearly_price).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-xs font-bold text-zinc-500">ระยะเวลา {item.duration_days} วัน</p>
+                  <ul className="mt-4 flex-1 space-y-2">
+                    {(item.features || []).map(f => (
+                      <li key={f} className="flex gap-2 text-xs text-zinc-600">
+                        <Check size={14} className="shrink-0 text-emerald-500" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-6 flex gap-2 border-t border-zinc-100 pt-4">
+                    <button
+                      onClick={() => open(item)}
+                      className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-zinc-200 text-xs font-bold hover:bg-zinc-50"
+                    >
+                      <Pencil size={14} />
+                      แก้ไข
+                    </button>
+                    <button
+                      onClick={() => remove(item)}
+                      className="grid size-10 place-items-center rounded-xl border border-red-100 text-red-500 hover:bg-red-50"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            {!items.length && !error && (
+              <div className="mt-10 rounded-2xl border border-dashed border-zinc-300 py-16 text-center text-sm text-zinc-400">
+                ยังไม่มีแพ็กเกจในระบบ
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+      {modal && (
+        <PackageModal
+          item={editing}
+          onClose={() => setModal(false)}
+          onSaved={saved =>
+            setItems(x =>
+              editing ? x.map(p => (p.id === saved.id ? saved : p)) : [...x, saved].sort((a, b) => a.monthly_price - b.monthly_price)
+            )
+          }
+        />
+      )}
+    </div>
+  )
+}

@@ -24,6 +24,7 @@ import {
   VolumeX
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { useLanguage } from '../../../lib/language'
 import { useStore } from '../../StoreContext'
 import { PageHeader } from '../PageKit'
 
@@ -87,7 +88,7 @@ function parseCustomerInfo(rawName: string | null | undefined, orderType: string
   return { name: rawName, phone: '', location: '' }
 }
 
-function formatElapsed(createdAtStr: string, now: Date) {
+function formatElapsed(createdAtStr: string, now: Date, english: boolean) {
   if (!createdAtStr) return '00:00'
   const created = new Date(createdAtStr).getTime()
   const diffMs = Math.max(0, now.getTime() - created)
@@ -98,7 +99,7 @@ function formatElapsed(createdAtStr: string, now: Date) {
   if (min >= 60) {
     const hr = Math.floor(min / 60)
     const remainMin = min % 60
-    return `${hr}ชม. ${remainMin}น.`
+    return english ? `${hr}h ${remainMin}m` : `${hr}ชม. ${remainMin}น.`
   }
   return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
 }
@@ -168,6 +169,8 @@ const COLUMNS: ColumnConfig[] = [
 
 export default function Kitchen() {
   const { store } = useStore()
+  const { language } = useLanguage()
+  const english = language === 'en'
   const qc = useQueryClient()
   const [now, setNow] = useState(() => new Date())
   const [soundEnabled, setSoundEnabled] = useState(true)
@@ -336,6 +339,18 @@ export default function Kitchen() {
 
   // Active tickets count (excluding completed)
   const activeCount = orders.filter((o: any) => ['pending', 'accepted', 'preparing', 'ready'].includes(o.status)).length
+  const columns = COLUMNS.map(column => ({
+    ...column,
+    title: english
+      ? ({ preparing: 'Preparing', ready: 'Ready to serve / deliver', completed: 'Recently completed' }[column.id] || column.title)
+      : column.title,
+    subtitle: english
+      ? ({ preparing: 'Chef is preparing', ready: 'Waiting for staff or rider', completed: 'Completed order history' }[column.id] || column.subtitle)
+      : column.subtitle,
+    actionLabel: english
+      ? ({ preparing: 'Ready to serve', ready: 'Delivered successfully' }[column.id] || column.actionLabel)
+      : column.actionLabel
+  }))
 
   return (
     <div ref={containerRef} className={`space-y-6 ${isFullscreen ? 'fixed inset-0 z-50 overflow-y-auto bg-zinc-950 p-6 text-white' : ''}`}>
@@ -343,8 +358,8 @@ export default function Kitchen() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <PageHeader
           eyebrow="Kitchen Display System (KDS)"
-          title="Kitchen · หน้าจอห้องครัว"
-          description={`เชื่อมต่อออเดอร์ลูกค้าแบบเรียลไทม์ · มีทั้งหมด ${activeCount} ออเดอร์ที่กำลังดำเนินการ`}
+          title={english ? 'Kitchen display' : 'หน้าจอห้องครัว'}
+          description={english ? `Live customer orders · ${activeCount} active orders` : `เชื่อมต่อออเดอร์ลูกค้าแบบเรียลไทม์ · มีทั้งหมด ${activeCount} ออเดอร์ที่กำลังดำเนินการ`}
         />
 
         {/* Toolbar controls */}
@@ -362,10 +377,10 @@ export default function Kitchen() {
                 ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
                 : 'bg-white border-zinc-200 text-zinc-400 dark:bg-zinc-900 dark:border-zinc-800'
             }`}
-            title={soundEnabled ? 'ปิดเสียงเตือน' : 'เปิดเสียงเตือนเมื่อมีออเดอร์ใหม่'}
+            title={soundEnabled ? (english ? 'Disable sound alerts' : 'ปิดเสียงเตือน') : (english ? 'Enable sound alerts for new orders' : 'เปิดเสียงเตือนเมื่อมีออเดอร์ใหม่')}
           >
             {soundEnabled ? <Volume2 size={16} className="text-amber-500 animate-pulse" /> : <VolumeX size={16} />}
-            <span>{soundEnabled ? 'เปิดเสียงเตือน' : 'ปิดเสียงเตือน'}</span>
+            <span>{soundEnabled ? (english ? 'Sound alerts on' : 'เปิดเสียงเตือน') : (english ? 'Sound alerts off' : 'ปิดเสียงเตือน')}</span>
           </button>
 
           {/* Fullscreen toggle */}
@@ -375,7 +390,7 @@ export default function Kitchen() {
             className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3.5 py-2 text-xs font-bold text-zinc-700 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
             {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            <span>{isFullscreen ? 'ย่อหน้าจอ' : 'เต็มหน้าจอ (KDS)'}</span>
+            <span>{isFullscreen ? (english ? 'Exit fullscreen' : 'ย่อหน้าจอ') : (english ? 'Fullscreen (KDS)' : 'เต็มหน้าจอ (KDS)')}</span>
           </button>
 
           {/* Refresh button */}
@@ -384,7 +399,7 @@ export default function Kitchen() {
             onClick={() => refetch()}
             disabled={isFetching}
             className="grid size-9 place-items-center rounded-xl border border-zinc-200 bg-white text-zinc-600 shadow-sm transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            title="รีเฟรชข้อมูล"
+            title={english ? 'Refresh data' : 'รีเฟรชข้อมูล'}
           >
             <RefreshCw size={15} className={isFetching ? 'animate-spin text-orange-500' : ''} />
           </button>
@@ -396,10 +411,10 @@ export default function Kitchen() {
         {/* Channel Filters */}
         <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800">
           {[
-            { key: 'all', label: 'ทั้งหมด' },
-            { key: 'dine_in', label: '🍽️ ทานที่ร้าน' },
-            { key: 'takeaway', label: '🛍️ สั่งกลับบ้าน' },
-            { key: 'delivery', label: '🛵 เดลิเวอรี' }
+            { key: 'all', label: english ? 'All' : 'ทั้งหมด' },
+            { key: 'dine_in', label: english ? '🍽️ Dine-in' : '🍽️ ทานที่ร้าน' },
+            { key: 'takeaway', label: english ? '🛍️ Takeaway' : '🛍️ สั่งกลับบ้าน' },
+            { key: 'delivery', label: english ? '🛵 Delivery' : '🛵 เดลิเวอรี' }
           ].map(tab => (
             <button
               key={tab.key}
@@ -421,7 +436,7 @@ export default function Kitchen() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="ค้นหาเลขออเดอร์, โต๊ะ, รายการอาหาร..."
+            placeholder={english ? 'Search order, table, item…' : 'ค้นหาเลขออเดอร์, โต๊ะ, รายการอาหาร...'}
             className="h-9 w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 text-xs outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-white dark:focus:ring-orange-500/20"
           />
         </div>
@@ -431,11 +446,11 @@ export default function Kitchen() {
       {isLoading ? (
         <div className="flex min-h-[360px] flex-col items-center justify-center rounded-3xl border border-dashed border-zinc-200 bg-zinc-50/50 p-12 dark:border-zinc-800 dark:bg-zinc-900/20">
           <ChefHat size={40} className="animate-bounce text-orange-500" />
-          <p className="mt-3 text-sm font-bold text-zinc-500 dark:text-zinc-400">กำลังเชื่อมต่อข้อมูลครัว...</p>
+          <p className="mt-3 text-sm font-bold text-zinc-500 dark:text-zinc-400">{english ? 'Connecting to kitchen orders…' : 'กำลังเชื่อมต่อข้อมูลครัว...'}</p>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 items-start">
-          {COLUMNS.map(col => {
+          {columns.map(col => {
             const colOrders = filteredOrders.filter((o: any) => col.statuses.includes(o.status))
             const sortedOrders = col.id === 'completed'
               ? [...colOrders].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 15)
@@ -470,13 +485,13 @@ export default function Kitchen() {
                 <div className="flex-1 space-y-3">
                   {sortedOrders.length === 0 ? (
                     <div className="flex min-h-[140px] flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-200/80 p-6 text-center dark:border-zinc-800">
-                      <p className="text-xs font-bold text-zinc-400 dark:text-zinc-600">ไม่มีออเดอร์ในสถานะนี้</p>
+                      <p className="text-xs font-bold text-zinc-400 dark:text-zinc-600">{english ? 'No orders in this status' : 'ไม่มีออเดอร์ในสถานะนี้'}</p>
                     </div>
                   ) : (
                     sortedOrders.map((order: any) => {
                       const cust = parseCustomerInfo(order.customer_name, order.order_type)
                       const elapsedMin = getElapsedMinutes(order.created_at, now)
-                      const elapsedStr = formatElapsed(order.created_at, now)
+                      const elapsedStr = formatElapsed(order.created_at, now, english)
                       const isUrgent = col.id !== 'completed' && elapsedMin > 15
                       const isCritical = col.id !== 'completed' && elapsedMin > 30
                       const items = (order.store_order_items || []).filter((item: any) => item.status !== 'cancelled')
@@ -514,15 +529,15 @@ export default function Kitchen() {
                               <div className="mt-0.5 flex items-center gap-1 text-xs">
                                 {isDineIn ? (
                                   <span className="font-bold text-orange-600 dark:text-orange-400">
-                                    🍽️ {tableNum ? `โต๊ะ ${tableNum}` : cust.name}
+                                    🍽️ {tableNum ? (english ? `Table ${tableNum}` : `โต๊ะ ${tableNum}`) : cust.name}
                                   </span>
                                 ) : isTakeaway ? (
                                   <span className="font-bold text-blue-600 dark:text-blue-400">
-                                    🛍️ สั่งกลับบ้าน
+                                    🛍️ {english ? 'Takeaway' : 'สั่งกลับบ้าน'}
                                   </span>
                                 ) : isDelivery ? (
                                   <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                    🛵 เดลิเวอรี
+                                    🛵 {english ? 'Delivery' : 'เดลิเวอรี'}
                                   </span>
                                 ) : (
                                   <span className="font-bold text-zinc-600 dark:text-zinc-400">
@@ -543,7 +558,7 @@ export default function Kitchen() {
                                   ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
                                   : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
                               }`}
-                              title={`สั่งเมื่อ: ${new Date(order.created_at).toLocaleTimeString('th-TH')}`}
+                              title={`${english ? 'Ordered at' : 'สั่งเมื่อ'}: ${new Date(order.created_at).toLocaleTimeString(english ? 'en-US' : 'th-TH')}`}
                             >
                               <Clock3 size={12} />
                               <span>{elapsedStr}</span>
@@ -554,14 +569,14 @@ export default function Kitchen() {
                           {order.notes && (
                             <div className="my-2.5 rounded-xl bg-amber-50/80 p-2 text-xs font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-300 border border-amber-200/60 dark:border-amber-500/20 flex items-start gap-1.5">
                               <AlertCircle size={13} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-                              <span className="line-clamp-2">โน้ต: {order.notes}</span>
+                              <span className="line-clamp-2">{english ? 'Note' : 'โน้ต'}: {order.notes}</span>
                             </div>
                           )}
 
                           {/* Menu Items List */}
                           <div className="my-3 space-y-2">
                             {items.length === 0 ? (
-                              <p className="text-xs italic text-zinc-400">ไม่มีรายการอาหาร</p>
+                              <p className="text-xs italic text-zinc-400">{english ? 'No menu items' : 'ไม่มีรายการอาหาร'}</p>
                             ) : (
                               items.map((item: any) => {
                                 const isChecked = !!checkedItems[item.id]
@@ -614,7 +629,7 @@ export default function Kitchen() {
                                 disabled={updateStatus.isPending}
                                 onClick={() => updateStatus.mutate({ id: order.id, status: col.prevStatus! })}
                                 className="grid size-8 shrink-0 place-items-center rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                                title="ย้อนกลับสถานะก่อนหน้า"
+                                title={english ? 'Move to previous status' : 'ย้อนกลับสถานะก่อนหน้า'}
                               >
                                 <ArrowLeft size={13} />
                               </button>
@@ -646,14 +661,14 @@ export default function Kitchen() {
                                 onClick={() => { setCancelOrder(order); setCancelReason('') }}
                                 className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100 disabled:opacity-50"
                               >
-                                ยกเลิก
+                                {english ? 'Cancel' : 'ยกเลิก'}
                               </button>
                             )}
 
                             {col.id === 'completed' && (
                               <div className="flex flex-1 items-center justify-center gap-1 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                                 <CheckCircle2 size={14} />
-                                <span>ส่งมอบสำเร็จแล้ว</span>
+                                <span>{english ? 'Delivered successfully' : 'ส่งมอบสำเร็จแล้ว'}</span>
                               </div>
                             )}
                           </div>
@@ -671,10 +686,10 @@ export default function Kitchen() {
       {cancelOrder && (
         <div className="fixed inset-0 z-[80] grid place-items-center bg-zinc-950/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-zinc-900">
-            <h2 className="text-lg font-black text-zinc-900 dark:text-white">ยกเลิกออเดอร์ #{cancelOrder.order_number}</h2>
-            <p className="mt-1 text-sm text-zinc-500">ระบุเหตุผลเพื่อแจ้งทีมงานและเก็บไว้ในประวัติออเดอร์</p>
-            <textarea value={cancelReason} onChange={event => setCancelReason(event.target.value)} autoFocus rows={4} placeholder="เช่น วัตถุดิบหมด / ลูกค้าขอยกเลิก" className="mt-4 w-full resize-none rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm outline-none focus:border-red-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
-            <div className="mt-4 flex justify-end gap-2"><button onClick={() => setCancelOrder(null)} className="rounded-xl px-4 py-2.5 text-sm font-bold text-zinc-500 hover:bg-zinc-100">กลับ</button><button disabled={cancelOrderMutation.isPending || !cancelReason.trim()} onClick={() => cancelOrderMutation.mutate()} className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-50">{cancelOrderMutation.isPending ? 'กำลังยกเลิก…' : 'ยืนยันยกเลิก'}</button></div>
+            <h2 className="text-lg font-black text-zinc-900 dark:text-white">{english ? 'Cancel order' : 'ยกเลิกออเดอร์'} #{cancelOrder.order_number}</h2>
+            <p className="mt-1 text-sm text-zinc-500">{english ? 'Add a reason to notify the team and save it in the order history.' : 'ระบุเหตุผลเพื่อแจ้งทีมงานและเก็บไว้ในประวัติออเดอร์'}</p>
+            <textarea value={cancelReason} onChange={event => setCancelReason(event.target.value)} autoFocus rows={4} placeholder={english ? 'For example: ingredient unavailable / customer requested cancellation' : 'เช่น วัตถุดิบหมด / ลูกค้าขอยกเลิก'} className="mt-4 w-full resize-none rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm outline-none focus:border-red-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
+            <div className="mt-4 flex justify-end gap-2"><button onClick={() => setCancelOrder(null)} className="rounded-xl px-4 py-2.5 text-sm font-bold text-zinc-500 hover:bg-zinc-100">{english ? 'Back' : 'กลับ'}</button><button disabled={cancelOrderMutation.isPending || !cancelReason.trim()} onClick={() => cancelOrderMutation.mutate()} className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-50">{cancelOrderMutation.isPending ? (english ? 'Cancelling…' : 'กำลังยกเลิก…') : (english ? 'Confirm cancellation' : 'ยืนยันยกเลิก')}</button></div>
           </div>
         </div>
       )}

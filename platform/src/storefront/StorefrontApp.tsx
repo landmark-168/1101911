@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import DeliveryRouteMap from '../components/DeliveryRouteMap'
 import { calculateDeliveryFee, formatEtaString, calculateDistanceKm } from '../lib/delivery'
+import { LanguageToggle, useLanguage } from '../lib/language'
 
 const qc = new QueryClient()
 
@@ -1003,6 +1004,8 @@ function OrderProcessStepper({ status, orderType = 'dine_in' }: { status: string
 }
 
 function StorefrontApp() {
+  const { language, t } = useLanguage()
+  const english = language === 'en'
   const [storeId, setStoreId] = useState<string | null>(null)
   const [tableId, setTableId] = useState<string | null>(null)
   const [tableName, setTableName] = useState<string | null>(null)
@@ -1455,12 +1458,12 @@ function StorefrontApp() {
 
         <nav className="hidden md:flex items-center gap-6">
           {[
-            ['home', 'หน้าแรก'],
-            ['order', 'สั่งอาหาร'],
-            ['track', 'ประวัติ'],
+            ['home', t('home')],
+            ['order', t('orderFood')],
+            ['track', t('history')],
             ...(!tableId ? [
-              ['promotions', 'โปรโมชั่น'],
-              ['contact', 'ติดต่อเรา']
+              ['promotions', t('promotions')],
+              ['contact', t('contact')]
             ] : [])
           ].map(([v, label]) => (
             <button
@@ -1480,13 +1483,14 @@ function StorefrontApp() {
         </nav>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <LanguageToggle className="px-2.5 py-1.5 sm:px-3 sm:py-2" />
           {tableId ? (
             <>
               <div
                 style={{ backgroundColor: themeColor }}
                 className="px-3 py-1.5 sm:py-2 rounded-2xl text-white font-black text-xs sm:text-sm flex items-center gap-1.5 shadow-md shrink-0"
               >
-                <MapPin size={14} className="shrink-0" /> โต๊ะ {tableName}
+                <MapPin size={14} className="shrink-0" /> {english ? 'Table' : 'โต๊ะ'} {tableName}
               </div>
               <button
                 onClick={() => {
@@ -1494,10 +1498,10 @@ function StorefrontApp() {
                   setIsCallStaffOpen(true)
                 }}
                 className="animate-breathing flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md transition active:scale-95 cursor-pointer"
-                title="เรียกพนักงาน"
+                title={english ? 'Call staff' : 'เรียกพนักงาน'}
               >
                 <Bell size={13} />
-                <span className="hidden sm:inline">เรียกพนักงาน</span>
+                <span className="hidden sm:inline">{t('callStaff')}</span>
               </button>
             </>
           ) : customer ? (
@@ -1510,7 +1514,7 @@ function StorefrontApp() {
                 onClick={() => { setCustomer(null); showToast('ออกจากระบบแล้ว') }}
                 className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg border border-zinc-200 text-xs font-bold text-zinc-500 hover:bg-zinc-50 cursor-pointer"
               >
-                <LogOut size={13} /> <span className="hidden xs:inline">ออกจากระบบ</span>
+                <LogOut size={13} /> <span className="hidden xs:inline">{t('logout')}</span>
               </button>
             </>
           ) : (
@@ -1518,7 +1522,7 @@ function StorefrontApp() {
               onClick={() => setView('login')}
               className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-zinc-900 text-white text-xs font-bold transition hover:bg-zinc-800 cursor-pointer"
             >
-              <User size={13} /> เข้าสู่ระบบ
+              <User size={13} /> {t('login')}
             </button>
           )}
         </div>
@@ -1552,8 +1556,8 @@ function StorefrontApp() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-line px-1 sm:px-2 py-1.5 flex items-center justify-around z-30 shadow-lg pb-safe">
         {[
           ['home', Compass, 'หน้าแรก'],
-          ['order', Utensils, 'สั่งอาหาร'],
-          ['track', Clock, 'ประวัติ'],
+          ['order', Utensils, t('orderFood')],
+          ['track', Clock, t('history')],
           ...(!tableId ? [
             ['promotions', Tag, 'โปรโมชั่น'],
             ['contact', MessageSquare, 'ติดต่อเรา'],
@@ -1587,8 +1591,8 @@ function StorefrontApp() {
                 <span className="inline-grid size-12 place-items-center rounded-full bg-ember/10 text-ember">
                   <User size={24} />
                 </span>
-                <h2 className="text-xl sm:text-2xl font-black text-ink">เข้าสู่ระบบสั่งเดลิเวอรี</h2>
-                <p className="text-xs text-smoke font-medium">กรอกชื่อและเบอร์โทรศัพท์เพื่อเริ่มสั่งอาหารสะสมแต้ม</p>
+                <h2 className="text-xl sm:text-2xl font-black text-ink">{english ? 'Sign in to order delivery' : 'เข้าสู่ระบบสั่งเดลิเวอรี'}</h2>
+                <p className="text-xs text-smoke font-medium">{english ? 'Enter your name and phone number to start ordering and earn points.' : 'กรอกชื่อและเบอร์โทรศัพท์เพื่อเริ่มสั่งอาหารสะสมแต้ม'}</p>
               </div>
 
               <form
@@ -1630,7 +1634,7 @@ function StorefrontApp() {
                   type="submit"
                   className="w-full py-3.5 rounded-xl bg-ember hover:bg-deep text-white font-bold text-sm shadow-md transition active:scale-95 cursor-pointer"
                 >
-                  เข้าสู่ระบบ / สมัครสมาชิก
+                  {english ? 'Sign in / Create account' : 'เข้าสู่ระบบ / สมัครสมาชิก'}
                 </button>
               </form>
 
@@ -1679,7 +1683,7 @@ function StorefrontApp() {
                     onClick={() => requireAuthAndNavigate('order')}
                     className="w-full sm:w-auto flex items-center justify-center gap-1 px-3 sm:px-6 py-2 sm:py-3.5 rounded-xl font-bold bg-ember hover:bg-deep text-white shadow-lg transition active:scale-95 text-xs sm:text-sm cursor-pointer shrink-0"
                   >
-                    เริ่มสั่งอาหาร <ChevronRight size={14} />
+                    {english ? 'Start ordering' : 'เริ่มสั่งอาหาร'} <ChevronRight size={14} />
                   </button>
                   {tableId ? (
                     <button
@@ -1717,9 +1721,9 @@ function StorefrontApp() {
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                 {[
-                  ['🍖', 'สั่งอาหารฟินๆ', 'เลือกเมนูลงเตา', () => requireAuthAndNavigate('order')],
-                  ['🛒', 'ตะกร้าของฉัน', 'ตรวจสอบรายการอาหาร', () => { if (cart.length === 0) setView('order'); else requireAuthAndNavigate('cart'); }],
-                  ['📍', 'ประวัติออเดอร์', 'ดูสถานะการทำ', () => setView('track')],
+                  ['🍖', english ? 'Order food' : 'สั่งอาหารฟินๆ', english ? 'Choose dishes for your table' : 'เลือกเมนูลงเตา', () => requireAuthAndNavigate('order')],
+                  ['🛒', english ? 'My cart' : 'ตะกร้าของฉัน', english ? 'Review your items' : 'ตรวจสอบรายการอาหาร', () => { if (cart.length === 0) setView('order'); else requireAuthAndNavigate('cart'); }],
+                  ['📍', english ? 'Order history' : 'ประวัติออเดอร์', english ? 'Track order progress' : 'ดูสถานะการทำ', () => setView('track')],
                   ...(tableId ? [
                     ['🔔', 'เรียกพนักงาน', 'บริการ / เรียกเช็คบิล', () => { setCallStaffDefaultReason('🙋‍♂️ เรียกพนักงาน'); setIsCallStaffOpen(true); }]
                   ] : [
@@ -1846,12 +1850,12 @@ function StorefrontApp() {
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs sm:text-sm font-black truncate">โต๊ะ {tableName}</span>
+                      <span className="text-xs sm:text-sm font-black truncate">{english ? 'Table' : 'โต๊ะ'} {tableName}</span>
                       <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] font-bold shrink-0">
-                        <span className="size-1 rounded-full bg-emerald-300 animate-pulse" /> ทานที่ร้าน
+                        <span className="size-1 rounded-full bg-emerald-300 animate-pulse" /> {english ? 'Dine-in' : 'ทานที่ร้าน'}
                       </span>
                     </div>
-                    <p className="text-[10px] text-white/90 font-medium truncate">สั่งอาหารส่งตรงเข้าครัว</p>
+                    <p className="text-[10px] text-white/90 font-medium truncate">{english ? 'Orders go straight to the kitchen' : 'สั่งอาหารส่งตรงเข้าครัว'}</p>
                   </div>
                 </div>
                 <button
@@ -1863,7 +1867,7 @@ function StorefrontApp() {
                   className="flex items-center gap-1 rounded-xl bg-white px-2.5 sm:px-3 py-1.5 text-[11px] font-black shadow-xs hover:bg-zinc-100 active:scale-95 transition cursor-pointer shrink-0 ml-2"
                 >
                   <Bell size={11} />
-                  <span>เรียกพนักงาน</span>
+                  <span>{english ? 'Call staff' : 'เรียกพนักงาน'}</span>
                 </button>
               </div>
             )}
@@ -1876,7 +1880,7 @@ function StorefrontApp() {
                 <input
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  placeholder="ค้นหาชื่อเมนูอาหาร เครื่องดื่ม..."
+                  placeholder={english ? 'Search food and drinks…' : 'ค้นหาชื่อเมนูอาหาร เครื่องดื่ม...'}
                   className="h-11 w-full pl-10 pr-4 rounded-2xl border border-zinc-200 bg-white text-xs font-semibold outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-100 shadow-xs"
                 />
                 {search && (
@@ -1899,7 +1903,7 @@ function StorefrontApp() {
                       : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-100'
                   }`}
                 >
-                  สำหรับคุณ
+                  {english ? 'For you' : 'สำหรับคุณ'}
                 </button>
                 {categories.map(c => (
                   <button
@@ -1922,10 +1926,10 @@ function StorefrontApp() {
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-black text-zinc-950 flex items-center gap-1.5">
-                    <span>🔥 สำหรับคุณ</span>
+                    <span>🔥 {english ? 'For you' : 'สำหรับคุณ'}</span>
                   </h2>
                   <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                    แนะนำ
+                    {english ? 'Recommended' : 'แนะนำ'}
                   </span>
                 </div>
 
@@ -2130,9 +2134,9 @@ function StorefrontApp() {
           <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 bg-paper">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-black text-ink">ตะกร้าของคุณ</h1>
+                <h1 className="text-2xl sm:text-3xl font-black text-ink">{english ? 'Your cart' : 'ตะกร้าของคุณ'}</h1>
                 <p className="text-xs font-semibold text-smoke mt-1">
-                  {tableId ? `รายการอาหารสำหรับ โต๊ะ ${tableName}` : 'ตรวจสอบรายการอาหารก่อนสั่งซื้อ'}
+                  {tableId ? (english ? `Items for table ${tableName}` : `รายการอาหารสำหรับ โต๊ะ ${tableName}`) : (english ? 'Review your items before ordering' : 'ตรวจสอบรายการอาหารก่อนสั่งซื้อ')}
                 </p>
               </div>
               {tableId && (
@@ -2240,7 +2244,7 @@ function StorefrontApp() {
                       )}
                     </div>
                     <div className="border-t border-line/60 pt-3 flex justify-between items-center">
-                      <span className="font-black text-ink text-xs sm:text-sm">ยอดรวมจ่ายทั้งหมด</span>
+                      <span className="font-black text-ink text-xs sm:text-sm">{english ? 'Total to pay' : 'ยอดรวมจ่ายทั้งหมด'}</span>
                       <span className="font-black text-base sm:text-lg text-deep" style={{ color: themeColor }}>
                         ฿{cartGrandTotal.toLocaleString()}
                       </span>
@@ -2259,8 +2263,8 @@ function StorefrontApp() {
                       className="w-full h-11 sm:h-12 rounded-xl text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer hover:brightness-95"
                     >
                       {tableId
-                        ? (checkout.isPending ? 'กำลังส่งคำสั่งซื้อ...' : `ยืนยันสั่งเลย (โต๊ะ ${tableName})`)
-                        : <>ไปหน้ากรอกที่อยู่และชำระเงิน <ChevronRight size={15} /></>
+                        ? (checkout.isPending ? (english ? 'Sending order…' : 'กำลังส่งคำสั่งซื้อ...') : (english ? `Confirm order (table ${tableName})` : `ยืนยันสั่งเลย (โต๊ะ ${tableName})`))
+                        : <>{english ? 'Continue to address and payment' : 'ไปหน้ากรอกที่อยู่และชำระเงิน'} <ChevronRight size={15} /></>
                       }
                     </button>
                   </div>
@@ -2269,13 +2273,13 @@ function StorefrontApp() {
             ) : (
               <div className="mt-6 max-w-md mx-auto bg-white border border-line rounded-3xl p-8 sm:p-12 text-center shadow-md space-y-4">
                 <span className="text-5xl block select-none">🛒</span>
-                <h2 className="font-black text-base sm:text-lg text-ink">ยังไม่มีอาหารในตะกร้าของคุณ</h2>
-                <p className="text-xs text-smoke font-medium">กดเลือกเมนูอาหารจานโปรดลงตะกร้าก่อนทำการสั่งซื้อ</p>
+                <h2 className="font-black text-base sm:text-lg text-ink">{english ? 'Your cart is empty' : 'ยังไม่มีอาหารในตะกร้าของคุณ'}</h2>
+                <p className="text-xs text-smoke font-medium">{english ? 'Add your favourite dishes before placing an order.' : 'กดเลือกเมนูอาหารจานโปรดลงตะกร้าก่อนทำการสั่งซื้อ'}</p>
                 <button
                   onClick={() => setView('order')}
                   className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer"
                 >
-                  ไปเลือกดูเมนูอาหาร
+                  {english ? 'Browse the menu' : 'ไปเลือกดูเมนูอาหาร'}
                 </button>
               </div>
             )}
@@ -2578,10 +2582,10 @@ function StorefrontApp() {
           <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-5 sm:space-y-6 bg-paper">
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-ink">
-                {tableId ? `ประวัติการสั่งอาหาร โต๊ะ ${tableName}` : 'ติดตามการจัดส่งเดลิเวอรี'}
+                {tableId ? (english ? `Order history — table ${tableName}` : `ประวัติการสั่งอาหาร โต๊ะ ${tableName}`) : (english ? 'Track delivery' : 'ติดตามการจัดส่งเดลิเวอรี')}
               </h1>
               <p className="text-xs font-semibold text-smoke mt-1">
-                {tableId ? 'รายการออเดอร์ทั้งหมดของโต๊ะนี้ (อัปเดตเรียลไทม์จากห้องครัว)' : 'ติดตามสถานะออเดอร์ พิกัดไรเดอร์ และเวลาถึงโดยประมาณ (ETA) แบบเรียลไทม์'}
+                {tableId ? (english ? 'All orders for this table, updated live from the kitchen.' : 'รายการออเดอร์ทั้งหมดของโต๊ะนี้ (อัปเดตเรียลไทม์จากห้องครัว)') : (english ? 'Track order status, rider location, and estimated arrival time live.' : 'ติดตามสถานะออเดอร์ พิกัดไรเดอร์ และเวลาถึงโดยประมาณ (ETA) แบบเรียลไทม์')}
               </p>
             </div>
 
@@ -2614,7 +2618,7 @@ function StorefrontApp() {
                             </h2>
                             <span className="text-zinc-300 font-bold">·</span>
                             <span className="text-xs font-semibold text-zinc-500 truncate">
-                              สั่งเมื่อ {new Date(ord.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
+                              {english ? 'Ordered at' : 'สั่งเมื่อ'} {new Date(ord.created_at).toLocaleTimeString(english ? 'en-US' : 'th-TH', { hour: '2-digit', minute: '2-digit' })}{english ? '' : ' น.'}
                             </span>
                           </div>
                           <span className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
@@ -2624,7 +2628,7 @@ function StorefrontApp() {
                               ? 'bg-red-50 text-red-700 border border-red-200'
                               : 'bg-orange-50 text-orange-600 border border-orange-200'
                           }`}>
-                            {ord.status === 'pending' ? '🔥 รอรับออเดอร์' : ord.status === 'accepted' ? '📋 รับออเดอร์แล้ว' : ord.status === 'preparing' ? '🍳 กำลังปรุงอาหาร' : ord.status === 'ready' ? '🍽️ พร้อมเสิร์ฟ' : ord.status === 'completed' ? '✨ เสิร์ฟเรียบร้อย' : ord.status === 'cancelled' ? '❌ ยกเลิกแล้ว' : ord.status}
+                            {ord.status === 'pending' ? (english ? '🔥 Waiting for acceptance' : '🔥 รอรับออเดอร์') : ord.status === 'accepted' ? (english ? '📋 Order accepted' : '📋 รับออเดอร์แล้ว') : ord.status === 'preparing' ? (english ? '🍳 Preparing' : '🍳 กำลังปรุงอาหาร') : ord.status === 'ready' ? (english ? '🍽️ Ready to serve' : '🍽️ พร้อมเสิร์ฟ') : ord.status === 'completed' ? (english ? '✨ Served' : '✨ เสิร์ฟเรียบร้อย') : ord.status === 'cancelled' ? (english ? '❌ Cancelled' : '❌ ยกเลิกแล้ว') : ord.status}
                           </span>
                         </div>
 
@@ -2634,9 +2638,9 @@ function StorefrontApp() {
                         {/* Order Items List */}
                         <div className="space-y-2.5 pt-3 border-t border-zinc-100">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-extrabold text-zinc-600">รายการอาหารรอบนี้:</span>
+                            <span className="text-xs font-extrabold text-zinc-600">{english ? 'Items in this order:' : 'รายการอาหารรอบนี้:'}</span>
                             <span className="text-[11px] font-bold text-zinc-400">
-                              {(ord.items || []).reduce((acc: number, it: any) => acc + (it.quantity || 1), 0)} รายการ
+                              {(ord.items || []).reduce((acc: number, it: any) => acc + (it.quantity || 1), 0)} {english ? 'items' : 'รายการ'}
                             </span>
                           </div>
                           <div className="space-y-2 divide-y divide-zinc-100">
@@ -2655,7 +2659,7 @@ function StorefrontApp() {
                             ))}
                           </div>
                           <div className="border-t border-zinc-200 pt-3 flex justify-between items-center">
-                            <span className="text-sm sm:text-base font-extrabold text-zinc-800">ยอดรวมรอบนี้</span>
+                            <span className="text-sm sm:text-base font-extrabold text-zinc-800">{english ? 'Order total' : 'ยอดรวมรอบนี้'}</span>
                             <span className="text-lg sm:text-xl font-black text-orange-500">฿{Number(ord.total || 0).toLocaleString()}</span>
                           </div>
                         </div>
@@ -2666,10 +2670,10 @@ function StorefrontApp() {
               ) : (
                 <div className="bg-white border border-line rounded-2xl sm:rounded-3xl p-8 sm:p-12 text-center shadow-sm space-y-4">
                   <span className="text-4xl sm:text-5xl block select-none">🪑</span>
-                  <h2 className="font-black text-base sm:text-lg text-ink">ยังไม่มีรายการสั่งอาหารสำหรับโต๊ะ {tableName}</h2>
-                  <p className="text-xs text-smoke font-medium">กดเลือกเมนูอร่อยลงเตาได้เลย!</p>
+                  <h2 className="font-black text-base sm:text-lg text-ink">{english ? `No orders yet for table ${tableName}` : `ยังไม่มีรายการสั่งอาหารสำหรับโต๊ะ ${tableName}`}</h2>
+                  <p className="text-xs text-smoke font-medium">{english ? 'Choose your dishes to start ordering.' : 'กดเลือกเมนูอร่อยลงเตาได้เลย!'}</p>
                   <button onClick={() => setView('order')} className="px-6 py-2.5 rounded-xl bg-ember hover:bg-deep text-white font-bold text-xs transition cursor-pointer">
-                    ไปที่หน้าสั่งอาหาร
+                    {english ? 'Go to order food' : 'ไปที่หน้าสั่งอาหาร'}
                   </button>
                 </div>
               )

@@ -17,6 +17,7 @@ import { ROLE_CONFIG, type Employee } from './components/employees/EmployeesMana
 import { StoreProvider, useStore } from './StoreContext'
 import { fetchCurrentUserSummary } from '../lib/database'
 import { supabase } from '../lib/supabase'
+import { LanguageToggle, useLanguage } from '../lib/language'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -99,6 +100,7 @@ function SubscriptionExpiredWall() {
 }
 
 function App() {
+  const { t } = useLanguage()
   const { store } = useStore()
   const qc = useQueryClient()
   const themeColor = (store as any)?.theme_color || '#F97316'
@@ -399,7 +401,7 @@ function App() {
               >
                 <div className="flex items-center gap-3">
                   <Icon size={17} />
-                  <span>{label}</span>
+                  <span>{({ dashboard: t('dashboard'), orders: t('orders'), pos: 'POS', menu: t('menu'), categories: t('categories'), tables: t('tables'), kitchen: t('kitchen'), inventory: t('inventory'), promotions: t('promotions'), customers: t('customers'), employees: t('employees'), reports: t('reports'), settings: t('settings') } as Record<string, string>)[id] || label}</span>
                 </div>
                 {hasTableAlert && (
                   <span className="flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white shadow-sm animate-pulse">
@@ -491,13 +493,14 @@ function App() {
             >
               {dark ? <Sun size={18} className="text-amber-400 animate-fade-in" /> : <Moon size={18} className="text-zinc-600 animate-fade-in" />}
             </button>
+            <LanguageToggle className="px-2.5 sm:px-3" />
 
             <button
               onClick={() => go('pos')}
               style={{ backgroundColor: themeColor }}
               className="hidden h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold text-white sm:flex cursor-pointer shadow-md hover:brightness-95"
             >
-              <CircleDollarSign size={16} /> Open POS
+              <CircleDollarSign size={16} /> {t('openPos')}
             </button>
           </div>
         </header>
