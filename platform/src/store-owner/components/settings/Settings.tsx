@@ -111,7 +111,7 @@ export default function Settings() {
         ? openingHoursRaw
         : (openingHoursRaw?.text || 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.')
 
-      const delConf = (settingsData as any)?.delivery_config || {}
+      const delConf = (settingsData as any)?.delivery_config || openingHoursRaw?.delivery_config || {}
 
       return {
         ...emptySettings,
@@ -265,6 +265,45 @@ export default function Settings() {
     },
     onError: (e: any) => {
       showToast(e.message || 'เกิดข้อผิดพลาดในการบันทึก', 'error')
+    }
+  })
+
+  const updateDeliveryEnabled = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const deliveryConfig = {
+        latitude: Number(form.latitude || 13.7563),
+        longitude: Number(form.longitude || 100.5018),
+        delivery_enabled: enabled,
+        delivery_radius_km: Number(form.delivery_radius_km || 10),
+        base_delivery_fee: Number(form.base_delivery_fee || form.delivery_fee || 25),
+        delivery_fee_per_km: Number(form.delivery_fee_per_km || 10),
+        min_delivery_fee: Number(form.min_delivery_fee || 25),
+        max_delivery_fee: Number(form.max_delivery_fee || 150),
+        free_delivery_threshold: Number(form.free_delivery_threshold || 500),
+        avg_prep_time_minutes: Number(form.avg_prep_time_minutes || 20)
+      }
+      const payload: any = {
+        store_id: store.id,
+        delivery_config: deliveryConfig,
+        opening_hours: { text: form.opening_hours_text?.trim() || 'เปิดให้บริการทุกวัน 11:00 – 23:00 น.', delivery_config: deliveryConfig },
+        updated_at: new Date().toISOString()
+      }
+      let { error } = await supabase.from('store_settings').upsert(payload, { onConflict: 'store_id' })
+      if (error?.message?.includes('delivery_config') || error?.code === 'PGRST204') {
+        delete payload.delivery_config
+        const retry = await supabase.from('store_settings').upsert(payload, { onConflict: 'store_id' })
+        error = retry.error
+      }
+      if (error) throw error
+    },
+    onSuccess: (_, enabled) => {
+      setForm((current: any) => ({ ...current, delivery_enabled: enabled }))
+      qc.invalidateQueries({ queryKey: ['settings', store.id] })
+      showToast(enabled ? 'เปิดรับออเดอร์เดลิเวอรีแล้ว' : 'ปิดรับออเดอร์เดลิเวอรีแล้ว')
+    },
+    onError: (error: any, enabled) => {
+      setForm((current: any) => ({ ...current, delivery_enabled: !enabled }))
+      showToast(error.message || 'ไม่สามารถเปลี่ยนสถานะเดลิเวอรีได้', 'error')
     }
   })
   const activeThemeColor = form.theme_color || '#F97316'
@@ -809,7 +848,12 @@ export default function Settings() {
               <input
                 type="checkbox"
                 checked={form.delivery_enabled !== false}
-                onChange={e => setForm({ ...form, delivery_enabled: e.target.checked })}
+                onChange={e => {
+                  const enabled = e.target.checked
+                  setForm((current: any) => ({ ...current, delivery_enabled: enabled }))
+                  updateDeliveryEnabled.mutate(enabled)
+                }}
+                disabled={updateDeliveryEnabled.isPending}
                 className="size-4 accent-orange-500 rounded"
               />
               <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">

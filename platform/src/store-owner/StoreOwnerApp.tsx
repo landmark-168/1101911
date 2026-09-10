@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   BarChart3, Bell, Boxes, ChefHat, ChevronDown, CircleDollarSign, ClipboardList, Gift,
@@ -42,6 +42,28 @@ const nav = [
   ['reports', 'Reports', BarChart3],
   ['settings', 'Store Settings', Settings]
 ] as const
+
+function playServiceAlert() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+    if (!AudioContextClass) return
+    const context = new AudioContextClass()
+    ;[880, 1046.5].forEach((frequency, index) => {
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+      const start = context.currentTime + index * 0.16
+      oscillator.frequency.setValueAtTime(frequency, start)
+      gain.gain.setValueAtTime(0.2, start)
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35)
+      oscillator.connect(gain)
+      gain.connect(context.destination)
+      oscillator.start(start)
+      oscillator.stop(start + 0.35)
+    })
+  } catch {
+    // The browser may require a user interaction before playing sound.
+  }
+}
 
 
 function SubscriptionExpiredWall() {
@@ -206,6 +228,33 @@ function App() {
     refetchInterval: 6000
   })
 
+  const { data: staffCalls = [] } = useQuery({
+    queryKey: ['global-staff-calls', store?.id],
+    enabled: Boolean(store?.id),
+    queryFn: async () => {
+      if (!store?.id) return []
+      const { data } = await supabase
+        .from('store_orders')
+        .select('id, table_id, order_number, customer_name, notes, status, created_at, store_tables(table_number)')
+        .eq('store_id', store.id)
+        .neq('status', 'completed')
+        .neq('status', 'cancelled')
+      return (data || []).filter((order: any) => {
+        const number = String(order.order_number || '').toUpperCase()
+        const name = String(order.customer_name || '')
+        const notes = String(order.notes || '')
+        return number.startsWith('SRV') || name.includes('เรียกพนักงาน') || notes.includes('เรียกพนักงาน')
+      })
+    },
+    refetchInterval: 6000
+  })
+
+  const previousStaffCallCount = useRef<number | null>(null)
+  useEffect(() => {
+    if (previousStaffCallCount.current !== null && staffCalls.length > previousStaffCallCount.current) playServiceAlert()
+    previousStaffCallCount.current = staffCalls.length
+  }, [staffCalls.length])
+
   // Realtime listener for global bill calls
   useEffect(() => {
     if (!store?.id) return
@@ -216,6 +265,7 @@ function App() {
         { event: '*', schema: 'public', table: 'store_orders', filter: `store_id=eq.${store.id}` },
         () => {
           qc.invalidateQueries({ queryKey: ['global-bill-calls', store.id] })
+          qc.invalidateQueries({ queryKey: ['global-staff-calls', store.id] })
         }
       )
       .subscribe()
@@ -333,7 +383,8 @@ function App() {
 
         <nav className="mt-3 flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
           {visibleNav.map(([id, label, Icon]) => {
-            const hasBillCall = id === 'tables' && billCalls.length > 0
+            const tableAlertCount = billCalls.length + staffCalls.length
+            const hasTableAlert = id === 'tables' && tableAlertCount > 0
 
             return (
               <button
@@ -350,10 +401,10 @@ function App() {
                   <Icon size={17} />
                   <span>{label}</span>
                 </div>
-                {hasBillCall && (
+                {hasTableAlert && (
                   <span className="flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white shadow-sm animate-pulse">
                     <Bell size={11} className="animate-bell-wiggle" />
-                    <span>{billCalls.length}</span>
+                    <span>{tableAlertCount}</span>
                   </span>
                 )}
               </button>
@@ -367,7 +418,7 @@ function App() {
 
       {/* Main Content Area */}
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 flex h-18 items-center gap-3 border-b border-zinc-200/70 bg-white/85 px-4 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-950/85 lg:px-6">
+        <header className="fixed inset-x-0 top-0 z-30 flex h-18 items-center gap-3 border-b border-zinc-200/70 bg-white/85 px-4 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-950/85 lg:left-64 lg:px-6">
           <button onClick={() => setMobile(true)} className="grid size-10 place-items-center rounded-xl border dark:border-zinc-700 lg:hidden">
             <MenuIcon />
           </button>
@@ -451,7 +502,7 @@ function App() {
           </div>
         </header>
 
-        <main className="p-4 lg:p-6">
+        <main className="p-4 pt-[calc(4.5rem+1rem)] lg:p-6 lg:pt-[calc(4.5rem+1.5rem)]">
           <Suspense fallback={<div className="grid min-h-80 place-items-center text-sm text-zinc-400">Loading workspace…</div>}>
             {isPageAllowed ? (
               page

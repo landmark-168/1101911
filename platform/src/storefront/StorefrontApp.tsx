@@ -438,7 +438,7 @@ function CallStaffModal({
   tableId: string | null
   tableOrders?: any[]
   defaultReason?: string
-  onSuccess: (reason: string) => void
+  onSuccess: (reason: string, requestId: string) => void
 }) {
   const [selectedType, setSelectedType] = useState<'service' | 'bill'>('service')
   const [customNote, setCustomNote] = useState('')
@@ -493,20 +493,22 @@ function CallStaffModal({
         customer_name: `โต๊ะ ${tableName} (${actionName})`,
         notes: `[${actionName}]${totalAmount > 0 && isPayment ? ` (ยอดรวม ฿${totalAmount.toLocaleString()})` : ''}${customNote ? ` : ${customNote}` : ''}`
       }
-      const { error } = await supabase.from('store_orders').insert(orderPayload)
+      let { data: request, error } = await supabase.from('store_orders').insert(orderPayload).select('id').single()
       if (error) {
         if (error.message?.includes('notes')) {
           delete orderPayload.notes
-          const retry = await supabase.from('store_orders').insert(orderPayload)
+          const retry = await supabase.from('store_orders').insert(orderPayload).select('id').single()
           if (retry.error) throw retry.error
+          request = retry.data
         } else {
           throw error
         }
       }
+      return request?.id || ''
     },
-    onSuccess: () => {
+    onSuccess: (requestId) => {
       const actionName = selectedType === 'bill' ? '💵 เรียกเก็บเงิน / เช็คบิล' : '🙋‍♂️ เรียกพนักงาน'
-      onSuccess(actionName + (customNote ? ` (${customNote})` : ''))
+      onSuccess(actionName + (customNote ? ` (${customNote})` : ''), requestId)
       onClose()
       setCustomNote('')
     },
@@ -1010,7 +1012,7 @@ function StorefrontApp() {
   const [isCallStaffOpen, setIsCallStaffOpen] = useState(false)
   const [callStaffDefaultReason, setCallStaffDefaultReason] = useState('💵 เรียกเก็บเงิน / เช็คบิล')
   const [isBillOpen, setIsBillOpen] = useState(false)
-  const [activeServiceRequest, setActiveServiceRequest] = useState<{ type: string; time: string } | null>(null)
+  const [activeServiceRequest, setActiveServiceRequest] = useState<{ id: string; type: string; time: string } | null>(null)
 
   const [view, setView] = useState<'home' | 'order' | 'cart' | 'checkout' | 'track' | 'promotions' | 'contact' | 'login'>('home')
   const [customer, setCustomer] = useState<{ name: string; phone: string; email?: string } | null>(() => {
@@ -1131,7 +1133,8 @@ function StorefrontApp() {
       ])
       return { shop, settings }
     },
-    enabled: !!storeId
+    enabled: !!storeId,
+    refetchInterval: 5000
   })
 
   const menuQuery = useQuery({
@@ -1171,6 +1174,7 @@ function StorefrontApp() {
   const shop = storeQuery.data?.shop
   const settings = storeQuery.data?.settings
   const deliveryConfig = (settings as any)?.delivery_config || (settings as any)?.opening_hours?.delivery_config || {}
+  const deliveryEnabled = deliveryConfig.delivery_enabled !== false
   const storeLat = Number(shop?.latitude ?? deliveryConfig.latitude ?? 13.7563)
   const storeLng = Number(shop?.longitude ?? deliveryConfig.longitude ?? 100.5018)
 
@@ -1281,7 +1285,7 @@ function StorefrontApp() {
         table_id: tableId,
         order_number: 'ORD' + Math.floor(1000 + Math.random() * 9000),
         order_type: tableId ? 'dine_in' : 'delivery',
-        status: 'pending',
+        status: tableId ? 'preparing' : 'pending',
         subtotal: cartSubtotal,
         tax: taxAmount,
         total: cartGrandTotal,
@@ -1329,7 +1333,7 @@ function StorefrontApp() {
         id: `#ORD-${order.order_number || order.id.slice(0, 5)}`,
         orderId: order.id,
         total: cartGrandTotal,
-        status: 'pending',
+        status: tableId ? 'preparing' : 'pending',
         items: [...cart],
         address: { ...address },
         distanceKm: deliveryCalc.distanceKm,
@@ -1520,6 +1524,17 @@ function StorefrontApp() {
         </div>
       </header>
 
+      {!tableId && !deliveryEnabled && (
+        <div className="fixed inset-x-0 bottom-0 top-14 z-[35] grid place-items-center bg-[#faf7f2]/95 p-4 backdrop-blur-sm sm:top-16">
+          <div className="w-full max-w-md rounded-3xl border border-orange-200 bg-white p-7 text-center shadow-2xl sm:p-9">
+            <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-orange-100 text-3xl">⏸️</div>
+            <p className="mt-5 text-xs font-black uppercase tracking-wider text-orange-500">Online Store</p>
+            <h1 className="mt-2 text-2xl font-black text-zinc-900">ร้านปิดรับออเดอร์ชั่วคราว</h1>
+            <p className="mt-3 text-sm font-medium leading-relaxed text-zinc-500">ขออภัย ขณะนี้ร้านยังไม่เปิดรับออเดอร์เดลิเวอรี่ กรุณากลับมาใหม่อีกครั้ง</p>
+          </div>
+        </div>
+      )}
+
       {/* Active Service Call Notification Alert Bar */}
       {activeServiceRequest && tableId && (
         <div className="fixed top-14 sm:top-16 left-0 right-0 z-30 bg-amber-100/95 backdrop-blur-md border-b border-amber-300 px-3 sm:px-4 py-2 flex items-center justify-between text-xs text-amber-900 font-bold animate-fade-in shadow-inner">
@@ -1530,15 +1545,6 @@ function StorefrontApp() {
             </span>
             <span className="hidden sm:inline text-[10px] text-amber-600 font-normal">({activeServiceRequest.time})</span>
           </div>
-          <button
-            onClick={() => {
-              setActiveServiceRequest(null)
-              showToast('ยกเลิกการเรียกพนักงานแล้ว')
-            }}
-            className="text-[11px] text-amber-800 hover:text-red-600 underline font-bold shrink-0 ml-2 cursor-pointer"
-          >
-            ยกเลิกการเรียก
-          </button>
         </div>
       )}
 
@@ -2144,7 +2150,8 @@ function StorefrontApp() {
                 <section className="space-y-4">
                   <div className="bg-white border border-line rounded-3xl p-4 sm:p-5 shadow-sm divide-y divide-zinc-100 space-y-3">
                     {cart.map((c) => (
-                      <div key={c.item.id} className="pt-3 first:pt-0 flex items-center justify-between gap-3">
+                      <div key={c.item.id} className="pt-3 first:pt-0">
+                      <div className="flex items-center justify-between gap-3">
                         {/* Food Image + Info */}
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="size-14 sm:size-16 rounded-2xl bg-soft flex items-center justify-center overflow-hidden border border-zinc-200 shrink-0 shadow-xs">
@@ -2191,6 +2198,13 @@ function StorefrontApp() {
                             <Trash2 size={16} />
                           </button>
                         </div>
+                      </div>
+                      <input
+                        value={c.notes}
+                        onChange={event => setCart(cart.map(item => item.item.id === c.item.id ? { ...item, notes: event.target.value } : item))}
+                        placeholder="หมายเหตุถึงครัว เช่น ไม่เผ็ด / ไม่ใส่ผัก"
+                        className="mt-2 h-9 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-xs font-medium text-zinc-700 outline-none transition placeholder:text-zinc-400 focus:border-orange-400 focus:bg-white"
+                      />
                       </div>
                     ))}
                   </div>
@@ -2537,12 +2551,14 @@ function StorefrontApp() {
 
                   <button
                     onClick={() => checkout.mutate()}
-                    disabled={checkout.isPending || (!tableId && deliveryCalc.isOutOfRange)}
-                    style={{ backgroundColor: !tableId && deliveryCalc.isOutOfRange ? '#9ca3af' : themeColor }}
+                    disabled={checkout.isPending || (!tableId && (deliveryCalc.isOutOfRange || !deliveryEnabled))}
+                    style={{ backgroundColor: !tableId && (deliveryCalc.isOutOfRange || !deliveryEnabled) ? '#9ca3af' : themeColor }}
                     className="w-full h-11 sm:h-12 rounded-xl text-white font-bold text-xs sm:text-sm shadow-md transition active:scale-95 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer hover:brightness-95"
                   >
                     {checkout.isPending ? (
                       'กำลังส่งคำสั่งซื้อ...'
+                    ) : !tableId && !deliveryEnabled ? (
+                      'ร้านปิดรับเดลิเวอรีชั่วคราว'
                     ) : !tableId && deliveryCalc.isOutOfRange ? (
                       '⚠️ อยู่นอกพื้นที่จัดส่ง'
                     ) : tableId ? (
@@ -2938,8 +2954,9 @@ function StorefrontApp() {
         shop={shop}
         settings={settings}
         defaultReason={callStaffDefaultReason}
-        onSuccess={(reason) => {
+        onSuccess={(reason, requestId) => {
           setActiveServiceRequest({
+            id: requestId,
             type: reason,
             time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
           })

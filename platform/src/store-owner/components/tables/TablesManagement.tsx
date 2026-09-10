@@ -463,6 +463,9 @@ export default function TablesManagement() {
   const [selectedTable, setSelectedTable] = useState<any | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [isAddTableOpen, setIsAddTableOpen] = useState(false)
+  const [newTableNumber, setNewTableNumber] = useState('')
+  const [newTableCapacity, setNewTableCapacity] = useState('4')
   const lastBillCallCountRef = useRef<number>(0)
 
   const showMsg = (text: string, type: 'success' | 'error' = 'success') => {
@@ -594,19 +597,20 @@ export default function TablesManagement() {
 
   // Add Table
   const add = useMutation({
-    mutationFn: async () => {
-      const name = prompt('กรอกหมายเลขโต๊ะ (เช่น 1, 2, A1)')
-      if (!name) return
+    mutationFn: async ({ tableNumber, capacity }: { tableNumber: string; capacity: number }) => {
       const { error } = await supabase.from('store_tables').insert({
         store_id: store.id,
-        table_number: name.trim(),
-        capacity: 4
+        table_number: tableNumber,
+        capacity
       })
       if (error) throw error
     },
     onSuccess: () => {
       showMsg('เพิ่มโต๊ะเรียบร้อย')
       qc.invalidateQueries({ queryKey: key })
+      setIsAddTableOpen(false)
+      setNewTableNumber('')
+      setNewTableCapacity('4')
     },
     onError: e => showMsg((e as Error).message, 'error')
   })
@@ -702,28 +706,24 @@ export default function TablesManagement() {
   }, [query.data, search])
 
   const storeSlug = typeof window !== 'undefined' ? (window.location.pathname.split('/')[2] || store.slug || store.id) : (store.slug || store.id)
-  const realSlug = store.slug || store.id
+  const storefrontLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${store.slug || store.id}`
+  const [storefrontCopied, setStorefrontCopied] = useState(false)
   const liveTable = selectedTable ? rows.find((x: any) => x.id === selectedTable.id) || selectedTable : null
   const liveTableOrders = liveTable ? getTableActiveOrders(liveTable.id, liveTable.session_opened_at) : []
   const liveItemsCount = liveTable ? getTableActiveItemsCount(liveTable.id, liveTable.session_opened_at) : 0
   const liveBillCall = liveTable ? getTableBillCall(liveTable.id) : null
   const liveStaffCall = liveTable ? getTableStaffCall(liveTable.id) : null
 
-
-  // Online Storefront Link (ใช้ Slug หรือ ID จริงของร้านค้า)
-  const storefrontLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${realSlug}`
-  const [copied, setCopied] = useState(false)
-  const copyLink = () => {
-    navigator.clipboard.writeText(storefrontLink)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-
   // Stats calculation
   const totalTables = rows.length
   const occupiedTables = rows.filter((x: any) => x.status === 'occupied').length
   const availableTables = totalTables - occupiedTables
+
+  const copyStorefrontLink = async () => {
+    await navigator.clipboard.writeText(storefrontLink)
+    setStorefrontCopied(true)
+    setTimeout(() => setStorefrontCopied(false), 2000)
+  }
 
   // Tables that currently have active bill call
   const callingTables = useMemo(() => {
@@ -842,7 +842,7 @@ export default function TablesManagement() {
 
           {/* Add Table Button */}
           <button
-            onClick={() => add.mutate()}
+            onClick={() => setIsAddTableOpen(true)}
             className="flex h-11 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-5 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:bg-orange-600 transition active:scale-95 cursor-pointer"
           >
             <Plus size={18} strokeWidth={3} /> เพิ่มโต๊ะใหม่
@@ -850,49 +850,10 @@ export default function TablesManagement() {
         </div>
       </div>
 
-      {/* Online Storefront URL Card (ลิงก์ร้านค้าออนไลน์) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl border border-orange-200/80 bg-gradient-to-r from-orange-50/70 via-amber-50/40 to-white dark:border-orange-950/50 dark:from-orange-950/20 dark:to-zinc-900 shadow-2xs">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="grid size-10 place-items-center rounded-xl bg-orange-500 text-white shadow-sm shrink-0">
-            <Globe size={18} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-zinc-900 dark:text-white">
-                ลิงก์เว็บร้านค้าออนไลน์ (Online Storefront)
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 px-2 py-0.5 text-[10px] font-bold">
-                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> ออนไลน์
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate font-mono mt-0.5">
-              {storefrontLink}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={copyLink}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-800 text-xs font-bold shadow-2xs border border-zinc-200 transition cursor-pointer dark:bg-zinc-800 dark:border-zinc-700 dark:text-white dark:hover:bg-zinc-700 active:scale-95"
-            title="คัดลอกลิงก์ร้านค้าออนไลน์"
-          >
-            {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-            <span>{copied ? 'คัดลอกแล้ว!' : 'คัดลอกลิงก์'}</span>
-          </button>
-          <a
-            href={storefrontLink}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-sm shadow-orange-500/20 transition active:scale-95 cursor-pointer"
-            title="เปิดหน้าร้านออนไลน์ในแท็บใหม่"
-          >
-            <ExternalLink size={14} />
-            <span>เปิดดูหน้าร้าน</span>
-          </a>
-        </div>
+      <div className="flex flex-col gap-2 rounded-2xl border border-zinc-200/80 bg-white px-4 py-3 shadow-2xs dark:border-zinc-800 dark:bg-zinc-900 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0"><p className="text-xs font-black text-zinc-800 dark:text-white">ลิงก์ Online Store</p><p className="mt-0.5 truncate font-mono text-[11px] text-zinc-500 dark:text-zinc-400">{storefrontLink}</p></div>
+        <div className="flex shrink-0 gap-2"><button type="button" onClick={copyStorefrontLink} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-zinc-200 px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"><Copy size={14} />{storefrontCopied ? 'คัดลอกแล้ว' : 'คัดลอก'}</button><a href={storefrontLink} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-orange-500 px-3 text-xs font-bold text-white hover:bg-orange-600"><ExternalLink size={14} />เปิดร้าน</a></div>
       </div>
-
 
       {/* Quick KPI Stat Chips */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1000,7 +961,7 @@ export default function TablesManagement() {
                 <span className="text-4xl block opacity-40">🪑</span>
                 <p className="text-sm font-bold text-zinc-400">ยังไม่มีข้อมูลโต๊ะในระบบ</p>
                 <button
-                  onClick={() => add.mutate()}
+                  onClick={() => setIsAddTableOpen(true)}
                   className="px-4 py-2 rounded-xl bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 transition"
                 >
                   + เพิ่มโต๊ะแรก
@@ -1194,6 +1155,29 @@ export default function TablesManagement() {
           </div>
         )}
       </div>
+
+      {isAddTableOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-zinc-950/60 p-4 backdrop-blur-sm" onMouseDown={event => event.target === event.currentTarget && !add.isPending && setIsAddTableOpen(false)}>
+          <form onSubmit={event => {
+            event.preventDefault()
+            const tableNumber = newTableNumber.trim()
+            const capacity = Number(newTableCapacity)
+            if (!tableNumber) return showMsg('กรุณากรอกหมายเลขโต๊ะ', 'error')
+            if (!Number.isInteger(capacity) || capacity < 1) return showMsg('จำนวนที่นั่งต้องมากกว่า 0', 'error')
+            add.mutate({ tableNumber, capacity })
+          }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-zinc-900 sm:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div><p className="text-xs font-black uppercase tracking-wider text-orange-500">Tables</p><h2 className="mt-1 text-2xl font-black text-zinc-900 dark:text-white">เพิ่มโต๊ะใหม่</h2><p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">กำหนดเลขโต๊ะและจำนวนที่นั่งก่อนสร้าง QR</p></div>
+              <button type="button" onClick={() => setIsAddTableOpen(false)} className="grid size-9 place-items-center rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"><X size={18} /></button>
+            </div>
+            <div className="mt-6 space-y-4">
+              <label className="block"><span className="mb-1.5 block text-sm font-bold text-zinc-700 dark:text-zinc-200">หมายเลขโต๊ะ</span><input autoFocus value={newTableNumber} onChange={event => setNewTableNumber(event.target.value)} placeholder="เช่น 1, 2 หรือ A1" className="h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 text-base font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" /></label>
+              <label className="block"><span className="mb-1.5 block text-sm font-bold text-zinc-700 dark:text-zinc-200">จำนวนที่นั่ง</span><div className="grid grid-cols-4 gap-2">{[2, 4, 6, 8].map(capacity => <button key={capacity} type="button" onClick={() => setNewTableCapacity(String(capacity))} className={`h-11 rounded-xl text-sm font-black transition ${newTableCapacity === String(capacity) ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300'}`}>{capacity} ที่</button>)}</div></label>
+            </div>
+            <div className="mt-7 flex justify-end gap-2"><button type="button" disabled={add.isPending} onClick={() => setIsAddTableOpen(false)} className="h-11 rounded-xl px-4 text-sm font-bold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">ยกเลิก</button><button disabled={add.isPending} className="inline-flex h-11 items-center gap-2 rounded-xl bg-orange-500 px-5 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:bg-orange-600 disabled:opacity-50"><Plus size={17} />{add.isPending ? 'กำลังเพิ่ม…' : 'เพิ่มโต๊ะ'}</button></div>
+          </form>
+        </div>
+      )}
 
       {/* ── Table Action & Details Modal ── */}
       <TableActionModal

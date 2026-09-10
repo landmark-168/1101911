@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Minus, Plus, Printer, Check, Receipt, CheckCircle, Bluetooth } from 'lucide-react'
+import { Minus, Plus, Printer, Check, Receipt, CheckCircle, Bluetooth, Search } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../../../lib/supabase'
 import { useStore } from '../../StoreContext'
@@ -61,13 +61,23 @@ export default function POS() {
   const qc = useQueryClient()
 
   const initialTableId = new URLSearchParams(window.location.search).get('table_id') || ''
+  const editOrderId = new URLSearchParams(window.location.search).get('edit_order_id') || ''
+  const paymentOrderIds = (new URLSearchParams(window.location.search).get('payment_order_ids') || '').split(',').filter(Boolean)
+  const isBatchPayment = paymentOrderIds.length > 0
   const [tableId, setTableId] = useState(initialTableId)
   const [type, setType] = useState('dine_in')
   const [cart, setCart] = useState<{ id: string; name: string; price: number; qty: number; fromCustomer?: boolean }[]>([])
+  const [editDirty, setEditDirty] = useState(false)
+  const [orderNote, setOrderNote] = useState('')
   const [isBillModalOpen, setIsBillModalOpen] = useState(false)
   const [completedBill, setCompletedBill] = useState<any | null>(null)
   const [btPrinting, setBtPrinting] = useState(false)
   const [btStatus, setBtStatus] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'promptpay'>('cash')
+  const [cashReceived, setCashReceived] = useState('')
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [menuSearch, setMenuSearch] = useState('')
+  const [selectedMenuCategory, setSelectedMenuCategory] = useState('all')
 
   // Fetch Menu
   const menu = useQuery({
@@ -75,8 +85,9 @@ export default function POS() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('store_menu_items')
-        .select('*')
+        .select('*, category:store_categories(name)')
         .eq('store_id', store.id)
+        .eq('available', true)
         .order('name')
       if (error) throw error
       return data || []
@@ -112,6 +123,42 @@ export default function POS() {
   })
 
   const selectedTableObj = tables.data?.find((t: any) => t.id === tableId)
+  const menuCategories = Array.from(new Set((menu.data || []).map((item: any) => item.category?.name || 'อื่น ๆ')))
+  const filteredMenu = (menu.data || []).filter((item: any) => {
+    const category = item.category?.name || 'อื่น ๆ'
+    const matchesCategory = selectedMenuCategory === 'all' || category === selectedMenuCategory
+    const searchable = `${item.name} ${item.description || ''} ${category}`.toLowerCase()
+    return matchesCategory && searchable.includes(menuSearch.toLowerCase())
+  })
+
+  const editOrder = useQuery({
+    queryKey: ['pos-edit-order', store.id, editOrderId],
+    enabled: Boolean(editOrderId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('store_orders')
+        .select('*, store_order_items(*)')
+        .eq('store_id', store.id)
+        .eq('id', editOrderId)
+        .single()
+      if (error) throw error
+      return data
+    }
+  })
+
+  const batchPaymentOrders = useQuery({
+    queryKey: ['pos-batch-payment-orders', store.id, paymentOrderIds],
+    enabled: isBatchPayment,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('store_orders')
+        .select('*, store_order_items(*)')
+        .eq('store_id', store.id)
+        .in('id', paymentOrderIds)
+      if (error) throw error
+      return data || []
+    }
+  })
 
   // Fetch Active Orders for Table
   const tableOrders = useQuery({
@@ -164,6 +211,7 @@ export default function POS() {
 
   // Sync Table Orders into Cart
   useEffect(() => {
+    if (editOrderId || isBatchPayment) return
     if (type === 'dine_in' && tableId && tableOrders.data) {
       const consolidated: { id: string; name: string; price: number; qty: number; fromCustomer?: boolean }[] = []
 
@@ -201,7 +249,47 @@ export default function POS() {
     } else if (type !== 'dine_in' || !tableId) {
       setCart([])
     }
-  }, [tableOrders.data, tableId, type])
+  }, [tableOrders.data, tableId, type, editOrderId, isBatchPayment])
+
+  useEffect(() => {
+    const order = editOrder.data
+    if (!order) return
+    setType(order.order_type)
+    setTableId(order.table_id || '')
+    setCart((order.store_order_items || [])
+      .filter((item: any) => item.status !== 'cancelled')
+      .map((item: any) => ({
+        id: item.menu_item_id || item.id,
+        sourceItemId: item.id,
+        name: item.name,
+        price: Number(item.unit_price || 0),
+        qty: Number(item.quantity || 0),
+        originalQty: Number(item.quantity || 0),
+        notes: item.notes || '',
+        originalNotes: item.notes || '',
+        itemStatus: item.status || 'waiting',
+        fromCustomer: true
+      })))
+    setOrderNote(order.notes || '')
+    setEditDirty(false)
+  }, [editOrder.data])
+
+  useEffect(() => {
+    if (!isBatchPayment || !batchPaymentOrders.data) return
+    setType('takeaway')
+    setTableId('')
+    setCart(batchPaymentOrders.data.flatMap((order: any) => (order.store_order_items || [])
+      .filter((item: any) => item.status !== 'cancelled')
+      .map((item: any) => ({
+        id: `${order.id}-${item.id}`,
+        name: `${item.name} · #${order.order_number}`,
+        price: Number(item.unit_price || 0),
+        qty: Number(item.quantity || 0),
+        fromCustomer: true,
+        notes: item.notes || ''
+      }))))
+    setOrderNote(`ชำระรวม ${batchPaymentOrders.data.length} บิล`)
+  }, [isBatchPayment, batchPaymentOrders.data])
 
   const taxPercent = Number(settings.data?.tax_percent ?? 0)
   const serviceChargePercent = Number(settings.data?.service_charge_percent ?? 0)
@@ -211,6 +299,10 @@ export default function POS() {
   const serviceCharge = Math.round(subtotal * (serviceChargePercent / 100) * 100) / 100
   const tax = Math.round((subtotal + serviceCharge) * (taxPercent / 100) * 100) / 100
   const total = subtotal + serviceCharge + tax
+  const cashReceivedAmount = Number(cashReceived || 0)
+  const changeDue = Math.max(0, cashReceivedAmount - total)
+  const newItemCount = cart.filter(item => !item.fromCustomer).reduce((sum, item) => sum + item.qty, 0)
+  const hasEditChanges = Boolean(editOrderId) && editDirty
 
   const promptPayPhone = settings.data?.phone || store.phone || '0812345678'
   const promptPayPayload = generatePromptPayPayload(promptPayPhone, total)
@@ -219,11 +311,12 @@ export default function POS() {
     mutationFn: async () => {
       if (!cart.length) throw new Error('กรุณาเลือกเมนู')
       if (type === 'dine_in' && !tableId) throw new Error('กรุณาเลือกโต๊ะ')
+      if (paymentMethod === 'cash' && cashReceivedAmount < total) throw new Error('จำนวนเงินสดที่รับน้อยกว่ายอดชำระ')
 
       const number = `INV-${Date.now().toString().slice(-6)}`
       const billData = {
-        billNumber: number,
-        tableName: selectedTableObj?.table_number || (type === 'dine_in' ? 'Dine-in' : type === 'takeaway' ? 'Takeaway' : 'Delivery'),
+        billNumber: isBatchPayment ? `รวม ${batchPaymentOrders.data?.length || paymentOrderIds.length} บิล` : editOrder.data?.order_number || number,
+        tableName: isBatchPayment ? `ชำระรวม ${batchPaymentOrders.data?.length || paymentOrderIds.length} บิล` : selectedTableObj?.table_number || (type === 'dine_in' ? 'Dine-in' : type === 'takeaway' ? 'Takeaway' : 'Delivery'),
         storeName: store.name,
         storeLogo: settings.data?.logo_url || store.logo_url || '',
         storePhone: promptPayPhone,
@@ -237,40 +330,182 @@ export default function POS() {
         total,
         themeColor,
         createdAt: new Date().toLocaleString('th-TH'),
-        promptPayPayload
+        promptPayPayload,
+        paymentMethod,
+        cashReceived: paymentMethod === 'cash' ? cashReceivedAmount : null,
+        changeDue: paymentMethod === 'cash' ? changeDue : null
       }
 
-      // Mark existing table orders completed
-      if (type === 'dine_in' && tableId) {
-        await supabase
+      // A dine-in bill is made up of the orders already sent to the kitchen.
+      // Do not create another completed order here, otherwise sales are counted twice.
+      if (isBatchPayment) {
+        const orders = batchPaymentOrders.data || []
+        if (orders.length !== paymentOrderIds.length) throw new Error('ไม่พบข้อมูลบิลบางรายการ')
+        if (orders.some((order: any) => order.status === 'cancelled')) throw new Error('มีบิลที่ยกเลิกอยู่ในรายการ กรุณาเลือกใหม่')
+
+        let { error } = await supabase
           .from('store_orders')
-          .update({ status: 'completed' })
+          .update({ status: 'completed', payment_status: 'paid', payment_method: paymentMethod, updated_at: new Date().toISOString() })
+          .eq('store_id', store.id)
+          .in('id', paymentOrderIds)
+
+        if (error?.message?.includes('payment_status')) {
+          const results = await Promise.all(orders.map((order: any) => {
+            const currentNotes = String(order.notes || '').trim()
+            const notes = currentNotes.includes('[ชำระแล้ว]') ? currentNotes : `${currentNotes}${currentNotes ? '\n' : ''}[ชำระแล้ว]`
+            return supabase.from('store_orders').update({ status: 'completed', payment_method: paymentMethod, notes, updated_at: new Date().toISOString() }).eq('store_id', store.id).eq('id', order.id)
+          }))
+          error = results.find(result => result.error)?.error || null
+        }
+        if (error) throw error
+        return billData
+      }
+
+      if (editOrderId) {
+        if (!editOrder.data) throw new Error('กำลังโหลดข้อมูลบิล กรุณาลองใหม่อีกครั้ง')
+        if (editOrder.data.status === 'cancelled') throw new Error('บิลนี้ยกเลิกแล้ว จึงรับชำระเงินไม่ได้')
+        let { error } = await supabase
+          .from('store_orders')
+          .update({ status: 'completed', payment_status: 'paid', payment_method: paymentMethod, updated_at: new Date().toISOString() })
+          .eq('store_id', store.id)
+          .eq('id', editOrderId)
+
+        if (error?.message?.includes('payment_status')) {
+          const currentNotes = String(editOrder.data.notes || '').trim()
+          const notes = currentNotes.includes('[ชำระแล้ว]') ? currentNotes : `${currentNotes}${currentNotes ? '\n' : ''}[ชำระแล้ว]`
+          const fallback = await supabase
+            .from('store_orders')
+            .update({ status: 'completed', payment_method: paymentMethod, notes, updated_at: new Date().toISOString() })
+            .eq('store_id', store.id)
+            .eq('id', editOrderId)
+          error = fallback.error
+        }
+        if (error) throw error
+        return billData
+      }
+
+      if (type === 'dine_in' && tableId) {
+        const { data: activeOrders, error: activeOrdersError } = await supabase
+          .from('store_orders')
+          .select('id')
           .eq('store_id', store.id)
           .eq('table_id', tableId)
-          .neq('status', 'cancelled')
+          .in('status', ['pending', 'accepted', 'preparing', 'ready'])
+
+        if (activeOrdersError) throw activeOrdersError
+        if (!activeOrders?.length) throw new Error('ไม่พบบิลที่รอชำระสำหรับโต๊ะนี้')
+
+        let { error } = await supabase
+          .from('store_orders')
+          .update({ status: 'completed', payment_status: 'paid', payment_method: paymentMethod, updated_at: new Date().toISOString() })
+          .eq('store_id', store.id)
+          .eq('table_id', tableId)
+          .in('status', ['pending', 'accepted', 'preparing', 'ready'])
+        if (error?.message?.includes('payment_status')) {
+          const fallback = await supabase
+            .from('store_orders')
+            .update({ status: 'completed', payment_method: paymentMethod, updated_at: new Date().toISOString() })
+            .eq('store_id', store.id)
+            .eq('table_id', tableId)
+            .in('status', ['pending', 'accepted', 'preparing', 'ready'])
+          error = fallback.error
+        }
+        if (error) throw error
+        return billData
       }
 
-      // Insert final settled order
-      await supabase.from('store_orders').insert({
-        store_id: store.id,
-        table_id: tableId || null,
-        order_number: number,
-        order_type: type,
-        status: 'completed',
-        subtotal,
-        tax,
-        total,
-        customer_name: selectedTableObj ? `โต๊ะ ${selectedTableObj.table_number}` : 'Walk-in'
-      })
-
-      return billData
+      throw new Error('กรุณารับออเดอร์ก่อนเช็คบิล')
     },
     onSuccess: (data) => {
+      setIsPaymentModalOpen(false)
       setCompletedBill(data)
       setIsBillModalOpen(true)
       qc.invalidateQueries()
     },
     onError: (e) => alert((e as Error).message)
+  })
+
+  const holdBill = useMutation({
+    mutationFn: async () => {
+      const newItems = editOrderId
+        ? cart.filter((item: any) => !item.sourceItemId)
+        : cart.filter(item => !item.fromCustomer)
+      if (editOrderId) {
+        const editedItems = cart.filter((item: any) => item.sourceItemId)
+        const hasChanges = editedItems.some((item: any) => item.qty !== item.originalQty || item.notes !== item.originalNotes) || newItems.length > 0 || orderNote !== (editOrder.data?.notes || '')
+        if (!hasChanges) throw new Error('ยังไม่มีการเปลี่ยนแปลงในบิล')
+
+        await Promise.all(editedItems.map(async (item: any) => {
+          if (item.qty === item.originalQty && item.notes === item.originalNotes) return
+          const { error } = await supabase
+            .from('store_order_items')
+            .update({ quantity: item.qty, notes: item.notes || null, status: item.qty ? item.itemStatus : 'cancelled' })
+            .eq('store_id', store.id)
+            .eq('id', item.sourceItemId)
+          if (error) throw error
+        }))
+
+        if (newItems.length) {
+          const { error } = await supabase.from('store_order_items').insert(newItems.map(item => ({
+            store_id: store.id,
+            order_id: editOrderId,
+            menu_item_id: (item as any).menuItemId || item.id,
+            name: item.name,
+            quantity: item.qty,
+            unit_price: item.price,
+            notes: (item as any).notes || null,
+            status: 'waiting'
+          })))
+          if (error) throw error
+        }
+
+        const { error } = await supabase
+          .from('store_orders')
+          .update({ subtotal, total, notes: orderNote || null, updated_at: new Date().toISOString() })
+          .eq('store_id', store.id)
+          .eq('id', editOrderId)
+        if (error) throw error
+        return editOrderId
+      }
+
+      if (!newItems.length) throw new Error('ยังไม่มีรายการใหม่สำหรับพักบิล')
+      if (type === 'dine_in' && !tableId) throw new Error('กรุณาเลือกโต๊ะก่อนพักบิล')
+      const orderNumber = `ORD-${Date.now().toString().slice(-8)}`
+      const orderSubtotal = newItems.reduce((sum, item) => sum + Number(item.price) * item.qty, 0)
+      const { data: order, error } = await supabase.from('store_orders').insert({
+        store_id: store.id,
+        table_id: tableId || null,
+        order_number: orderNumber,
+        order_type: type,
+        status: type === 'delivery' ? 'pending' : 'preparing',
+        subtotal: orderSubtotal,
+        tax: 0,
+        total: orderSubtotal,
+        notes: orderNote || null,
+        customer_name: selectedTableObj ? `โต๊ะ ${selectedTableObj.table_number}` : 'Walk-in'
+      }).select('id').single()
+      if (error) throw error
+      const { error: itemError } = await supabase.from('store_order_items').insert(newItems.map(item => ({ store_id: store.id, order_id: order.id, menu_item_id: (item as any).menuItemId || item.id, name: item.name, quantity: item.qty, unit_price: item.price, notes: (item as any).notes || null, status: 'waiting' })))
+      if (itemError) {
+        await supabase.from('store_orders').delete().eq('store_id', store.id).eq('id', order.id)
+        throw itemError
+      }
+      if (tableId) {
+        const { error: tableError } = await supabase.from('store_tables').update({ status: 'occupied' }).eq('store_id', store.id).eq('id', tableId)
+        if (tableError) throw tableError
+      }
+      return order.id
+    },
+    onSuccess: (orderId) => {
+      qc.invalidateQueries({ queryKey: ['pos-table-orders', store.id, tableId] })
+      qc.invalidateQueries({ queryKey: ['pos-tables', store.id] })
+      qc.invalidateQueries({ queryKey: ['pos-edit-order', store.id, editOrderId] })
+      if (editOrderId) window.history.back()
+      else if (type === 'dine_in') setCart(current => current.filter(item => item.fromCustomer))
+      else setCart([])
+      setOrderNote('')
+    },
+    onError: error => alert((error as Error).message)
   })
 
   const handleFinishAndCloseTable = async () => {
@@ -290,17 +525,22 @@ export default function POS() {
     setIsBillModalOpen(false)
     setCompletedBill(null)
     setCart([])
+    setHeldOrderId('')
     setTableId('')
+    const ordersPath = window.location.pathname.replace(/\/pos$/, '/orders')
+    window.history.pushState({}, '', ordersPath)
+    window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
+      {!isPaymentModalOpen && <>
       <section>
         {/* Top Header Controls */}
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs font-bold text-orange-500 uppercase">POINT OF SALE</p>
-            <h1 className="text-3xl font-black dark:text-white">New order</h1>
+            <h1 className="text-3xl font-black dark:text-white">{isBatchPayment ? `รับชำระเงิน ${batchPaymentOrders.data?.length || paymentOrderIds.length} บิล` : editOrderId ? `แก้ไขบิล #${editOrder.data?.order_number || ''}` : 'New order'}</h1>
           </div>
           <div className="flex gap-2">
             <select
@@ -308,7 +548,9 @@ export default function POS() {
               onChange={e => {
                 setType(e.target.value)
                 if (e.target.value !== 'dine_in') setTableId('')
+                setOrderNote('')
               }}
+              disabled={Boolean(editOrderId) || isBatchPayment}
               className="h-11 rounded-xl border bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
             >
               <option value="dine_in">Dine-in</option>
@@ -319,6 +561,7 @@ export default function POS() {
               <select
                 value={tableId}
                 onChange={e => setTableId(e.target.value)}
+                disabled={Boolean(editOrderId) || isBatchPayment}
                 className="h-11 rounded-xl border bg-white px-3 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
               >
                 <option value="">เลือกโต๊ะ</option>
@@ -332,20 +575,33 @@ export default function POS() {
           </div>
         </div>
 
+        <div className="mt-5">
+          <div className="relative max-w-md">
+            <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input value={menuSearch} onChange={event => setMenuSearch(event.target.value)} placeholder="ค้นหาเมนู" className="h-10 w-full rounded-xl border border-zinc-200 bg-white pl-10 pr-3 text-sm outline-none focus:border-orange-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" />
+          </div>
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            <button type="button" onClick={() => setSelectedMenuCategory('all')} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${selectedMenuCategory === 'all' ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}>ทั้งหมด</button>
+            {menuCategories.map(category => <button key={category} type="button" onClick={() => setSelectedMenuCategory(category)} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${selectedMenuCategory === category ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}>{category}</button>)}
+          </div>
+        </div>
+
         {/* Menu Catalog Grid */}
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-          {menu.data?.map((x: any) => (
+          {filteredMenu.map((x: any) => (
             <button
               key={x.id}
-              onClick={() =>
+              disabled={isBatchPayment}
+              onClick={() => {
+                if (editOrderId) setEditDirty(true)
                 setCart(c => {
                   const found = c.find(i => i.id === x.id || i.name === x.name)
                   return found
-                    ? c.map(i => (i.id === x.id || i.name === x.name) ? { ...i, qty: i.qty + 1 } : i)
-                    : [...c, { id: x.id, name: x.name, price: Number(x.price), qty: 1 }]
+                    ? found.fromCustomer ? [...c, { id: `${x.id}-${Date.now()}`, menuItemId: x.id, name: x.name, price: Number(x.price), qty: 1 }] : c.map(i => i.id === found.id ? { ...i, qty: i.qty + 1 } : i)
+                    : [...c, { id: x.id, menuItemId: x.id, name: x.name, price: Number(x.price), qty: 1 }]
                 })
-              }
-              className="rounded-2xl border bg-white p-3 text-left dark:border-zinc-800 dark:bg-zinc-900 transition hover:shadow-md cursor-pointer active:scale-95"
+              }}
+              className="rounded-2xl border bg-white p-3 text-left dark:border-zinc-800 dark:bg-zinc-900 transition hover:shadow-md cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
             >
               <div className="relative aspect-[1.5] overflow-hidden rounded-xl bg-orange-50 dark:bg-orange-500/10 grid place-items-center">
                 {x.image_url ? (
@@ -360,49 +616,36 @@ export default function POS() {
           ))}
         </div>
 
-        {!menu.isLoading && !menu.data?.length && (
-          <p className="mt-16 text-center text-zinc-400">เพิ่มเมนูก่อนเริ่มขาย</p>
+        {!menu.isLoading && !filteredMenu.length && (
+          <p className="mt-16 text-center text-zinc-400">ไม่พบเมนูที่ค้นหา</p>
         )}
       </section>
 
       {/* Aside Bill Cart */}
       <aside className="h-fit rounded-2xl border bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-lg font-black dark:text-white">
-          Current bill {selectedTableObj && <span className="text-orange-500">(โต๊ะ {selectedTableObj.table_number})</span>}
-        </h2>
+        <div className="flex items-start justify-between gap-3">
+          <div><h2 className="text-lg font-black dark:text-white">Current bill</h2><p className="mt-1 text-xs text-zinc-400">{selectedTableObj ? `โต๊ะ ${selectedTableObj.table_number}` : type === 'takeaway' ? 'สั่งกลับบ้าน' : type === 'delivery' ? 'เดลิเวอรี' : 'เลือกโต๊ะเพื่อเริ่มบิล'}</p></div>
+        </div>
         <div className="my-5 max-h-72 overflow-y-auto space-y-3">
           {cart.map(x => (
-            <div key={x.name} className="flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <b className="block truncate text-sm dark:text-white">{x.name}</b>
-                <span className="text-xs text-orange-500">฿{x.price}</span>
+            <div key={x.id} className="space-y-2 border-b border-zinc-100 pb-3 last:border-0 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1"><b className="block truncate text-sm dark:text-white">{x.name}</b><span className="text-xs text-orange-500">฿{x.price}</span></div>
+                <button disabled={isBatchPayment} onClick={() => { if (editOrderId) setEditDirty(true); setCart(c => c.flatMap(i => (i.id !== x.id ? [i] : editOrderId && (i as any).sourceItemId ? [{ ...i, qty: Math.max(0, i.qty - 1) }] : i.qty > 1 ? [{ ...i, qty: i.qty - 1 }] : []))) }} className="grid size-7 place-items-center rounded-lg bg-zinc-100 dark:bg-zinc-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-45"><Minus size={12} /></button>
+                <b className="w-4 text-center text-sm dark:text-white">{x.qty}</b>
+                <button disabled={isBatchPayment} onClick={() => { if (editOrderId) setEditDirty(true); setCart(c => c.map(i => (i.id === x.id ? { ...i, qty: i.qty + 1 } : i))) }} className="grid size-7 place-items-center rounded-lg bg-zinc-100 dark:bg-zinc-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-45"><Plus size={12} /></button>
               </div>
-              <button
-                onClick={() =>
-                  setCart(c =>
-                    c.flatMap(i => (i.name === x.name ? (i.qty > 1 ? [{ ...i, qty: i.qty - 1 }] : []) : [i]))
-                  )
-                }
-                className="grid size-7 place-items-center rounded-lg bg-zinc-100 dark:bg-zinc-800 cursor-pointer"
-              >
-                <Minus size={12} />
-              </button>
-              <b className="text-sm dark:text-white w-4 text-center">{x.qty}</b>
-              <button
-                onClick={() =>
-                  setCart(c =>
-                    c.map(i => (i.name === x.name ? { ...i, qty: i.qty + 1 } : i))
-                  )
-                }
-                className="grid size-7 place-items-center rounded-lg bg-zinc-100 dark:bg-zinc-800 cursor-pointer"
-              >
-                <Plus size={12} />
-              </button>
+              <input disabled={isBatchPayment} value={(x as any).notes || ''} onChange={event => { if (editOrderId) setEditDirty(true); setCart(items => items.map(item => item.id === x.id ? { ...item, notes: event.target.value } : item)) }} placeholder="หมายเหตุถึงครัว เช่น ไม่ใส่ผัก / เผ็ดน้อย" className="h-8 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 text-xs outline-none focus:border-orange-400 disabled:opacity-45 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
             </div>
           ))}
           {!cart.length && (
             <p className="text-center text-xs text-zinc-400 py-6">ยังไม่มีรายการในบิล</p>
           )}
+        </div>
+
+        <div className="mb-4">
+          <label className="mb-1.5 block text-xs font-bold text-zinc-600 dark:text-zinc-300">หมายเหตุทั้งบิล</label>
+          <textarea disabled={isBatchPayment} value={orderNote} onChange={event => { if (editOrderId) setEditDirty(true); setOrderNote(event.target.value) }} placeholder="เช่น ลูกค้ารอรับเอง / แจ้งเมื่ออาหารพร้อม" rows={2} className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs outline-none focus:border-orange-400 disabled:opacity-45 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
         </div>
 
         <div className="space-y-2 border-y py-4 text-sm dark:border-zinc-700">
@@ -430,15 +673,24 @@ export default function POS() {
 
         {checkout.error && <p className="mt-3 text-xs text-red-500">{(checkout.error as Error).message}</p>}
 
-        <button
-          disabled={checkout.isPending || !cart.length}
-          onClick={() => checkout.mutate()}
-          style={{ backgroundColor: themeColor }}
-          className="mt-4 h-12 w-full rounded-xl font-bold text-white shadow-md transition hover:brightness-95 disabled:opacity-40 cursor-pointer"
-        >
-          {checkout.isPending ? 'กำลังสร้างออเดอร์…' : `ยืนยันเช็คบิล ฿${total.toLocaleString()}`}
-        </button>
+        <div className="mt-5 border-t pt-4 dark:border-zinc-700">
+        {isBatchPayment ? <button disabled={!cart.length || batchPaymentOrders.isLoading} onClick={() => setIsPaymentModalOpen(true)} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-700 disabled:opacity-40 cursor-pointer"><CheckCircle size={17}/>{`รับชำระเงิน ${batchPaymentOrders.data?.length || paymentOrderIds.length} บิล · ฿${total.toLocaleString()}`}</button> : editOrderId ? <div className="space-y-2"><button disabled={holdBill.isPending || !hasEditChanges} onClick={() => holdBill.mutate()} style={{ backgroundColor: themeColor }} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold text-white shadow-lg shadow-orange-500/20 transition hover:brightness-95 disabled:opacity-40 cursor-pointer"><Receipt size={17}/>{holdBill.isPending ? 'กำลังบันทึก…' : hasEditChanges ? 'บันทึกการแก้ไขและส่งครัว' : 'ยังไม่มีรายการแก้ไข'}</button><button disabled={!cart.length || editOrder.data?.status === 'cancelled'} onClick={() => setIsPaymentModalOpen(true)} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-40 cursor-pointer"><CheckCircle size={17}/>{`รับชำระเงินและเช็คบิล · ฿${total.toLocaleString()}`}</button></div> : newItemCount ? <button disabled={holdBill.isPending} onClick={() => holdBill.mutate()} style={{ backgroundColor: themeColor }} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold text-white shadow-lg shadow-orange-500/20 transition hover:brightness-95 disabled:opacity-40 cursor-pointer"><Receipt size={17}/>{holdBill.isPending ? 'กำลังส่งออเดอร์…' : `${type === 'dine_in' ? 'ส่งเข้าครัว' : 'รับออเดอร์'} · ${newItemCount} รายการ`}</button> : <button disabled={!cart.length} onClick={() => setIsPaymentModalOpen(true)} style={{ backgroundColor: themeColor }} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold text-white shadow-lg shadow-orange-500/20 transition hover:brightness-95 disabled:opacity-40 cursor-pointer"><CheckCircle size={17}/>{`เช็คบิล · ฿${total.toLocaleString()}`}</button>}
+        </div>
       </aside>
+      </>}
+
+      {isPaymentModalOpen && (
+        <div className="col-span-full rounded-3xl bg-white p-5 dark:bg-zinc-900 sm:p-6">
+          <div className="mx-auto w-full max-w-5xl">
+            <div className="flex items-center justify-between gap-3 border-b border-zinc-100 pb-3 dark:border-zinc-800"><div><p className="text-xs font-bold uppercase tracking-wide text-emerald-600">Payment</p><h2 className="text-xl font-black text-zinc-900 dark:text-white">รับชำระ ฿{total.toLocaleString()}</h2></div><button type="button" onClick={() => setIsPaymentModalOpen(false)} className="rounded-xl px-3 py-2 text-sm font-bold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">ปิด</button></div>
+            <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_1px_minmax(260px,320px)]">
+              <section className="min-w-0"><h3 className="text-sm font-black text-zinc-900 dark:text-white">รายการที่สั่ง</h3><div className="mt-2 max-h-[280px] space-y-1.5 overflow-y-auto pr-2">{cart.map(item => <div key={item.id} className="flex items-start justify-between gap-3 rounded-lg border border-zinc-100 px-3 py-2 dark:border-zinc-800"><div className="min-w-0"><p className="text-sm font-bold text-zinc-900 dark:text-white">{item.name}</p>{(item as any).notes && <p className="mt-0.5 text-xs text-orange-600">โน้ต: {(item as any).notes}</p>}</div><div className="shrink-0 text-right"><p className="text-sm font-bold text-zinc-700 dark:text-zinc-200">{item.qty} × ฿{item.price.toLocaleString()}</p><p className="mt-0.5 text-sm font-black text-orange-600">฿{(item.qty * item.price).toLocaleString()}</p></div></div>)}</div><div className="mt-3 border-t border-zinc-200 pt-2 dark:border-zinc-700"><div className="flex justify-between text-xs text-zinc-500"><span>รวมค่าอาหาร</span><span>฿{subtotal.toLocaleString()}</span></div><div className="mt-1 flex justify-between text-lg font-black text-zinc-900 dark:text-white"><span>ยอดสุทธิ</span><span className="text-orange-500">฿{total.toLocaleString()}</span></div></div></section>
+              <div className="hidden bg-zinc-200 lg:block dark:bg-zinc-700" />
+              <section><h3 className="text-base font-black text-zinc-900 dark:text-white">เลือกวิธีชำระเงิน</h3><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setPaymentMethod('cash')} className={`h-11 rounded-xl px-4 text-base font-bold transition ${paymentMethod === 'cash' ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}>เงินสด</button><button type="button" onClick={() => setPaymentMethod('promptpay')} className={`h-11 rounded-xl px-4 text-base font-bold transition ${paymentMethod === 'promptpay' ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}>PromptPay</button></div>{paymentMethod === 'cash' ? <div className="mt-4"><div className="flex items-center justify-between gap-3"><label className="text-base font-bold text-zinc-600 dark:text-zinc-300">รับเงินมา</label><input autoFocus inputMode="decimal" value={cashReceived} onChange={event => setCashReceived(event.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" className="h-11 w-36 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-right text-xl font-black outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" /></div><div className="mt-3 grid grid-cols-4 gap-2">{[1000, 500, 100, 50].map(amount => <button key={amount} type="button" onClick={() => setCashReceived(String(amount))} className="h-10 rounded-lg bg-zinc-100 text-sm font-bold text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200">฿{amount}</button>)}</div><div className="mx-auto mt-3 grid max-w-[240px] grid-cols-3 gap-1.5">{['1', '2', '3', '4', '5', '6', '7', '8', '9', 'ล้าง', '0', '⌫'].map(key => <button key={key} type="button" onClick={() => setCashReceived(current => key === 'ล้าง' ? '' : key === '⌫' ? current.slice(0, -1) : `${current}${key}`)} className="h-12 rounded-lg bg-zinc-100 text-base font-bold text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200">{key}</button>)}</div><div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10"><span className="text-base font-bold text-emerald-700 dark:text-emerald-300">เงินทอน</span><span className="text-xl font-black text-emerald-700 dark:text-emerald-300">฿{changeDue.toLocaleString()}</span></div></div> : <div className="mt-4 flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/50 p-5 text-center dark:border-emerald-700 dark:bg-emerald-500/10"><div className="rounded-xl bg-white p-3 shadow-sm"><QRCodeSVG value={promptPayPayload} size={170} level="M" /></div><p className="mt-3 text-base font-black text-emerald-700 dark:text-emerald-300">สแกน PromptPay เพื่อชำระ ฿{total.toLocaleString()}</p></div>}<button type="button" disabled={checkout.isPending || (paymentMethod === 'cash' && cashReceivedAmount < total)} onClick={() => checkout.mutate()} className="mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-emerald-600 text-base font-black text-white transition hover:bg-emerald-700 disabled:opacity-40">{checkout.isPending ? 'กำลังบันทึก…' : paymentMethod === 'cash' ? 'ยืนยันรับเงินสด' : 'ยืนยันชำระ PromptPay'}</button></section>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Bill & QR Slip Modal ── */}
       {isBillModalOpen && completedBill && (
@@ -519,10 +771,12 @@ export default function POS() {
                     <span>ยอดชำระทั้งสิ้น:</span>
                     <span style={{ color: completedBill.themeColor || '#F97316' }}>฿{completedBill.total.toLocaleString()}</span>
                   </div>
+                  <div className="flex justify-between pt-1 text-zinc-500"><span>ชำระโดย:</span><span>{completedBill.paymentMethod === 'cash' ? 'เงินสด' : 'PromptPay'}</span></div>
+                  {completedBill.paymentMethod === 'cash' && <><div className="flex justify-between text-zinc-500"><span>รับเงินสด:</span><span>฿{Number(completedBill.cashReceived || 0).toLocaleString()}</span></div><div className="flex justify-between font-bold text-emerald-700"><span>เงินทอน:</span><span>฿{Number(completedBill.changeDue || 0).toLocaleString()}</span></div></>}
                 </div>
 
                 {/* PromptPay QR on Bill */}
-                <div className="pt-3 border-t border-dashed border-zinc-300 dark:border-zinc-700 flex flex-col items-center gap-1.5">
+                {completedBill.paymentMethod === 'promptpay' && <div className="pt-3 border-t border-dashed border-zinc-300 dark:border-zinc-700 flex flex-col items-center gap-1.5">
                   <div className="bg-white p-2.5 rounded-xl shadow-xs border border-zinc-200 inline-block">
                     <QRCodeSVG
                       value={completedBill.promptPayPayload || '00020101021129370016A000000677010111011300668123456785802TH53037646304'}
@@ -539,7 +793,7 @@ export default function POS() {
                   <p className="text-[9px] text-zinc-500">
                     PromptPay: {completedBill.storePhone}
                   </p>
-                </div>
+                </div>}
 
                 <p className="text-[10px] text-zinc-400 pt-2">
                   *** ขอบคุณที่ใช้บริการ ***

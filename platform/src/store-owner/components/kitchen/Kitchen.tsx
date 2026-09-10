@@ -126,19 +126,6 @@ interface ColumnConfig {
 
 const COLUMNS: ColumnConfig[] = [
   {
-    id: 'pending',
-    title: 'รอปรุงอาหาร',
-    subtitle: 'ออเดอร์ใหม่รอรับทำ',
-    color: 'border-t-amber-500',
-    headerBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-    badgeBg: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
-    badgeText: 'text-amber-600 dark:text-amber-400',
-    statuses: ['pending', 'accepted'],
-    actionLabel: 'เริ่มทำอาหาร',
-    actionNext: 'preparing',
-    icon: Clock
-  },
-  {
     id: 'preparing',
     title: 'กำลังปรุง',
     subtitle: 'เชฟกำลังทำในครัว',
@@ -146,10 +133,9 @@ const COLUMNS: ColumnConfig[] = [
     headerBg: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
     badgeBg: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300',
     badgeText: 'text-indigo-600 dark:text-indigo-400',
-    statuses: ['preparing'],
+    statuses: ['accepted', 'preparing'],
     actionLabel: 'ปรุงเสร็จแล้ว',
     actionNext: 'ready',
-    prevStatus: 'pending',
     icon: Flame
   },
   {
@@ -189,6 +175,8 @@ export default function Kitchen() {
   const [search, setSearch] = useState('')
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({})
+  const [cancelOrder, setCancelOrder] = useState<any | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const lastOrderCountRef = useRef<number>(0)
 
@@ -213,7 +201,11 @@ export default function Kitchen() {
         .limit(120)
 
       if (error) throw error
-      return data || []
+      return (data || []).filter((order: any) => {
+        const number = String(order.order_number || '').toUpperCase()
+        const notes = String(order.notes || '')
+        return !number.startsWith('SRV') && !number.startsWith('BILL') && order.order_type !== 'service_request' && !notes.includes('เรียกพนักงาน') && !notes.includes('เรียกเก็บเงิน')
+      })
     },
     refetchInterval: 15000 // Polling fallback every 15s
   })
@@ -246,7 +238,7 @@ export default function Kitchen() {
 
   // Play audio chime when new pending orders are detected
   useEffect(() => {
-    const pendingOrders = orders.filter((o: any) => ['pending', 'accepted'].includes(o.status))
+    const pendingOrders = orders.filter((o: any) => o.status === 'pending')
     if (lastOrderCountRef.current > 0 && pendingOrders.length > lastOrderCountRef.current) {
       if (soundEnabled) {
         playChime()
@@ -270,6 +262,36 @@ export default function Kitchen() {
       qc.invalidateQueries({ queryKey: ['kitchen-orders', store.id] })
       qc.invalidateQueries({ queryKey: ['orders', store.id] })
     }
+  })
+
+  const cancelOrderMutation = useMutation({
+    mutationFn: async () => {
+      if (!cancelOrder) throw new Error('ไม่พบออเดอร์ที่ต้องการยกเลิก')
+      if (!cancelReason.trim()) throw new Error('กรุณาระบุเหตุผลที่ยกเลิก')
+      const currentNotes = String(cancelOrder.notes || '').trim()
+      const notes = `${currentNotes}${currentNotes ? '\n' : ''}[ยกเลิกโดยร้าน] ${cancelReason.trim()}`
+      let { error } = await supabase
+        .from('store_orders')
+        .update({ status: 'cancelled', payment_status: 'not_required', notes, updated_at: new Date().toISOString() })
+        .eq('store_id', store.id)
+        .eq('id', cancelOrder.id)
+      if (error?.message?.includes('payment_status')) {
+        const fallback = await supabase
+          .from('store_orders')
+          .update({ status: 'cancelled', notes, updated_at: new Date().toISOString() })
+          .eq('store_id', store.id)
+          .eq('id', cancelOrder.id)
+        error = fallback.error
+      }
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setCancelOrder(null)
+      setCancelReason('')
+      qc.invalidateQueries({ queryKey: ['kitchen-orders', store.id] })
+      qc.invalidateQueries({ queryKey: ['orders', store.id] })
+    },
+    onError: error => alert((error as Error).message)
   })
 
   const toggleItemChecked = (itemId: string) => {
@@ -412,10 +434,9 @@ export default function Kitchen() {
           <p className="mt-3 text-sm font-bold text-zinc-500 dark:text-zinc-400">กำลังเชื่อมต่อข้อมูลครัว...</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 items-start">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 items-start">
           {COLUMNS.map(col => {
             const colOrders = filteredOrders.filter((o: any) => col.statuses.includes(o.status))
-            // Sort completed descending (newest completed first), others ascending (oldest first)
             const sortedOrders = col.id === 'completed'
               ? [...colOrders].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 15)
               : [...colOrders].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -458,7 +479,7 @@ export default function Kitchen() {
                       const elapsedStr = formatElapsed(order.created_at, now)
                       const isUrgent = col.id !== 'completed' && elapsedMin > 15
                       const isCritical = col.id !== 'completed' && elapsedMin > 30
-                      const items = order.store_order_items || []
+                      const items = (order.store_order_items || []).filter((item: any) => item.status !== 'cancelled')
                       const tableNum = order.store_tables?.table_number
 
                       // Order channel badge
@@ -618,6 +639,17 @@ export default function Kitchen() {
                               </button>
                             )}
 
+                            {col.id !== 'completed' && (
+                              <button
+                                type="button"
+                                disabled={cancelOrderMutation.isPending}
+                                onClick={() => { setCancelOrder(order); setCancelReason('') }}
+                                className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100 disabled:opacity-50"
+                              >
+                                ยกเลิก
+                              </button>
+                            )}
+
                             {col.id === 'completed' && (
                               <div className="flex flex-1 items-center justify-center gap-1 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                                 <CheckCircle2 size={14} />
@@ -633,6 +665,17 @@ export default function Kitchen() {
               </section>
             )
           })}
+        </div>
+      )}
+
+      {cancelOrder && (
+        <div className="fixed inset-0 z-[80] grid place-items-center bg-zinc-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-zinc-900">
+            <h2 className="text-lg font-black text-zinc-900 dark:text-white">ยกเลิกออเดอร์ #{cancelOrder.order_number}</h2>
+            <p className="mt-1 text-sm text-zinc-500">ระบุเหตุผลเพื่อแจ้งทีมงานและเก็บไว้ในประวัติออเดอร์</p>
+            <textarea value={cancelReason} onChange={event => setCancelReason(event.target.value)} autoFocus rows={4} placeholder="เช่น วัตถุดิบหมด / ลูกค้าขอยกเลิก" className="mt-4 w-full resize-none rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-sm outline-none focus:border-red-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
+            <div className="mt-4 flex justify-end gap-2"><button onClick={() => setCancelOrder(null)} className="rounded-xl px-4 py-2.5 text-sm font-bold text-zinc-500 hover:bg-zinc-100">กลับ</button><button disabled={cancelOrderMutation.isPending || !cancelReason.trim()} onClick={() => cancelOrderMutation.mutate()} className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-50">{cancelOrderMutation.isPending ? 'กำลังยกเลิก…' : 'ยืนยันยกเลิก'}</button></div>
+          </div>
         </div>
       )}
     </div>
