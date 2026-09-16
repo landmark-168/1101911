@@ -158,20 +158,6 @@ function App() {
     window.dispatchEvent(new Event('staff-changed'))
   }
 
-  // Fetch employees for PIN modal
-  const { data: storeEmployees = [] } = useQuery<Employee[]>({
-    queryKey: ['store-employees', store?.id],
-    enabled: Boolean(store?.id),
-    queryFn: async () => {
-      if (!store?.id) return []
-      const { data } = await supabase
-        .from('store_members')
-        .select('*')
-        .eq('store_id', store.id)
-      return data || []
-    }
-  })
-
   useEffect(() => {
     if (dark) {
       document.documentElement.classList.add('dark')
@@ -547,7 +533,7 @@ function App() {
       {/* Global Staff PIN Keypad Switcher Modal */}
       {isStaffPinModalOpen && (
         <GlobalStaffPinModal
-          employees={storeEmployees}
+          storeId={store.id}
           activeStaff={activeStaff}
           themeColor={themeColor}
           onClose={() => setIsStaffPinModalOpen(false)}
@@ -556,14 +542,14 @@ function App() {
               id: emp.id,
               name: emp.full_name || emp.role,
               role: emp.role,
-              pin: emp.pin_code,
+              pin: '',
               permissions: emp.permissions || ROLE_CONFIG[emp.role]?.defaultPermissions || []
             }))
             setActiveStaff({
               id: emp.id,
               name: emp.full_name || emp.role,
               role: emp.role,
-              pin: emp.pin_code || '',
+              pin: '',
               permissions: emp.permissions || ROLE_CONFIG[emp.role]?.defaultPermissions || []
             })
             window.dispatchEvent(new Event('staff-changed'))
@@ -579,8 +565,8 @@ function App() {
   )
 }
 
-function GlobalStaffPinModal({ employees, activeStaff, themeColor, onClose, onSelectStaff, onResetOwner }: {
-  employees: Employee[]
+function GlobalStaffPinModal({ storeId, activeStaff, themeColor, onClose, onSelectStaff, onResetOwner }: {
+  storeId: string
   activeStaff: any
   themeColor: string
   onClose: () => void
@@ -590,6 +576,30 @@ function GlobalStaffPinModal({ employees, activeStaff, themeColor, onClose, onSe
   const [pin, setPin] = useState('')
   const [matchedStaff, setMatchedStaff] = useState<Employee | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [isChecking, setIsChecking] = useState(false)
+  const [lockedUntil, setLockedUntil] = useState<string | null>(null)
+  const [lockSecondsRemaining, setLockSecondsRemaining] = useState(0)
+
+  useEffect(() => {
+    if (!lockedUntil) {
+      setLockSecondsRemaining(0)
+      return
+    }
+
+    const updateRemaining = () => {
+      const remaining = Math.max(0, Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 1000))
+      setLockSecondsRemaining(remaining)
+      if (remaining === 0) {
+        setLockedUntil(null)
+        setPin('')
+        setErrorMsg('')
+      }
+    }
+
+    updateRemaining()
+    const timer = window.setInterval(updateRemaining, 1000)
+    return () => window.clearInterval(timer)
+  }, [lockedUntil])
 
   const handleKeyClick = (key: string) => {
     if (key === 'C') {
@@ -600,30 +610,48 @@ function GlobalStaffPinModal({ employees, activeStaff, themeColor, onClose, onSe
       setPin(prev => prev.slice(0, -1))
       setMatchedStaff(null)
       setErrorMsg('')
-    } else {
-      if (pin.length < 6) {
+    } else if (!lockedUntil || new Date(lockedUntil).getTime() <= Date.now()) {
+      if (pin.length < 4 && !isChecking) {
         const nextPin = pin + key
         setPin(nextPin)
-        checkPin(nextPin)
+        if (nextPin.length === 4) void checkPin(nextPin)
       }
     }
   }
 
-  const checkPin = (code: string) => {
-    if (code.length >= 4) {
-      const found = employees.find(e => e.pin_code === code && e.status === 'active')
-      if (found) {
-        setMatchedStaff(found)
-        setErrorMsg('')
+  const checkPin = async (code: string) => {
+    setIsChecking(true)
+    setMatchedStaff(null)
+    setErrorMsg('')
+    try {
+      const { data, error } = await supabase.rpc('verify_store_member_pin', {
+        target_store: storeId,
+        input_pin: code
+      })
+      if (error) throw error
+
+      const result = data as {
+        status?: string
+        member?: Employee
+        attempts_remaining?: number
+        locked_until?: string
+      } | null
+
+      if (result?.status === 'success' && result.member) {
+        setMatchedStaff(result.member)
+        setLockedUntil(null)
+      } else if (result?.status === 'locked' && result.locked_until) {
+        setLockedUntil(result.locked_until)
+        setErrorMsg('กรอก PIN ผิดครบ 5 ครั้ง ระบบล็อกชั่วคราว 15 นาที')
+      } else if (result?.status === 'invalid') {
+        setErrorMsg(`PIN ไม่ถูกต้อง เหลือ ${result.attempts_remaining ?? 0} ครั้งก่อนระบบล็อก`)
       } else {
-        setMatchedStaff(null)
-        if (code.length >= 4) {
-          setErrorMsg('ไม่พบรหัส PIN นี้ หรือพนักงานถูกระงับสิทธิ์')
-        }
+        setErrorMsg('กรุณากรอก PIN ตัวเลข 4 หลัก')
       }
-    } else {
-      setMatchedStaff(null)
-      setErrorMsg('')
+    } catch {
+      setErrorMsg('ตรวจสอบ PIN ไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setIsChecking(false)
     }
   }
 
@@ -660,7 +688,11 @@ function GlobalStaffPinModal({ employees, activeStaff, themeColor, onClose, onSe
             ))}
           </div>
           <p className="mt-2 font-mono text-xs font-bold text-zinc-400">
-            {pin ? `PIN: ${pin}` : 'กดตัวเลข 4 หลัก'}
+            {lockSecondsRemaining > 0
+              ? `ลองใหม่ใน ${Math.ceil(lockSecondsRemaining / 60)} นาที`
+              : isChecking
+                ? 'กำลังตรวจสอบ…'
+                : pin ? `PIN: ${pin}` : 'กดตัวเลข 4 หลัก'}
           </p>
         </div>
 
@@ -696,7 +728,8 @@ function GlobalStaffPinModal({ employees, activeStaff, themeColor, onClose, onSe
               key={key}
               type="button"
               onClick={() => handleKeyClick(key)}
-              className={`h-12 rounded-2xl font-bold text-base transition cursor-pointer active:scale-95 flex items-center justify-center ${
+              disabled={isChecking || lockSecondsRemaining > 0}
+              className={`h-12 rounded-2xl font-bold text-base transition cursor-pointer active:scale-95 flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50 ${
                 key === 'C'
                   ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-400'
                   : key === 'DEL'

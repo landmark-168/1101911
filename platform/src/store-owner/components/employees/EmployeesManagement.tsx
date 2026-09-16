@@ -1281,25 +1281,23 @@ function PinTestModal({ employees, themeColor, onClose, onSelectStaff }: {
       setMatchedStaff(null)
       setErrorMsg('')
     } else {
-      if (pin.length < 6) {
+      if (pin.length < 4) {
         const nextPin = pin + key
         setPin(nextPin)
-        checkPin(nextPin)
+        if (nextPin.length === 4) checkPin(nextPin)
       }
     }
   }
 
   const checkPin = (code: string) => {
-    if (code.length >= 4) {
+    if (code.length === 4) {
       const found = employees.find(e => e.pin_code === code && e.status === 'active')
       if (found) {
         setMatchedStaff(found)
         setErrorMsg('')
       } else {
         setMatchedStaff(null)
-        if (code.length >= 4) {
-          setErrorMsg('ไม่พบรหัส PIN นี้ หรือพนักงานถูกพักงาน')
-        }
+        setErrorMsg('ไม่พบรหัส PIN นี้ หรือพนักงานถูกพักงาน')
       }
     } else {
       setMatchedStaff(null)
