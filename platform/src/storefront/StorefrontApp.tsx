@@ -1043,6 +1043,15 @@ function StorefrontApp() {
 
   const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>('delivery')
   const [pickupTime, setPickupTime] = useState<string>('asap')
+  const [couponCode, setCouponCode] = useState('')
+  const [couponMessage, setCouponMessage] = useState('')
+  const [isCheckingCoupon, setIsCheckingCoupon] = useState(false)
+  const [appliedPromotion, setAppliedPromotion] = useState<{
+    id: string
+    code: string
+    name: string
+    discountAmount: number
+  } | null>(null)
 
   const pickupTimeSlots = (() => {
     const slots: { value: string; label: string }[] = [{ value: 'asap', label: '⚡ เร็วที่สุด' }]
@@ -1200,6 +1209,46 @@ function StorefrontApp() {
   const storeLng = Number(shop?.longitude ?? deliveryConfig.longitude ?? 100.5018)
 
   const cartSubtotal = cart.reduce((sum, c) => sum + c.item.price * c.quantity, 0)
+  const orderChannel = tableId ? 'dine_in' : deliveryMethod === 'pickup' ? 'takeaway' : 'delivery'
+
+  useEffect(() => {
+    setAppliedPromotion(null)
+    setCouponMessage('')
+  }, [cartSubtotal, orderChannel])
+
+  const applyCoupon = async () => {
+    if (!storeId) return
+    setIsCheckingCoupon(true)
+    setCouponMessage('')
+    try {
+      const { data, error } = await supabase.rpc('validate_store_promotion', {
+        target_store: storeId,
+        input_code: couponCode.trim(),
+        order_subtotal: cartSubtotal,
+        order_channel: orderChannel
+      })
+      if (error) throw error
+      const result = data as any
+      if (result?.status !== 'valid') {
+        setAppliedPromotion(null)
+        setCouponMessage(result?.reason || 'ไม่สามารถใช้คูปองนี้ได้')
+        return
+      }
+      setAppliedPromotion({
+        id: result.promotion_id,
+        code: result.code,
+        name: result.name,
+        discountAmount: Number(result.discount_amount || 0)
+      })
+      setCouponCode(result.code)
+      setCouponMessage(`ใช้คูปอง ${result.code} สำเร็จ`)
+    } catch {
+      setAppliedPromotion(null)
+      setCouponMessage('ตรวจสอบคูปองไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setIsCheckingCoupon(false)
+    }
+  }
 
   const deliveryCalc = calculateDeliveryFee(
     storeLat,
@@ -1226,9 +1275,11 @@ function StorefrontApp() {
   const deliveryFee = tableId ? 0 : (deliveryMethod === 'pickup' ? 0 : deliveryCalc.deliveryFee)
   const themeColor = settings?.theme_color || '#F97316'
 
-  const serviceChargeAmount = Math.round(cartSubtotal * (serviceChargePercent / 100) * 100) / 100
-  const taxAmount = Math.round((cartSubtotal + serviceChargeAmount) * (taxPercent / 100) * 100) / 100
-  const cartGrandTotal = cartSubtotal + serviceChargeAmount + taxAmount + deliveryFee
+  const promotionDiscount = Math.min(cartSubtotal, appliedPromotion?.discountAmount || 0)
+  const discountedSubtotal = Math.max(0, cartSubtotal - promotionDiscount)
+  const serviceChargeAmount = Math.round(discountedSubtotal * (serviceChargePercent / 100) * 100) / 100
+  const taxAmount = Math.round((discountedSubtotal + serviceChargeAmount) * (taxPercent / 100) * 100) / 100
+  const cartGrandTotal = discountedSubtotal + serviceChargeAmount + taxAmount + deliveryFee
 
   // Rider Progress animation for Live Tracking
   const [riderProgress, setRiderProgress] = useState(0.15)
@@ -1286,6 +1337,25 @@ function StorefrontApp() {
       if (cart.length === 0) throw new Error('ไม่มีสินค้าในตะกร้า')
       if (!customer && !tableId) throw new Error('กรุณาล็อกอินก่อนทำการสั่งซื้อ')
 
+      let confirmedPromotion = appliedPromotion
+      if (appliedPromotion) {
+        const { data, error } = await supabase.rpc('validate_store_promotion', {
+          target_store: storeId,
+          input_code: appliedPromotion.code,
+          order_subtotal: cartSubtotal,
+          order_channel: orderChannel
+        })
+        if (error) throw error
+        const result = data as any
+        if (result?.status !== 'valid') throw new Error(result?.reason || 'คูปองไม่สามารถใช้งานได้แล้ว')
+        confirmedPromotion = {
+          id: result.promotion_id,
+          code: result.code,
+          name: result.name,
+          discountAmount: Number(result.discount_amount || 0)
+        }
+      }
+
       // Only enforce delivery restrictions for actual delivery orders (not pickup)
       if (!tableId && deliveryMethod === 'delivery') {
         if (deliveryConfig.delivery_enabled === false) {
@@ -1312,8 +1382,11 @@ function StorefrontApp() {
         order_type: tableId ? 'dine_in' : deliveryMethod === 'pickup' ? 'takeaway' : 'delivery',
         status: tableId ? 'preparing' : 'pending',
         subtotal: cartSubtotal,
+        discount: confirmedPromotion?.discountAmount || 0,
         tax: taxAmount,
         total: cartGrandTotal,
+        promotion_id: confirmedPromotion?.id || null,
+        coupon_code: confirmedPromotion?.code || null,
         customer_name: tableId ? `โต๊ะ ${tableName}` : (address.name || customer?.name || (deliveryMethod === 'pickup' ? 'รับที่ร้าน' : 'เดลิเวอรี')),
         notes: deliveryNotes
       }
@@ -1350,6 +1423,11 @@ function StorefrontApp() {
 
       const { error: itemsErr } = await supabase.from('store_order_items').insert(itemsToInsert)
       if (itemsErr) throw itemsErr
+
+      if (confirmedPromotion) {
+        const { error: promoError } = await supabase.rpc('record_store_promotion_use', { target_order: order.id })
+        if (promoError) throw promoError
+      }
 
       return order
     },
@@ -1625,32 +1703,32 @@ function StorefrontApp() {
                   const form = e.target as any
                   const name = form.name.value
                   const phone = form.phone.value
-                  if (!name || !phone) return alert('กรุณากรอกข้อมูลให้ครบถ้วน')
+                  if (!name || !phone) return alert(english ? 'Please complete all required fields.' : 'กรุณากรอกข้อมูลให้ครบถ้วน')
                   const newCust = { name, phone }
                   setCustomer(newCust)
                   setAddress(prev => ({ ...prev, name, phone }))
-                  showToast('เข้าสู่ระบบสำเร็จแล้ว!')
+                  showToast(english ? 'Signed in successfully!' : 'เข้าสู่ระบบสำเร็จแล้ว!')
                   setView('order')
                 }}
                 className="space-y-4"
               >
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-ink">ชื่อ-นามสกุล ผู้ใช้งาน</label>
+                  <label className="text-xs font-bold text-ink">{english ? 'Full name' : 'ชื่อ-นามสกุล ผู้ใช้งาน'}</label>
                   <input
                     name="name"
                     type="text"
                     required
-                    placeholder="เช่น สมชาย ใจดี"
+                    placeholder={english ? 'e.g. Alex Smith' : 'เช่น สมชาย ใจดี'}
                     className="w-full border border-line focus:border-ember outline-none rounded-xl p-3 bg-soft text-ink text-sm transition"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-ink">เบอร์โทรศัพท์ติดต่อ</label>
+                  <label className="text-xs font-bold text-ink">{english ? 'Phone number' : 'เบอร์โทรศัพท์ติดต่อ'}</label>
                   <input
                     name="phone"
                     type="tel"
                     required
-                    placeholder="เช่น 0812345678"
+                    placeholder={english ? 'e.g. 0812345678' : 'เช่น 0812345678'}
                     className="w-full border border-line focus:border-ember outline-none rounded-xl p-3 bg-soft text-ink text-sm transition"
                   />
                 </div>
@@ -1663,7 +1741,8 @@ function StorefrontApp() {
               </form>
 
               <div className="p-3.5 rounded-xl bg-paper/60 border border-line text-[11px] text-smoke space-y-1">
-                💡 <strong>เข้าใช้งานได้ง่ายๆ:</strong> ระบบจะจดจำโปรไฟล์และพิกัดจัดส่งของคุณไว้สำหรับการสั่งซื้อในครั้งถัดไปโดยอัตโนมัติ
+                💡 <strong>{english ? 'Quick access:' : 'เข้าใช้งานได้ง่ายๆ:'}</strong>{' '}
+                {english ? 'Your profile and delivery location will be saved for your next order.' : 'ระบบจะจดจำโปรไฟล์และพิกัดจัดส่งของคุณไว้สำหรับการสั่งซื้อในครั้งถัดไปโดยอัตโนมัติ'}
               </div>
             </div>
           </div>
@@ -2246,6 +2325,19 @@ function StorefrontApp() {
                         <span>ค่าอาหาร (Subtotal)</span>
                         <span className="text-ink">฿{cartSubtotal.toLocaleString()}</span>
                       </div>
+                      <div className="space-y-2 rounded-xl bg-orange-50 p-3">
+                        <div className="flex gap-2">
+                          <input value={couponCode} onChange={event => setCouponCode(event.target.value.toUpperCase())} placeholder="รหัสคูปอง" className="h-10 min-w-0 flex-1 rounded-lg border border-orange-200 bg-white px-3 font-bold uppercase outline-none focus:border-orange-500" />
+                          <button type="button" onClick={() => void applyCoupon()} disabled={isCheckingCoupon || !couponCode.trim()} className="h-10 rounded-lg bg-orange-500 px-3 font-bold text-white disabled:opacity-50">{isCheckingCoupon ? 'กำลังตรวจ…' : 'ใช้คูปอง'}</button>
+                        </div>
+                        {couponMessage && <p className={`text-xs font-bold ${appliedPromotion ? 'text-emerald-600' : 'text-red-600'}`}>{couponMessage}</p>}
+                      </div>
+                      {promotionDiscount > 0 && (
+                        <div className="flex justify-between font-bold text-emerald-600">
+                          <span>ส่วนลด ({appliedPromotion?.code})</span>
+                          <span>-฿{promotionDiscount.toLocaleString()}</span>
+                        </div>
+                      )}
                       {serviceChargePercent > 0 && (
                         <div className="flex justify-between">
                           <span>ค่าบริการ (Service Charge {serviceChargePercent}%)</span>
@@ -2452,14 +2544,14 @@ function StorefrontApp() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <input
                         type="text"
-                        placeholder="ชื่อผู้รับ *"
+                        placeholder={english ? 'Recipient name *' : 'ชื่อผู้รับ *'}
                         value={address.name}
                         onChange={e => setAddress({ ...address, name: e.target.value })}
                         className="w-full border border-line outline-none rounded-xl p-3 bg-soft text-ink text-xs focus:border-emerald-500"
                       />
                       <input
                         type="tel"
-                        placeholder="เบอร์โทรติดต่อ *"
+                        placeholder={english ? 'Phone number *' : 'เบอร์โทรติดต่อ *'}
                         value={address.phone}
                         onChange={e => setAddress({ ...address, phone: e.target.value })}
                         className="w-full border border-line outline-none rounded-xl p-3 bg-soft text-ink text-xs focus:border-emerald-500"
@@ -2536,14 +2628,14 @@ function StorefrontApp() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                           type="text"
-                          placeholder="ชื่อผู้รับ *"
+                          placeholder={english ? 'Recipient name *' : 'ชื่อผู้รับ *'}
                           value={address.name}
                           onChange={e => setAddress({ ...address, name: e.target.value })}
                           className="w-full border border-line outline-none rounded-xl p-3 bg-soft text-ink text-xs focus:border-ember"
                         />
                         <input
                           type="tel"
-                          placeholder="เบอร์โทรติดต่อ *"
+                          placeholder={english ? 'Phone number *' : 'เบอร์โทรติดต่อ *'}
                           value={address.phone}
                           onChange={e => setAddress({ ...address, phone: e.target.value })}
                           className="w-full border border-line outline-none rounded-xl p-3 bg-soft text-ink text-xs focus:border-ember"
@@ -2684,6 +2776,12 @@ function StorefrontApp() {
                       <span>ค่าอาหาร</span>
                       <span>฿{cartSubtotal.toLocaleString()}</span>
                     </div>
+                    {promotionDiscount > 0 && (
+                      <div className="flex justify-between font-bold text-emerald-600">
+                        <span>ส่วนลด ({appliedPromotion?.code})</span>
+                        <span>-฿{promotionDiscount.toLocaleString()}</span>
+                      </div>
+                    )}
                     {serviceChargePercent > 0 && (
                       <div className="flex justify-between">
                         <span>Service Charge ({serviceChargePercent}%)</span>

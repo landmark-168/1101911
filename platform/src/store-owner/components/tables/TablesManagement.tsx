@@ -70,6 +70,7 @@ interface TableActionModalProps {
   onOpenTable: (id: string) => void
   onCloseTable: (id: string) => void
   onRegenerateQR: (id: string) => void
+  onEdit: (table: any) => void
   onRemove: (id: string) => void
   onDismissCall: (orderId: string) => void
   isOpening: boolean
@@ -90,6 +91,7 @@ function TableActionModal({
   onOpenTable,
   onCloseTable,
   onRegenerateQR,
+  onEdit,
   onRemove,
   onDismissCall,
   isOpening,
@@ -439,9 +441,15 @@ function TableActionModal({
           )}
 
           <button
+            onClick={() => onEdit(table)}
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-zinc-200 text-zinc-600 hover:bg-zinc-50 text-xs font-bold transition cursor-pointer dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            แก้ไขเลขโต๊ะ / จำนวนที่นั่ง
+          </button>
+
+          <button
             onClick={() => {
               onRemove(table.id)
-              onClose()
             }}
             className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-zinc-400 hover:text-red-500 hover:bg-red-50 text-xs font-bold transition cursor-pointer dark:hover:bg-red-950/20"
           >
@@ -622,15 +630,54 @@ export default function TablesManagement() {
   const remove = useMutation({
     mutationFn: async (id: string) => {
       if (!confirm('ยืนยันการลบโต๊ะนี้?')) return
+      const [{ data: table, error: tableError }, { count, error: orderError }] = await Promise.all([
+        supabase.from('store_tables').select('status').eq('store_id', store.id).eq('id', id).single(),
+        supabase.from('store_orders').select('id', { count: 'exact', head: true }).eq('store_id', store.id).eq('table_id', id).not('status', 'in', '(completed,cancelled)')
+      ])
+      if (tableError) throw tableError
+      if (orderError) throw orderError
+      if (table?.status !== 'available' || Number(count || 0) > 0) throw new Error('ลบได้เฉพาะโต๊ะว่างที่ไม่มีออเดอร์ค้าง')
       const { error } = await supabase.from('store_tables').delete().eq('store_id', store.id).eq('id', id)
       if (error) throw error
     },
     onSuccess: () => {
       showMsg('ลบโต๊ะเรียบร้อย')
       qc.invalidateQueries({ queryKey: key })
+      setSelectedTable(null)
     },
     onError: e => showMsg((e as Error).message, 'error')
   })
+
+  const editTable = useMutation({
+    mutationFn: async ({ id, tableNumber, capacity }: { id: string; tableNumber: string; capacity: number }) => {
+      const cleanNumber = tableNumber.trim()
+      if (!cleanNumber) throw new Error('กรุณาระบุเลขโต๊ะ')
+      if (!Number.isInteger(capacity) || capacity < 1 || capacity > 50) throw new Error('จำนวนที่นั่งต้องอยู่ระหว่าง 1–50')
+      const { data, error } = await supabase
+        .from('store_tables')
+        .update({ table_number: cleanNumber, capacity })
+        .eq('store_id', store.id)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: data => {
+      showMsg('แก้ไขข้อมูลโต๊ะเรียบร้อย')
+      qc.invalidateQueries({ queryKey: key })
+      setSelectedTable(data)
+    },
+    onError: e => showMsg((e as Error).message, 'error')
+  })
+
+  const requestEditTable = (table: any) => {
+    const tableNumber = prompt('เลขโต๊ะ', String(table.table_number || ''))
+    if (tableNumber === null) return
+    const capacityText = prompt('จำนวนที่นั่ง (1–50)', String(table.capacity || 4))
+    if (capacityText === null) return
+    editTable.mutate({ id: table.id, tableNumber, capacity: Number(capacityText) })
+  }
 
   // Open Table
   const openTable = useMutation({
@@ -1193,6 +1240,7 @@ export default function TablesManagement() {
         onOpenTable={id => openTable.mutate(id)}
         onCloseTable={id => closeTable.mutate(id)}
         onRegenerateQR={id => regenerateQR.mutate(id)}
+        onEdit={requestEditTable}
         onRemove={id => remove.mutate(id)}
         onDismissCall={orderId => dismissCall.mutate(orderId)}
         isOpening={openTable.isPending}

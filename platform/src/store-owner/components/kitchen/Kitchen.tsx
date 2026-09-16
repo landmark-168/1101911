@@ -28,12 +28,20 @@ import { useLanguage } from '../../../lib/language'
 import { useStore } from '../../StoreContext'
 import { PageHeader } from '../PageKit'
 
-// Play chime sound using Web Audio API
-function playChime() {
+let kitchenAudioContext: AudioContext | null = null
+
+async function getKitchenAudioContext() {
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+  if (!AudioContextClass) return null
+  if (!kitchenAudioContext) kitchenAudioContext = new AudioContextClass()
+  if (kitchenAudioContext.state === 'suspended') await kitchenAudioContext.resume()
+  return kitchenAudioContext
+}
+
+async function playChime() {
   try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
-    if (!AudioContextClass) return
-    const ctx = new AudioContextClass()
+    const ctx = await getKitchenAudioContext()
+    if (!ctx) return false
     
     // Note 1 (High tone)
     const osc1 = ctx.createOscillator()
@@ -58,8 +66,9 @@ function playChime() {
     gain2.connect(ctx.destination)
     osc2.start(ctx.currentTime + 0.15)
     osc2.stop(ctx.currentTime + 0.7)
+    return true
   } catch {
-    // Audio might be blocked by browser policy until user interacts
+    return false
   }
 }
 
@@ -173,7 +182,8 @@ export default function Kitchen() {
   const english = language === 'en'
   const qc = useQueryClient()
   const [now, setNow] = useState(() => new Date())
-  const [soundEnabled, setSoundEnabled] = useState(true)
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('kds-sound-enabled') === 'true')
+  const [soundMessage, setSoundMessage] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'dine_in' | 'takeaway' | 'delivery'>('all')
   const [search, setSearch] = useState('')
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -181,7 +191,7 @@ export default function Kitchen() {
   const [cancelOrder, setCancelOrder] = useState<any | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
-  const lastOrderCountRef = useRef<number>(0)
+  const knownKitchenOrderIdsRef = useRef<Set<string> | null>(null)
 
   // Realtime clock tick every 5 seconds for elapsed times
   useEffect(() => {
@@ -239,15 +249,18 @@ export default function Kitchen() {
     }
   }, [store.id, qc])
 
-  // Play audio chime when new pending orders are detected
+  // Table orders start at "preparing", so checking only pending orders misses them.
   useEffect(() => {
-    const pendingOrders = orders.filter((o: any) => o.status === 'pending')
-    if (lastOrderCountRef.current > 0 && pendingOrders.length > lastOrderCountRef.current) {
-      if (soundEnabled) {
-        playChime()
-      }
+    const activeIds = new Set(
+      orders
+        .filter((o: any) => ['pending', 'accepted', 'preparing'].includes(o.status))
+        .map((o: any) => String(o.id))
+    )
+    const previousIds = knownKitchenOrderIdsRef.current
+    if (previousIds && soundEnabled && [...activeIds].some(id => !previousIds.has(id))) {
+      void playChime()
     }
-    lastOrderCountRef.current = pendingOrders.length
+    knownKitchenOrderIdsRef.current = activeIds
   }, [orders, soundEnabled])
 
   // Update order status mutation
@@ -367,10 +380,19 @@ export default function Kitchen() {
           {/* Sound alert toggle */}
           <button
             type="button"
-            onClick={() => {
-              const nextVal = !soundEnabled
-              setSoundEnabled(nextVal)
-              if (nextVal) playChime()
+            onClick={async () => {
+              if (soundEnabled) {
+                setSoundEnabled(false)
+                localStorage.setItem('kds-sound-enabled', 'false')
+                setSoundMessage(english ? 'Sound alerts disabled' : 'ปิดเสียงแจ้งเตือนแล้ว')
+                return
+              }
+              const ready = await playChime()
+              setSoundEnabled(ready)
+              localStorage.setItem('kds-sound-enabled', String(ready))
+              setSoundMessage(ready
+                ? (english ? 'Sound alerts enabled' : 'เปิดเสียงแจ้งเตือนแล้ว')
+                : (english ? 'Browser blocked audio. Allow sound and try again.' : 'เบราว์เซอร์บล็อกเสียง กรุณาอนุญาตเสียงแล้วลองใหม่'))
             }}
             className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition border ${
               soundEnabled
@@ -382,6 +404,7 @@ export default function Kitchen() {
             {soundEnabled ? <Volume2 size={16} className="text-amber-500 animate-pulse" /> : <VolumeX size={16} />}
             <span>{soundEnabled ? (english ? 'Sound alerts on' : 'เปิดเสียงเตือน') : (english ? 'Sound alerts off' : 'ปิดเสียงเตือน')}</span>
           </button>
+          {soundMessage && <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">{soundMessage}</span>}
 
           {/* Fullscreen toggle */}
           <button
