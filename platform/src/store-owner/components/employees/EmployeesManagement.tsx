@@ -995,8 +995,8 @@ function EmployeeFormModal({ employee, themeColor, onClose, onSave, isPending }:
       alert('กรุณากรอกชื่อพนักงาน')
       return
     }
-    if (!pinCode || pinCode.length < 4) {
-      alert('กรุณากำหนดรหัส PIN อย่างน้อย 4 หลัก (สำหรับล็อคอินเข้าเครื่อง POS)')
+    if (!/^\d{4,6}$/.test(pinCode)) {
+      alert('รหัส PIN ต้องเป็นตัวเลข 4–6 หลักเท่านั้น')
       return
     }
 
@@ -1132,12 +1132,12 @@ function EmployeeFormModal({ employee, themeColor, onClose, onSave, isPending }:
                 maxLength={6}
                 required
                 value={pinCode}
-                onChange={e => setPinCode(e.target.value.replace(/[^0-9]/g, ''))}
+                onChange={e => setPinCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                 placeholder="เช่น 1234"
                 className="w-48 rounded-xl border border-orange-300 bg-white px-4 py-2.5 text-center font-mono text-lg font-black tracking-widest text-zinc-900 focus:border-orange-500 focus:outline-none dark:border-orange-800 dark:bg-zinc-800 dark:text-white"
               />
               <span className="text-xs text-zinc-400">
-                {pinCode.length >= 4 ? '✅ รหัส PIN พร้อมใช้งาน' : '⚠️ ระบุตัวเลขอย่างน้อย 4 หลัก'}
+                {/^\d{4,6}$/.test(pinCode) ? '✅ รหัส PIN พร้อมใช้งาน' : '⚠️ ระบุตัวเลข 4–6 หลัก'}
               </span>
             </div>
           </div>

@@ -224,6 +224,18 @@ export default function Orders() {
 
   const update = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      if (status === 'cancelled') {
+        const { data: current, error: currentError } = await supabase
+          .from('store_orders')
+          .select('status, payment_status')
+          .eq('store_id', store.id)
+          .eq('id', id)
+          .single()
+        if (currentError) throw currentError
+        if (['completed', 'cancelled'].includes(current.status) || current.payment_status === 'paid') {
+          throw new Error('ไม่สามารถยกเลิกออเดอร์ที่ปิดบิลหรือชำระเงินแล้ว')
+        }
+      }
       const { error } = await supabase
         .from('store_orders')
         .update({ status, updated_at: new Date().toISOString() })
@@ -813,7 +825,7 @@ function OrderDetailModal({
                 { s: 'ready', label: 'พร้อมเสิร์ฟ/ส่ง', icon: Utensils, color: 'hover:border-purple-500 hover:text-purple-600' },
                 { s: 'completed', label: 'จัดส่งสำเร็จ', icon: CheckCircle2, color: 'hover:border-emerald-500 hover:text-emerald-600' },
                 { s: 'cancelled', label: 'ยกเลิกออเดอร์', icon: AlertCircle, color: 'hover:border-red-500 hover:text-red-600' },
-              ].map(btn => (
+              ].filter(btn => btn.s !== 'cancelled' || (!['completed', 'cancelled'].includes(order.status) && order.payment_status !== 'paid')).map(btn => (
                 <button
                   key={btn.s}
                   disabled={isUpdating || order.status === btn.s}

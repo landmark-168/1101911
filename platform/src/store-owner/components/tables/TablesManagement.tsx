@@ -477,6 +477,7 @@ export default function TablesManagement() {
   const [isAddTableOpen, setIsAddTableOpen] = useState(false)
   const [newTableNumber, setNewTableNumber] = useState('')
   const [newTableCapacity, setNewTableCapacity] = useState('4')
+  const [addTableError, setAddTableError] = useState('')
   const lastBillCallCountRef = useRef<number>(0)
 
   const showMsg = (text: string, type: 'success' | 'error' = 'success') => {
@@ -609,9 +610,21 @@ export default function TablesManagement() {
   // Add Table
   const add = useMutation({
     mutationFn: async ({ tableNumber, capacity }: { tableNumber: string; capacity: number }) => {
+      const cleanNumber = tableNumber.trim()
+      if (!cleanNumber) throw new Error('กรุณาระบุเลขโต๊ะ')
+      if (!Number.isInteger(capacity) || capacity < 1 || capacity > 50) throw new Error('จำนวนที่นั่งต้องอยู่ระหว่าง 1–50')
+      const { data: duplicate, error: duplicateError } = await supabase
+        .from('store_tables')
+        .select('id')
+        .eq('store_id', store.id)
+        .ilike('table_number', cleanNumber)
+        .limit(1)
+        .maybeSingle()
+      if (duplicateError) throw duplicateError
+      if (duplicate) throw new Error(`มีโต๊ะหมายเลข ${cleanNumber} อยู่แล้ว กรุณาใช้หมายเลขอื่น`)
       const { error } = await supabase.from('store_tables').insert({
         store_id: store.id,
-        table_number: tableNumber,
+        table_number: cleanNumber,
         capacity
       })
       if (error) throw error
@@ -620,10 +633,11 @@ export default function TablesManagement() {
       showMsg('เพิ่มโต๊ะเรียบร้อย')
       qc.invalidateQueries({ queryKey: key })
       setIsAddTableOpen(false)
+      setAddTableError('')
       setNewTableNumber('')
       setNewTableCapacity('4')
     },
-    onError: e => showMsg((e as Error).message, 'error')
+    onError: e => setAddTableError((e as Error).message || 'เพิ่มโต๊ะไม่สำเร็จ')
   })
 
   // Delete Table
@@ -892,7 +906,7 @@ export default function TablesManagement() {
 
           {/* Add Table Button */}
           <button
-            onClick={() => setIsAddTableOpen(true)}
+            onClick={() => { setAddTableError(''); setIsAddTableOpen(true) }}
             className="flex h-11 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-5 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:bg-orange-600 transition active:scale-95 cursor-pointer"
           >
             <Plus size={18} strokeWidth={3} /> {english ? 'Add table' : 'เพิ่มโต๊ะใหม่'}
@@ -1011,7 +1025,7 @@ export default function TablesManagement() {
                 <span className="text-4xl block opacity-40">🪑</span>
                 <p className="text-sm font-bold text-zinc-400">ยังไม่มีข้อมูลโต๊ะในระบบ</p>
                 <button
-                  onClick={() => setIsAddTableOpen(true)}
+                  onClick={() => { setAddTableError(''); setIsAddTableOpen(true) }}
                   className="px-4 py-2 rounded-xl bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 transition"
                 >
                   + เพิ่มโต๊ะแรก
@@ -1212,8 +1226,9 @@ export default function TablesManagement() {
             event.preventDefault()
             const tableNumber = newTableNumber.trim()
             const capacity = Number(newTableCapacity)
-            if (!tableNumber) return showMsg('กรุณากรอกหมายเลขโต๊ะ', 'error')
-            if (!Number.isInteger(capacity) || capacity < 1) return showMsg('จำนวนที่นั่งต้องมากกว่า 0', 'error')
+            setAddTableError('')
+            if (!tableNumber) return setAddTableError('กรุณากรอกหมายเลขโต๊ะ')
+            if (!Number.isInteger(capacity) || capacity < 1) return setAddTableError('จำนวนที่นั่งต้องมากกว่า 0')
             add.mutate({ tableNumber, capacity })
           }} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-zinc-900 sm:p-7">
             <div className="flex items-start justify-between gap-4">
@@ -1221,7 +1236,7 @@ export default function TablesManagement() {
               <button type="button" onClick={() => setIsAddTableOpen(false)} className="grid size-9 place-items-center rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"><X size={18} /></button>
             </div>
             <div className="mt-6 space-y-4">
-              <label className="block"><span className="mb-1.5 block text-sm font-bold text-zinc-700 dark:text-zinc-200">หมายเลขโต๊ะ</span><input autoFocus value={newTableNumber} onChange={event => setNewTableNumber(event.target.value)} placeholder="เช่น 1, 2 หรือ A1" className="h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 text-base font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" /></label>
+              <label className="block"><span className="mb-1.5 block text-sm font-bold text-zinc-700 dark:text-zinc-200">หมายเลขโต๊ะ</span><input autoFocus value={newTableNumber} onChange={event => {setNewTableNumber(event.target.value);setAddTableError('')}} aria-invalid={Boolean(addTableError)} aria-describedby={addTableError ? 'add-table-error' : undefined} placeholder="เช่น 1, 2 หรือ A1" className={`h-12 w-full rounded-xl border bg-zinc-50 px-4 text-base font-bold outline-none focus:bg-white dark:bg-zinc-800 dark:text-white ${addTableError ? 'border-red-400 focus:border-red-500 ring-2 ring-red-100 dark:ring-red-500/20' : 'border-zinc-200 focus:border-orange-500 dark:border-zinc-700'}`} />{addTableError && <span id="add-table-error" role="alert" className="mt-2 flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"><AlertCircle size={14} className="shrink-0" />{addTableError}</span>}</label>
               <label className="block"><span className="mb-1.5 block text-sm font-bold text-zinc-700 dark:text-zinc-200">จำนวนที่นั่ง</span><div className="grid grid-cols-4 gap-2">{[2, 4, 6, 8].map(capacity => <button key={capacity} type="button" onClick={() => setNewTableCapacity(String(capacity))} className={`h-11 rounded-xl text-sm font-black transition ${newTableCapacity === String(capacity) ? 'bg-orange-500 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300'}`}>{capacity} ที่</button>)}</div></label>
             </div>
             <div className="mt-7 flex justify-end gap-2"><button type="button" disabled={add.isPending} onClick={() => setIsAddTableOpen(false)} className="h-11 rounded-xl px-4 text-sm font-bold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">ยกเลิก</button><button disabled={add.isPending} className="inline-flex h-11 items-center gap-2 rounded-xl bg-orange-500 px-5 text-sm font-black text-white shadow-lg shadow-orange-500/25 hover:bg-orange-600 disabled:opacity-50"><Plus size={17} />{add.isPending ? 'กำลังเพิ่ม…' : 'เพิ่มโต๊ะ'}</button></div>
