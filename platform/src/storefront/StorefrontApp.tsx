@@ -1179,6 +1179,17 @@ function StorefrontApp() {
     enabled: !!storeId
   })
 
+  const promotionsQuery = useQuery({
+    queryKey: ['store_promotions_public', storeId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('list_public_store_promotions', { target_store: storeId })
+      if (error) throw error
+      return (data || []) as any[]
+    },
+    enabled: !!storeId,
+    refetchInterval: 15000
+  })
+
   const tableOrdersQuery = useQuery({
     queryKey: ['table_orders', tableId, sessionOpenedAt],
     queryFn: async () => {
@@ -3161,32 +3172,64 @@ function StorefrontApp() {
               <p className="text-xs font-semibold text-smoke mt-1">คูปองสิทธิพิเศษสำหรับลูกค้าเดลิเวอรี</p>
             </div>
 
+            {promotionsQuery.isLoading ? (
+              <div className="rounded-2xl border border-line bg-white p-10 text-center text-xs font-bold text-smoke">
+                {english ? 'Loading promotions…' : 'กำลังโหลดโปรโมชัน…'}
+              </div>
+            ) : promotionsQuery.isError ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-xs font-bold text-red-600">
+                {english ? 'Unable to load promotions. Please try again.' : 'โหลดโปรโมชันไม่สำเร็จ กรุณาลองใหม่'}
+              </div>
+            ) : promotionsQuery.data?.length ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
-              {[
-                { code: 'TAOTHAN100', desc: 'ลดทันที 100 บาท เมื่อสั่งครบ 500 บาท', expire: '31 ธ.ค. 2569' },
-                { code: 'FREESHIP', desc: 'ส่งฟรี 5 กม. แรก ทุกออเดอร์', expire: '31 ธ.ค. 2569' },
-                { code: 'WELCOME50', desc: 'ส่วนลด 50 บาท สำหรับลูกค้าใหม่', expire: '31 ธ.ค. 2569' }
-              ].map((promo) => (
-                <div key={promo.code} className="bg-white border border-line rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col xs:flex-row xs:items-center justify-between gap-3">
+              {promotionsQuery.data.map((promo:any) => {
+                const discount = promo.discount || {}
+                const value = Number(discount.value || 0)
+                const discountText = discount.type === 'fixed'
+                  ? (english ? `THB ${value.toLocaleString()} off` : `ลด ${value.toLocaleString()} บาท`)
+                  : (english ? `${value}% off` : `ลด ${value}%`)
+                const minimumText = Number(promo.minimum_order || 0) > 0
+                  ? (english ? ` on orders of THB ${Number(promo.minimum_order).toLocaleString()} or more` : ` เมื่อสั่งครบ ${Number(promo.minimum_order).toLocaleString()} บาท`)
+                  : ''
+                const expiry = promo.end_date
+                  ? new Date(promo.end_date).toLocaleDateString(english ? 'en-GB' : 'th-TH', { day: 'numeric', month: 'short', year: 'numeric' })
+                  : (english ? 'No expiry date' : 'ไม่กำหนดวันหมดอายุ')
+                const usedCount = Number(promo.used_count || 0)
+                const usageLimit = promo.usage_limit == null ? null : Number(promo.usage_limit)
+                const usageText = usageLimit == null
+                  ? (english ? 'Unlimited redemptions' : 'ไม่จำกัดสิทธิ์')
+                  : (english
+                    ? `Used ${usedCount.toLocaleString()} / ${usageLimit.toLocaleString()} · ${Math.max(0, usageLimit - usedCount).toLocaleString()} remaining`
+                    : `ใช้แล้ว ${usedCount.toLocaleString()} / ${usageLimit.toLocaleString()} สิทธิ์ · เหลือ ${Math.max(0, usageLimit - usedCount).toLocaleString()} สิทธิ์`)
+                return (
+                <div key={promo.id} className="bg-white border border-line rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col xs:flex-row xs:items-center justify-between gap-3">
                   <div className="space-y-1">
                     <span className="inline-block font-mono font-black text-ember text-sm sm:text-base px-2.5 py-0.5 rounded-md bg-ember/10 border border-ember/30">
-                      {promo.code}
+                      {promo.coupon_code}
                     </span>
-                    <p className="text-xs font-bold text-ink mt-1">{promo.desc}</p>
-                    <p className="text-[10px] text-smoke font-medium">หมดเขต: {promo.expire}</p>
+                    <p className="text-xs font-bold text-ink mt-1">{promo.name}</p>
+                    <p className="text-[11px] font-semibold text-ember">{discountText}{minimumText}</p>
+                    <p className="text-[10px] text-smoke font-medium">{promo.end_date ? (english ? `Expires: ${expiry}` : `หมดเขต: ${expiry}`) : expiry}</p>
+                    <p className="text-[10px] font-semibold text-smoke">{usageText}</p>
                   </div>
                   <button
                     onClick={() => {
-                      navigator.clipboard?.writeText(promo.code)
-                      showToast(`คัดลอกโค้ด ${promo.code} แล้ว`)
+                      navigator.clipboard?.writeText(promo.coupon_code)
+                      showToast(english ? `Copied ${promo.coupon_code}` : `คัดลอกโค้ด ${promo.coupon_code} แล้ว`)
                     }}
                     className="px-3 py-1.5 rounded-lg border border-line hover:bg-soft text-xs font-bold text-smoke transition flex items-center justify-center gap-1 shrink-0 self-start xs:self-center cursor-pointer"
                   >
-                    <Copy size={12} /> คัดลอก
+                    <Copy size={12} /> {english ? 'Copy' : 'คัดลอก'}
                   </button>
                 </div>
-              ))}
+              )})}
             </div>
+            ) : (
+              <div className="rounded-2xl border border-line bg-white p-10 text-center">
+                <span className="mb-3 block text-4xl">🎁</span>
+                <p className="text-sm font-black text-ink">{english ? 'No promotions available right now' : 'ตอนนี้ยังไม่มีโปรโมชันที่ใช้ได้'}</p>
+              </div>
+            )}
           </div>
         )}
 
