@@ -815,7 +815,7 @@ function ProductDetailModal({
 
   const categoryName = item.category?.name || categories.find(c => c.id === item.category_id)?.name
   const addOns = Array.isArray(item.toppings) ? item.toppings.filter((option: any) => option?.name) : []
-  const selectedAddOnItems = addOns.filter((option: any) => selectedAddOns.includes(option.name))
+  const selectedAddOnItems = addOns.filter((option: any, index: number) => selectedAddOns.includes(`${index}:${option.name}`))
   const configuredPrice = Number(item.price || 0) + selectedAddOnItems.reduce((sum: number, option: any) => sum + Number(option.price || 0), 0)
 
   return (
@@ -846,18 +846,6 @@ function ProductDetailModal({
             </div>
           )}
 
-          {addOns.length > 0 && (
-            <div className="space-y-2 border-t border-zinc-100 pt-3">
-              <div><h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">ตัวเลือกเสริม</h4><p className="text-[11px] text-zinc-400">เลือกได้มากกว่า 1 รายการ</p></div>
-              {addOns.map((option: any) => {
-                const checked = selectedAddOns.includes(option.name)
-                return <label key={option.name} className={`flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-sm transition ${checked ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 bg-white'}`}>
-                  <span className="flex items-center gap-2 font-bold text-zinc-700"><input type="checkbox" checked={checked} onChange={() => setSelectedAddOns(current => checked ? current.filter(name => name !== option.name) : [...current, option.name])} className="accent-orange-500" />{option.name}</span>
-                  <span className="font-black text-orange-500">+฿{Number(option.price || 0).toLocaleString()}</span>
-                </label>
-              })}
-            </div>
-          )}
         </div>
 
         {/* Content Area */}
@@ -898,6 +886,20 @@ function ProductDetailModal({
               <p className="text-xs text-zinc-400 italic">
                 (ไม่มีคำอธิบายเพิ่มเติมสำหรับเมนูนี้)
               </p>
+            </div>
+          )}
+
+          {addOns.length > 0 && (
+            <div className="space-y-2 border-t border-zinc-100 pt-3">
+              <div><h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">ตัวเลือกเสริม</h4><p className="text-[11px] text-zinc-400">เลือกได้มากกว่า 1 รายการ</p></div>
+              {addOns.map((option: any, index: number) => {
+                const optionId = `${index}:${option.name}`
+                const checked = selectedAddOns.includes(optionId)
+                return <label key={optionId} className={`flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-sm transition ${checked ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 bg-white'}`}>
+                  <span className="flex items-center gap-2 font-bold text-zinc-700"><input type="checkbox" checked={checked} onChange={() => setSelectedAddOns(current => checked ? current.filter(id => id !== optionId) : [...current, optionId])} className="accent-orange-500" />{option.name}</span>
+                  <span className="font-black text-orange-500">+฿{Number(option.price || 0).toLocaleString()}</span>
+                </label>
+              })}
             </div>
           )}
         </div>
