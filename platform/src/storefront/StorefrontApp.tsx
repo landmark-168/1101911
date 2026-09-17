@@ -809,9 +809,14 @@ function ProductDetailModal({
   onAddToCart: (item: any) => void
   onChangeQty: (id: string, delta: number) => void
 }) {
+  const [selectedAddOns, setSelectedAddOns] = useState<string[]>([])
+  useEffect(() => { setSelectedAddOns([]) }, [item?.id, isOpen])
   if (!isOpen || !item) return null
 
   const categoryName = item.category?.name || categories.find(c => c.id === item.category_id)?.name
+  const addOns = Array.isArray(item.toppings) ? item.toppings.filter((option: any) => option?.name) : []
+  const selectedAddOnItems = addOns.filter((option: any) => selectedAddOns.includes(option.name))
+  const configuredPrice = Number(item.price || 0) + selectedAddOnItems.reduce((sum: number, option: any) => sum + Number(option.price || 0), 0)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
@@ -838,6 +843,19 @@ function ProductDetailModal({
           ) : (
             <div className="grid size-full place-items-center bg-orange-50 text-5xl">
               🍲
+            </div>
+          )}
+
+          {addOns.length > 0 && (
+            <div className="space-y-2 border-t border-zinc-100 pt-3">
+              <div><h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">ตัวเลือกเสริม</h4><p className="text-[11px] text-zinc-400">เลือกได้มากกว่า 1 รายการ</p></div>
+              {addOns.map((option: any) => {
+                const checked = selectedAddOns.includes(option.name)
+                return <label key={option.name} className={`flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-sm transition ${checked ? 'border-orange-400 bg-orange-50' : 'border-zinc-200 bg-white'}`}>
+                  <span className="flex items-center gap-2 font-bold text-zinc-700"><input type="checkbox" checked={checked} onChange={() => setSelectedAddOns(current => checked ? current.filter(name => name !== option.name) : [...current, option.name])} className="accent-orange-500" />{option.name}</span>
+                  <span className="font-black text-orange-500">+฿{Number(option.price || 0).toLocaleString()}</span>
+                </label>
+              })}
             </div>
           )}
         </div>
@@ -889,11 +907,11 @@ function ProductDetailModal({
           <div>
             <span className="text-[11px] text-zinc-400 font-bold block">ราคารวม</span>
             <span className="text-lg font-black text-zinc-950">
-              ฿{Number((item.price || 0) * (cartQty > 0 ? cartQty : 1)).toLocaleString()}
+              ฿{configuredPrice.toLocaleString()}
             </span>
           </div>
 
-          {cartQty > 0 ? (
+          {cartQty > 0 && addOns.length === 0 ? (
             <div className="flex items-center gap-3 bg-emerald-600 text-white rounded-2xl px-4 py-2 shadow-md">
               <button
                 onClick={() => onChangeQty(item.id, -1)}
@@ -912,11 +930,12 @@ function ProductDetailModal({
           ) : (
             <button
               onClick={() => {
-                onAddToCart(item)
+                const optionKey = selectedAddOnItems.map((option: any) => option.name).sort().join('|')
+                onAddToCart({ ...item, basePrice: Number(item.price || 0), price: configuredPrice, selectedToppings: selectedAddOnItems, cartKey: `${item.id}:${optionKey}` })
               }}
               className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-sm font-black shadow-md transition cursor-pointer"
             >
-              <Plus size={18} strokeWidth={2.8} /> เพิ่มลงตะกร้า
+              <Plus size={18} strokeWidth={2.8} /> {addOns.length ? 'เพิ่มพร้อมตัวเลือก' : 'เพิ่มลงตะกร้า'}
             </button>
           )}
         </div>
@@ -1429,7 +1448,8 @@ function StorefrontApp() {
         name: c.item.name,
         unit_price: c.item.price,
         quantity: c.quantity,
-        notes: c.notes || ''
+        notes: c.notes || '',
+        toppings: c.item.selectedToppings || []
       }))
 
       const { error: itemsErr } = await supabase.from('store_order_items').insert(itemsToInsert)
@@ -1469,11 +1489,17 @@ function StorefrontApp() {
   const [activeCat, setActiveCat] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [detailItem, setDetailItem] = useState<any | null>(null)
+  const cartKeyFor = (item: any) => item.cartKey || item.id
 
   const addToCart = (item: any) => {
-    const existing = cart.find(x => x.item.id === item.id)
+    if (Array.isArray(item.toppings) && item.toppings.length > 0 && !item.cartKey) {
+      setDetailItem(item)
+      return
+    }
+    const key = cartKeyFor(item)
+    const existing = cart.find(x => cartKeyFor(x.item) === key)
     if (existing) {
-      setCart(cart.map(x => x.item.id === item.id ? { ...x, quantity: x.quantity + 1 } : x))
+      setCart(cart.map(x => cartKeyFor(x.item) === key ? { ...x, quantity: x.quantity + 1 } : x))
     } else {
       setCart([...cart, { item, quantity: 1, notes: '' }])
     }
@@ -1481,7 +1507,7 @@ function StorefrontApp() {
   }
 
   const changeQty = (id: string, delta: number) => {
-    setCart(cart.map(x => x.item.id === id ? { ...x, quantity: Math.max(0, x.quantity + delta) } : x).filter(x => x.quantity > 0))
+    setCart(cart.map(x => cartKeyFor(x.item) === id ? { ...x, quantity: Math.max(0, x.quantity + delta) } : x).filter(x => x.quantity > 0))
   }
 
   useEffect(() => {
@@ -2268,7 +2294,7 @@ function StorefrontApp() {
                 <section className="space-y-4">
                   <div className="bg-white border border-line rounded-3xl p-4 sm:p-5 shadow-sm divide-y divide-zinc-100 space-y-3">
                     {cart.map((c) => (
-                      <div key={c.item.id} className="pt-3 first:pt-0">
+                      <div key={cartKeyFor(c.item)} className="pt-3 first:pt-0">
                       <div className="flex items-center justify-between gap-3">
                         {/* Food Image + Info */}
                         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -2280,6 +2306,7 @@ function StorefrontApp() {
                           <div className="min-w-0 space-y-0.5">
                             <h3 className="font-extrabold text-sm sm:text-base text-zinc-900 truncate">{c.item.name}</h3>
                             <p className="text-xs font-semibold text-zinc-400">฿{c.item.price.toLocaleString()} / ชิ้น</p>
+                            {c.item.selectedToppings?.length > 0 && <p className="text-[10px] font-semibold text-orange-600">+ {c.item.selectedToppings.map((option:any) => option.name).join(', ')}</p>}
                             <p className="text-sm font-black text-orange-500 sm:hidden">
                               ฿{(c.item.price * c.quantity).toLocaleString()}
                             </p>
@@ -2294,14 +2321,14 @@ function StorefrontApp() {
 
                           <div className="flex items-center bg-zinc-100 rounded-full h-8 px-1 border border-zinc-200">
                             <button
-                              onClick={() => changeQty(c.item.id, -1)}
+                              onClick={() => changeQty(cartKeyFor(c.item), -1)}
                               className="size-6 grid place-items-center rounded-full text-zinc-700 hover:bg-white active:scale-90 font-black text-xs transition"
                             >
                               −
                             </button>
                             <span className="w-7 text-center font-extrabold text-xs text-zinc-900">{c.quantity}</span>
                             <button
-                              onClick={() => changeQty(c.item.id, 1)}
+                              onClick={() => changeQty(cartKeyFor(c.item), 1)}
                               className="size-6 grid place-items-center rounded-full text-zinc-700 hover:bg-white active:scale-90 font-black text-xs transition"
                             >
                               +
@@ -2309,7 +2336,7 @@ function StorefrontApp() {
                           </div>
 
                           <button
-                            onClick={() => changeQty(c.item.id, -c.quantity)}
+                            onClick={() => changeQty(cartKeyFor(c.item), -c.quantity)}
                             className="size-8 grid place-items-center rounded-full text-zinc-400 hover:text-red-500 hover:bg-red-50 transition active:scale-90 cursor-pointer"
                             title="ลบรายการ"
                           >
@@ -2319,7 +2346,7 @@ function StorefrontApp() {
                       </div>
                       <input
                         value={c.notes}
-                        onChange={event => setCart(cart.map(item => item.item.id === c.item.id ? { ...item, notes: event.target.value } : item))}
+                        onChange={event => setCart(cart.map(item => cartKeyFor(item.item) === cartKeyFor(c.item) ? { ...item, notes: event.target.value } : item))}
                         placeholder="หมายเหตุถึงครัว เช่น ไม่เผ็ด / ไม่ใส่ผัก"
                         className="mt-2 h-9 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-xs font-medium text-zinc-700 outline-none transition placeholder:text-zinc-400 focus:border-orange-400 focus:bg-white"
                       />
@@ -2775,8 +2802,8 @@ function StorefrontApp() {
                   <h2 className="text-sm sm:text-base font-black text-ink border-b border-line pb-3">สรุปยอดคำสั่งซื้อ</h2>
                   <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1 divide-y divide-line/30">
                     {cart.map(c => (
-                      <div key={c.item.id} className="flex justify-between items-center text-xs pt-2 first:pt-0 font-medium text-ink">
-                        <span className="truncate max-w-[170px]">{c.item.name} <small className="text-smoke">x{c.quantity}</small></span>
+                      <div key={cartKeyFor(c.item)} className="flex justify-between items-center text-xs pt-2 first:pt-0 font-medium text-ink">
+                        <span className="truncate max-w-[170px]">{c.item.name}{c.item.selectedToppings?.length ? ` + ${c.item.selectedToppings.map((option:any) => option.name).join(', ')}` : ''} <small className="text-smoke">x{c.quantity}</small></span>
                         <b>฿{(c.item.price * c.quantity).toLocaleString()}</b>
                       </div>
                     ))}

@@ -20,6 +20,7 @@ type MenuItem = {
   description: string | null
   available: boolean
   cooking_time: number
+  toppings?: { name: string; price: number }[]
   created_at?: string
   updated_at?: string
   category?: { name: string }
@@ -32,7 +33,8 @@ const blank = {
   price: 0,
   description: '',
   available: true,
-  cooking_time: 10
+  cooking_time: 10,
+  toppings: [] as { name: string; price: number }[]
 }
 
 export default function MenuManagement() {
@@ -98,7 +100,7 @@ export default function MenuManagement() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('store_menu_items')
-        .select(`id, store_id, category_id, name, image_url, price, description, available, cooking_time, created_at, updated_at, category:store_categories(name)`)
+        .select(`id, store_id, category_id, name, image_url, price, description, available, cooking_time, toppings, created_at, updated_at, category:store_categories(name)`)
         .eq('store_id', store.id)
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -172,7 +174,8 @@ export default function MenuManagement() {
       image_url: item.image_url || '',
       description: item.description || '',
       available: item.available,
-      cooking_time: item.cooking_time || 10
+      cooking_time: item.cooking_time || 10,
+      toppings: Array.isArray(item.toppings) ? item.toppings.map((option: any) => ({ name: String(option.name || ''), price: Number(option.price || 0) })) : []
     })
     setImageError('')
     setOpen(true)
@@ -200,6 +203,7 @@ export default function MenuManagement() {
         description: form.description.trim() || null,
         available: form.available,
         cooking_time: Number(form.cooking_time || 10),
+        toppings: form.toppings.filter(option => option.name.trim()).map(option => ({ name: option.name.trim(), price: Number(option.price || 0) })),
         updated_at: new Date().toISOString()
       }
 
@@ -739,6 +743,22 @@ export default function MenuManagement() {
                       />
                     </div>
                   </button>
+                </div>
+              </div>
+
+              {/* Optional add-ons */}
+              <div className="rounded-2xl border border-orange-200 bg-orange-50/50 p-4 dark:border-orange-900/50 dark:bg-orange-950/10">
+                <div className="flex items-center justify-between gap-3">
+                  <div><p className="text-xs font-black text-zinc-800 dark:text-zinc-100">ตัวเลือกเสริมของเมนู</p><p className="mt-0.5 text-[11px] text-zinc-500">ลูกค้าและแคชเชียร์เลือกได้หลายรายการ ราคาจะบวกจากราคาเมนู</p></div>
+                  <button type="button" onClick={() => setForm({ ...form, toppings: [...form.toppings, { name: '', price: 0 }] })} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white"><Plus size={13}/>เพิ่มตัวเลือก</button>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {form.toppings.map((option, index) => <div key={index} className="grid grid-cols-[1fr_110px_36px] gap-2">
+                    <input value={option.name} onChange={event => setForm({ ...form, toppings: form.toppings.map((entry, i) => i === index ? { ...entry, name: event.target.value } : entry) })} placeholder="เช่น เพิ่มชีส" className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
+                    <input type="number" min="0" step="0.01" value={option.price || ''} onChange={event => setForm({ ...form, toppings: form.toppings.map((entry, i) => i === index ? { ...entry, price: Number(event.target.value) } : entry) })} placeholder="ราคาเพิ่ม" className="h-10 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:border-orange-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" />
+                    <button type="button" aria-label="ลบตัวเลือกเสริม" onClick={() => setForm({ ...form, toppings: form.toppings.filter((_, i) => i !== index) })} className="grid size-9 place-items-center rounded-xl text-red-500 hover:bg-red-50"><X size={15}/></button>
+                  </div>)}
+                  {!form.toppings.length && <p className="py-2 text-center text-xs text-zinc-400">ยังไม่มีตัวเลือกเสริม</p>}
                 </div>
               </div>
 

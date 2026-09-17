@@ -69,7 +69,7 @@ export default function POS() {
   const isBatchPayment = paymentOrderIds.length > 0
   const [tableId, setTableId] = useState(initialTableId)
   const [type, setType] = useState('dine_in')
-  const [cart, setCart] = useState<{ id: string; name: string; price: number; qty: number; fromCustomer?: boolean }[]>([])
+  const [cart, setCart] = useState<{ id: string; name: string; price: number; qty: number; fromCustomer?: boolean; menuItemId?: string; notes?: string; toppings?: any[]; [key: string]: any }[]>([])
   const [editDirty, setEditDirty] = useState(false)
   const [orderNote, setOrderNote] = useState('')
   const [isBillModalOpen, setIsBillModalOpen] = useState(false)
@@ -81,6 +81,8 @@ export default function POS() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [menuSearch, setMenuSearch] = useState('')
   const [selectedMenuCategory, setSelectedMenuCategory] = useState('all')
+  const [optionItem, setOptionItem] = useState<any | null>(null)
+  const [selectedOptionNames, setSelectedOptionNames] = useState<string[]>([])
 
   // Fetch Menu
   const menu = useQuery({
@@ -216,7 +218,7 @@ export default function POS() {
   useEffect(() => {
     if (editOrderId || isBatchPayment) return
     if (type === 'dine_in' && tableId && tableOrders.data) {
-      const consolidated: { id: string; name: string; price: number; qty: number; fromCustomer?: boolean }[] = []
+      const consolidated: { id: string; name: string; price: number; qty: number; fromCustomer?: boolean; toppings?: any[] }[] = []
 
       tableOrders.data.forEach((order: any) => {
         // Skip settlement invoices and service notification records
@@ -232,16 +234,20 @@ export default function POS() {
             const name = it.name
             const price = Number(it.unit_price ?? it.price ?? 0)
             const quantity = Number(it.quantity ?? it.qty ?? 1)
-            const existing = consolidated.find(x => x.name === name && Number(x.price) === price)
+            const toppings = Array.isArray(it.toppings) ? it.toppings : []
+            const optionKey = toppings.map((option: any) => option?.name || option).sort().join('|')
+            const cartId = `${it.menu_item_id || it.id || name}:${optionKey}`
+            const existing = consolidated.find(x => x.id === cartId)
             if (existing) {
               existing.qty += quantity
             } else {
               consolidated.push({
-                id: it.menu_item_id || it.id || name,
+                id: cartId,
                 name,
                 price,
                 qty: quantity,
-                fromCustomer: true
+                fromCustomer: true,
+                toppings
               })
             }
           })
@@ -262,7 +268,8 @@ export default function POS() {
     setCart((order.store_order_items || [])
       .filter((item: any) => item.status !== 'cancelled')
       .map((item: any) => ({
-        id: item.menu_item_id || item.id,
+        id: item.id,
+        menuItemId: item.menu_item_id || undefined,
         sourceItemId: item.id,
         name: item.name,
         price: Number(item.unit_price || 0),
@@ -271,6 +278,7 @@ export default function POS() {
         notes: item.notes || '',
         originalNotes: item.notes || '',
         itemStatus: item.status || 'waiting',
+        toppings: Array.isArray(item.toppings) ? item.toppings : [],
         fromCustomer: true
       })))
     setOrderNote(order.notes || '')
@@ -289,7 +297,8 @@ export default function POS() {
         price: Number(item.unit_price || 0),
         qty: Number(item.quantity || 0),
         fromCustomer: true,
-        notes: item.notes || ''
+        notes: item.notes || '',
+        toppings: Array.isArray(item.toppings) ? item.toppings : []
       }))))
     setOrderNote(`ชำระรวม ${batchPaymentOrders.data.length} บิล`)
   }, [isBatchPayment, batchPaymentOrders.data])
@@ -306,6 +315,18 @@ export default function POS() {
   const changeDue = Math.max(0, cashReceivedAmount - total)
   const newItemCount = cart.filter(item => !item.fromCustomer).reduce((sum, item) => sum + item.qty, 0)
   const hasEditChanges = Boolean(editOrderId) && editDirty
+
+  const addConfiguredMenuItem = (menuItem: any, selectedOptions: any[] = []) => {
+    if (editOrderId) setEditDirty(true)
+    const addOnTotal = selectedOptions.reduce((sum, option) => sum + Number(option.price || 0), 0)
+    const optionKey = selectedOptions.map(option => option.name).sort().join('|')
+    const cartId = `${menuItem.id}:${optionKey}`
+    setCart(current => {
+      const found = current.find(item => item.id === cartId && !item.fromCustomer)
+      if (found) return current.map(item => item.id === cartId ? { ...item, qty: item.qty + 1 } : item)
+      return [...current, { id: cartId, menuItemId: menuItem.id, name: menuItem.name, price: Number(menuItem.price) + addOnTotal, qty: 1, toppings: selectedOptions }]
+    })
+  }
 
   const promptPayPhone = settings.data?.phone || store.phone || '0812345678'
   const promptPayPayload = generatePromptPayPayload(promptPayPhone, total)
@@ -457,6 +478,7 @@ export default function POS() {
             quantity: item.qty,
             unit_price: item.price,
             notes: (item as any).notes || null,
+            toppings: (item as any).toppings || [],
             status: 'waiting'
           })))
           if (error) throw error
@@ -488,7 +510,7 @@ export default function POS() {
         customer_name: selectedTableObj ? `โต๊ะ ${selectedTableObj.table_number}` : 'Walk-in'
       }).select('id').single()
       if (error) throw error
-      const { error: itemError } = await supabase.from('store_order_items').insert(newItems.map(item => ({ store_id: store.id, order_id: order.id, menu_item_id: (item as any).menuItemId || item.id, name: item.name, quantity: item.qty, unit_price: item.price, notes: (item as any).notes || null, status: 'waiting' })))
+      const { error: itemError } = await supabase.from('store_order_items').insert(newItems.map(item => ({ store_id: store.id, order_id: order.id, menu_item_id: (item as any).menuItemId || item.id, name: item.name, quantity: item.qty, unit_price: item.price, toppings: (item as any).toppings || [], notes: (item as any).notes || null, status: 'waiting' })))
       if (itemError) {
         await supabase.from('store_orders').delete().eq('store_id', store.id).eq('id', order.id)
         throw itemError
@@ -596,13 +618,9 @@ export default function POS() {
               key={x.id}
               disabled={isBatchPayment}
               onClick={() => {
-                if (editOrderId) setEditDirty(true)
-                setCart(c => {
-                  const found = c.find(i => i.id === x.id || i.name === x.name)
-                  return found
-                    ? found.fromCustomer ? [...c, { id: `${x.id}-${Date.now()}`, menuItemId: x.id, name: x.name, price: Number(x.price), qty: 1 }] : c.map(i => i.id === found.id ? { ...i, qty: i.qty + 1 } : i)
-                    : [...c, { id: x.id, menuItemId: x.id, name: x.name, price: Number(x.price), qty: 1 }]
-                })
+                const options = Array.isArray(x.toppings) ? x.toppings.filter((option:any) => option?.name) : []
+                if (options.length) { setOptionItem(x); setSelectedOptionNames([]) }
+                else addConfiguredMenuItem(x)
               }}
               className="rounded-2xl border bg-white p-3 text-left dark:border-zinc-800 dark:bg-zinc-900 transition hover:shadow-md cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
             >
@@ -614,7 +632,7 @@ export default function POS() {
                 )}
               </div>
               <b className="mt-3 block text-sm dark:text-white truncate">{x.name}</b>
-              <span className="text-xs font-black text-orange-500">฿{Number(x.price).toLocaleString()}</span>
+              <div className="mt-1 flex items-center justify-between gap-2"><span className="text-xs font-black text-orange-500">฿{Number(x.price).toLocaleString()}</span>{Array.isArray(x.toppings) && x.toppings.length > 0 && <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[9px] font-bold text-orange-600 dark:bg-orange-500/10">มีตัวเลือกเสริม</span>}</div>
             </button>
           ))}
         </div>
@@ -633,7 +651,14 @@ export default function POS() {
           {cart.map(x => (
             <div key={x.id} className="space-y-2 border-b border-zinc-100 pb-3 last:border-0 dark:border-zinc-800">
               <div className="flex items-center gap-3">
-                <div className="min-w-0 flex-1"><b className="block truncate text-sm dark:text-white">{x.name}</b><span className="text-xs text-orange-500">฿{x.price}</span></div>
+                <div className="min-w-0 flex-1">
+                  <b className="block truncate text-sm dark:text-white">{x.name}</b>
+                  {Array.isArray(x.toppings) && x.toppings.length > 0 ? <>
+                    <p className="mt-0.5 text-[10px] text-zinc-400">ราคาเมนู ฿{(Number(x.price) - x.toppings.reduce((sum:number, option:any) => sum + Number(option.price || 0), 0)).toLocaleString()}</p>
+                    <div className="mt-1 space-y-0.5">{x.toppings.map((option:any, index:number) => <p key={`${option.name || option}-${index}`} className="flex max-w-[210px] justify-between gap-2 text-[10px] font-semibold text-orange-500"><span className="truncate">+ {option.name || option}</span><span className="shrink-0">+฿{Number(option.price || 0).toLocaleString()}</span></p>)}</div>
+                    <p className="mt-1 text-xs font-black text-orange-500">รวมต่อชิ้น ฿{Number(x.price).toLocaleString()}</p>
+                  </> : <span className="text-xs font-black text-orange-500">฿{Number(x.price).toLocaleString()}</span>}
+                </div>
                 <button disabled={isBatchPayment} onClick={() => { if (editOrderId) setEditDirty(true); setCart(c => c.flatMap(i => (i.id !== x.id ? [i] : editOrderId && (i as any).sourceItemId ? [{ ...i, qty: Math.max(0, i.qty - 1) }] : i.qty > 1 ? [{ ...i, qty: i.qty - 1 }] : []))) }} className="grid size-7 place-items-center rounded-lg bg-zinc-100 dark:bg-zinc-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-45"><Minus size={12} /></button>
                 <b className="w-4 text-center text-sm dark:text-white">{x.qty}</b>
                 <button disabled={isBatchPayment} onClick={() => { if (editOrderId) setEditDirty(true); setCart(c => c.map(i => (i.id === x.id ? { ...i, qty: i.qty + 1 } : i))) }} className="grid size-7 place-items-center rounded-lg bg-zinc-100 dark:bg-zinc-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-45"><Plus size={12} /></button>
@@ -682,12 +707,25 @@ export default function POS() {
       </aside>
       </>}
 
+      {optionItem && (() => {
+        const options = (Array.isArray(optionItem.toppings) ? optionItem.toppings : []).filter((option:any) => option?.name)
+        const selected = options.filter((option:any, index:number) => selectedOptionNames.includes(`${index}:${option.name}`))
+        const configuredPrice = Number(optionItem.price || 0) + selected.reduce((sum:number, option:any) => sum + Number(option.price || 0), 0)
+        return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onMouseDown={event => event.target === event.currentTarget && setOptionItem(null)}>
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-zinc-900">
+            <div className="flex items-start justify-between"><div><p className="text-xs font-black uppercase text-orange-500">Menu options</p><h2 className="mt-1 text-xl font-black dark:text-white">{optionItem.name}</h2><p className="mt-1 text-xs text-zinc-500">เลือกตัวเลือกเสริมได้มากกว่า 1 รายการ</p></div><button onClick={() => setOptionItem(null)} className="rounded-xl p-2 text-zinc-400 hover:bg-zinc-100">✕</button></div>
+            <div className="mt-5 space-y-2">{options.map((option:any, index:number) => { const optionId=`${index}:${option.name}`; const checked=selectedOptionNames.includes(optionId); return <label key={optionId} className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 ${checked ? 'border-orange-400 bg-orange-50 dark:bg-orange-500/10' : 'border-zinc-200 dark:border-zinc-700'}`}><span className="flex items-center gap-2 text-sm font-bold dark:text-white"><input type="checkbox" checked={checked} onChange={() => setSelectedOptionNames(current => checked ? current.filter(name => name !== optionId) : [...current, optionId])} className="accent-orange-500"/>{option.name}</span><b className="text-sm text-orange-500">+฿{Number(option.price || 0).toLocaleString()}</b></label> })}</div>
+            <div className="mt-6 flex items-center justify-between border-t pt-4 dark:border-zinc-700"><div><p className="text-[11px] font-bold text-zinc-400">ราคารวม</p><p className="text-xl font-black text-orange-500">฿{configuredPrice.toLocaleString()}</p></div><button onClick={() => { addConfiguredMenuItem(optionItem, selected); setOptionItem(null) }} className="rounded-xl bg-orange-500 px-5 py-3 text-sm font-black text-white">เพิ่มลงบิล</button></div>
+          </div>
+        </div>
+      })()}
+
       {isPaymentModalOpen && (
         <div className="col-span-full rounded-3xl bg-white p-5 dark:bg-zinc-900 sm:p-6">
           <div className="mx-auto w-full max-w-5xl">
             <div className="flex items-center justify-between gap-3 border-b border-zinc-100 pb-3 dark:border-zinc-800"><div><p className="text-xs font-bold uppercase tracking-wide text-emerald-600">Payment</p><h2 className="text-xl font-black text-zinc-900 dark:text-white">รับชำระ ฿{total.toLocaleString()}</h2></div><button type="button" onClick={() => setIsPaymentModalOpen(false)} className="rounded-xl px-3 py-2 text-sm font-bold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">ปิด</button></div>
             <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_1px_minmax(260px,320px)]">
-              <section className="min-w-0"><h3 className="text-sm font-black text-zinc-900 dark:text-white">รายการที่สั่ง</h3><div className="mt-2 max-h-[280px] space-y-1.5 overflow-y-auto pr-2">{cart.map(item => <div key={item.id} className="flex items-start justify-between gap-3 rounded-lg border border-zinc-100 px-3 py-2 dark:border-zinc-800"><div className="min-w-0"><p className="text-sm font-bold text-zinc-900 dark:text-white">{item.name}</p>{(item as any).notes && <p className="mt-0.5 text-xs text-orange-600">โน้ต: {(item as any).notes}</p>}</div><div className="shrink-0 text-right"><p className="text-sm font-bold text-zinc-700 dark:text-zinc-200">{item.qty} × ฿{item.price.toLocaleString()}</p><p className="mt-0.5 text-sm font-black text-orange-600">฿{(item.qty * item.price).toLocaleString()}</p></div></div>)}</div><div className="mt-3 border-t border-zinc-200 pt-2 dark:border-zinc-700"><div className="flex justify-between text-xs text-zinc-500"><span>รวมค่าอาหาร</span><span>฿{subtotal.toLocaleString()}</span></div><div className="mt-1 flex justify-between text-lg font-black text-zinc-900 dark:text-white"><span>ยอดสุทธิ</span><span className="text-orange-500">฿{total.toLocaleString()}</span></div></div></section>
+              <section className="min-w-0"><h3 className="text-sm font-black text-zinc-900 dark:text-white">รายการที่สั่ง</h3><div className="mt-2 max-h-[280px] space-y-1.5 overflow-y-auto pr-2">{cart.map(item => { const toppings=Array.isArray(item.toppings) ? item.toppings : []; const addOnTotal=toppings.reduce((sum:number, option:any) => sum + Number(option.price || 0), 0); const basePrice=Number(item.price)-addOnTotal; return <div key={item.id} className="flex items-start justify-between gap-3 rounded-lg border border-zinc-100 px-3 py-2 dark:border-zinc-800"><div className="min-w-0"><p className="text-sm font-bold text-zinc-900 dark:text-white">{item.name}</p>{toppings.length > 0 && <div className="mt-1 space-y-0.5">{toppings.map((option:any, index:number) => <p key={`${option.name}-${index}`} className="text-xs text-orange-600">+ {option.name} (+฿{Number(option.price || 0).toLocaleString()})</p>)}</div>}{(item as any).notes && <p className="mt-0.5 text-xs text-orange-600">โน้ต: {(item as any).notes}</p>}</div><div className="shrink-0 text-right"><p className="text-[11px] text-zinc-400">ราคาเมนู ฿{basePrice.toLocaleString()}</p><p className="text-sm font-bold text-zinc-700 dark:text-zinc-200">{item.qty} × ฿{item.price.toLocaleString()}</p><p className="mt-0.5 text-sm font-black text-orange-600">฿{(item.qty * item.price).toLocaleString()}</p></div></div>})}</div><div className="mt-3 border-t border-zinc-200 pt-2 dark:border-zinc-700"><div className="flex justify-between text-xs text-zinc-500"><span>รวมค่าอาหาร</span><span>฿{subtotal.toLocaleString()}</span></div><div className="mt-1 flex justify-between text-lg font-black text-zinc-900 dark:text-white"><span>ยอดสุทธิ</span><span className="text-orange-500">฿{total.toLocaleString()}</span></div></div></section>
               <div className="hidden bg-zinc-200 lg:block dark:bg-zinc-700" />
               <section><h3 className="text-base font-black text-zinc-900 dark:text-white">เลือกวิธีชำระเงิน</h3><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setPaymentMethod('cash')} className={`h-11 rounded-xl px-4 text-base font-bold transition ${paymentMethod === 'cash' ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}>เงินสด</button><button type="button" onClick={() => setPaymentMethod('promptpay')} className={`h-11 rounded-xl px-4 text-base font-bold transition ${paymentMethod === 'promptpay' ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'}`}>PromptPay</button></div>{paymentMethod === 'cash' ? <div className="mt-4"><div className="flex items-center justify-between gap-3"><label className="text-base font-bold text-zinc-600 dark:text-zinc-300">รับเงินมา</label><input autoFocus inputMode="decimal" value={cashReceived} onChange={event => setCashReceived(event.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" className="h-11 w-36 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-right text-xl font-black outline-none focus:border-emerald-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white" /></div><div className="mt-3 grid grid-cols-4 gap-2">{[1000, 500, 100, 50].map(amount => <button key={amount} type="button" onClick={() => setCashReceived(String(amount))} className="h-10 rounded-lg bg-zinc-100 text-sm font-bold text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200">฿{amount}</button>)}</div><div className="mx-auto mt-3 grid max-w-[240px] grid-cols-3 gap-1.5">{['1', '2', '3', '4', '5', '6', '7', '8', '9', 'ล้าง', '0', '⌫'].map(key => <button key={key} type="button" onClick={() => setCashReceived(current => key === 'ล้าง' ? '' : key === '⌫' ? current.slice(0, -1) : `${current}${key}`)} className="h-12 rounded-lg bg-zinc-100 text-base font-bold text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200">{key}</button>)}</div><div className="mt-3 flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 dark:bg-emerald-500/10"><span className="text-base font-bold text-emerald-700 dark:text-emerald-300">เงินทอน</span><span className="text-xl font-black text-emerald-700 dark:text-emerald-300">฿{changeDue.toLocaleString()}</span></div></div> : <div className="mt-4 flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-300 bg-emerald-50/50 p-5 text-center dark:border-emerald-700 dark:bg-emerald-500/10"><div className="rounded-xl bg-white p-3 shadow-sm"><QRCodeSVG value={promptPayPayload} size={170} level="M" /></div><p className="mt-3 text-base font-black text-emerald-700 dark:text-emerald-300">สแกน PromptPay เพื่อชำระ ฿{total.toLocaleString()}</p></div>}<button type="button" disabled={checkout.isPending || (paymentMethod === 'cash' && cashReceivedAmount < total)} onClick={() => checkout.mutate()} className="mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-emerald-600 text-base font-black text-white transition hover:bg-emerald-700 disabled:opacity-40">{checkout.isPending ? 'กำลังบันทึก…' : paymentMethod === 'cash' ? 'ยืนยันรับเงินสด' : 'ยืนยันชำระ PromptPay'}</button></section>
             </div>
@@ -744,12 +782,12 @@ export default function POS() {
                     <span>รายการ</span>
                     <span>รวม</span>
                   </div>
-                  {completedBill.items.map((it: any, i: number) => (
-                    <div key={i} className="flex justify-between text-xs font-semibold">
-                      <span className="truncate max-w-[200px]">{it.name} x{it.qty}</span>
-                      <span>฿{(it.price * it.qty).toLocaleString()}</span>
+                  {completedBill.items.map((it: any, i: number) => { const toppings=Array.isArray(it.toppings) ? it.toppings : []; const basePrice=Number(it.price)-toppings.reduce((sum:number, option:any) => sum + Number(option.price || 0), 0); return (
+                    <div key={i} className="space-y-0.5">
+                      <div className="flex justify-between text-xs font-semibold"><span className="truncate max-w-[200px]">{it.name} x{it.qty}</span><span>฿{(it.price * it.qty).toLocaleString()}</span></div>
+                      {toppings.length > 0 && <><div className="flex justify-between pl-3 text-[10px] text-zinc-500"><span>ราคาเมนู</span><span>฿{basePrice.toLocaleString()}</span></div>{toppings.map((option:any, index:number) => <div key={`${option.name}-${index}`} className="flex justify-between pl-3 text-[10px] text-orange-600"><span>+ {option.name}</span><span>+฿{Number(option.price || 0).toLocaleString()}</span></div>)}</>}
                     </div>
-                  ))}
+                  )})}
                 </div>
 
                 {/* Totals */}

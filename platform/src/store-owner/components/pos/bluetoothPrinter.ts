@@ -30,7 +30,7 @@ export interface BillData {
   storePhone: string
   storeAddress?: string
   tableName: string
-  items: { name: string; qty: number; price: number }[]
+  items: { name: string; qty: number; price: number; toppings?: { name: string; price: number }[] }[]
   subtotal: number
   serviceCharge: number
   serviceChargePercent: number
@@ -186,7 +186,7 @@ function makeBillTopSectionCanvas(bill: BillData): HTMLCanvasElement {
   totalH += 18 // Bill#
   totalH += 14 // Divider
   totalH += 22 // Header "รายการ"
-  totalH += (bill.items.length * 24) // Items
+  totalH += bill.items.reduce((height, item) => height + 24 + ((item.toppings?.length || 0) * 18), 0) // Items and add-ons
   totalH += 14 // Divider
   totalH += 22 // Subtotal
   if (bill.serviceChargePercent > 0) totalH += 18
@@ -265,6 +265,15 @@ function makeBillTopSectionCanvas(bill: BillData): HTMLCanvasElement {
     ctx.textAlign = 'right'
     ctx.fillText(itemTotal, W - 14, y)
     y += 22
+    for (const option of it.toppings || []) {
+      ctx.font = `14px ${FONT_FAMILY}`
+      ctx.textAlign = 'left'
+      ctx.fillText(`  + ${option.name}`, 14, y)
+      ctx.textAlign = 'right'
+      ctx.fillText(`+${Number(option.price || 0).toLocaleString()} ฿`, W - 14, y)
+      y += 18
+    }
+    ctx.font = `bold 16px ${FONT_FAMILY}`
   }
 
   drawLine(false)
